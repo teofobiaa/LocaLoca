@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+		<TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+
+		<RootNamespace>LocaLoca</RootNamespace>
+		<ApplicationManifest>app.manifest</ApplicationManifest>
+
+		<Platforms>x64</Platforms>
+		<RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+
+		<UseWinUI>true</UseWinUI>
+
+		<!-- Unpackaged WinUI 3 -->
+		<WindowsPackageType>None</WindowsPackageType>
+
+		<!-- Self-contained Windows App SDK -->
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+
+		<!-- Single EXE publishing -->
+		<SelfContained>true</SelfContained>
+		<EnableMsixTooling>true</EnableMsixTooling>
+		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
+		<PublishSingleFile>true</PublishSingleFile>
+
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<LangVersion>latest</LangVersion>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
+	</ItemGroup>
+
+	<!-- Server files -->
+	<ItemGroup>
+		<Content Include="Server\**\*"
+				 CopyToOutputDirectory="PreserveNewest"
+				 CopyToPublishDirectory="PreserveNewest" />
+	</ItemGroup>
+</Project>

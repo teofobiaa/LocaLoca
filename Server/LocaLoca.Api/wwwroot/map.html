@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Loca Loca — карта</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+  <style>
+    html,body,#map{height:100%;margin:0;font-family:Arial,sans-serif;background:#eef1f5}
+    .top{position:absolute;z-index:1000;top:14px;left:50px;background:#fff;padding:10px 15px;border-radius:12px;box-shadow:0 2px 14px #17233a22;color:#18243a}
+    .top strong{font-size:15px}.top small{display:block;color:#667085;margin-top:3px}
+    .pin{width:18px;height:18px;border:3px solid white;border-radius:50%;box-shadow:0 1px 7px #18243a77}
+    .leaflet-popup-content{max-height:70vh;overflow-y:auto}
+    .place-form{display:grid;gap:7px;min-width:230px}.place-form input,.place-form select,.place-form textarea{box-sizing:border-box;width:100%;padding:7px;border:1px solid #d5ddd7;border-radius:6px;font:inherit}.place-form textarea{resize:vertical;min-height:48px}.place-form button{padding:7px 10px;border:0;border-radius:7px;background:#d9ecb2;color:#253524;cursor:pointer}.place-form .danger{background:#f8e2de;color:#8f382e}.place-form label{font-size:12px;color:#58685d}.place-photos{display:grid;gap:5px}.status-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px}.status-switch label{display:flex;align-items:center;gap:6px;padding:8px;background:#f0f3ed;border-radius:8px;font-size:12px;cursor:pointer}.status-switch input{width:auto;margin:0}.field-label{font-size:11px;color:#58685d}
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="top"><strong>Loca Loca · Карта</strong><small id="map-hint">Нажмите на карту, чтобы добавить своё место</small></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token') || sessionStorage.getItem('ll_token') || '';
+    const startNewVisit = params.get('mode') === 'visit';
+    const today = new Date().toISOString().slice(0, 10);
+    document.getElementById('map-hint').textContent = startNewVisit
+      ? 'Выберите точку на карте, чтобы записать посещение'
+      : 'Нажмите на карту, чтобы добавить своё место';
+    if (token) { sessionStorage.setItem('ll_token', token); history.replaceState({}, '', '/map'); }
+    const map = L.map('map').setView([48, 16], 4);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+    const palette = { visited:'#26966f', wished:'#d59b2a', normal:'#4777c8' };
+    const markers = L.layerGroup().addTo(map);
+    const photoUrls = new Map();
+    async function api(path, options = {}) {
+      const response = await fetch(path, { ...options, headers: { Authorization: 'Bearer ' + token, ...(options.headers || {}) } });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || 'Не удалось сохранить данные.');
+      }
+      return response.status === 204 ? null : response.json();
+    }
+    function markerIcon(color) {
+      return L.divIcon({ className:'', html:`<div class="pin" style="background:${color}"></div>`, iconSize:[24,24], iconAnchor:[12,12] });
+    }
+    function statusControls(status) {
+      return `<div class="status-switch"><label><input type="radio" name="status" value="planned" ${status === 'planned' ? 'checked' : ''}>В планах</label><label><input type="radio" name="status" value="visited" ${status === 'visited' ? 'checked' : ''}>Посещено</label></div>`;
+    }
+    function getStatus(form) { return form.querySelector('input[name="status"]:checked').value; }
+    function bindStatusFields(form) {
+      const update = () => {
+        const visited = getStatus(form) === 'visited';
+        form.elements.date.disabled = !visited;
+        form.elements.rating.disabled = !visited;
+      };
+      form.querySelectorAll('input[name="status"]').forEach(input => input.addEventListener('change', update));
+      update();
+    }
+    function bindPlaceEditor(marker, item) {
+      const id = item.userPlaceId;
+      const date = item.visitDate || today;
+      marker.bindPopup(`<form class="place-form" id="edit-${id}">
+        <strong>Моё место</strong><input name="name" maxlength="150" required value="${escapeHtml(item.name)}" aria-label="Название места">
+        ${statusControls(item.visited ? 'visited' : 'planned')}
+        <label class="field-label">Дата посещения</label><input name="date" type="date" max="${today}" value="${date}"><label class="field-label">Оценка</label><select name="rating"><option value="">Выберите оценку</option>${[1,2,3,4,5].map(n => `<option value="${n}" ${item.rating === n ? 'selected' : ''}>${n} / 5</option>`).join('')}</select>
+        <textarea name="impressions" maxlength="10000" placeholder="Впечатления">${escapeHtml(item.impressions || '')}</textarea>
+        <textarea name="notes" maxlength="10000" placeholder="Личные заметки">${escapeHtml(item.notes || '')}</textarea>
+        <button type="submit">Сохранить место</button>
+        <label>Фотографии <input id="files-${id}" type="file" accept="image/*" multiple></label><button type="button" id="upload-${id}">Загрузить фото</button>
+        <div class="place-photos" id="photos-${id}"></div><button class="danger" type="button" id="delete-${id}">Удалить место</button>
+      </form>`);
+      marker.on('popupopen', () => {
+        const form = document.getElementById(`edit-${id}`);
+        bindStatusFields(form);
+        form.addEventListener('submit', async event => {
+          event.preventDefault();
+          try {
+            await api(`/api/me/map-places/${id}`, { method:'PUT', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({
+              name:form.elements.name.value, status:getStatus(form), visitDate:form.elements.date.value, rating:Number(form.elements.rating.value),
+              impressions:form.elements.impressions.value, notes:form.elements.notes.value
+            }) });
+            await loadMarkers();
+          } catch (error) { alert(error.message); }
+        });
+        document.getElementById(`upload-${id}`).addEventListener('click', async () => {
+          const files = document.getElementById(`files-${id}`).files;
+          if (!files.length) { alert('Сначала выберите фотографии.'); return; }
+          const data = new FormData();
+          for (const file of files) data.append('photos', file);
+          try { await api(`/api/me/map-places/${id}/photos`, { method:'POST', body:data }); await showPhotos(id); }
+          catch (error) { alert(error.message); }
+        });
+        document.getElementById(`delete-${id}`).addEventListener('click', async () => {
+          if (!confirm('Удалить место и связанные фотографии?')) return;
+          try { await api(`/api/me/map-places/${id}`, { method:'DELETE' }); await loadMarkers(); }
+          catch (error) { alert(error.message); }
+        });
+        showPhotos(id);
+      });
+    }
+    async function uploadPlacePhotos(id, files) {
+      if (!files.length) return;
+      const data = new FormData();
+      for (const file of files) data.append('photos', file);
+      await api(`/api/me/map-places/${id}/photos`, { method:'POST', body:data });
+    }
+    async function showPhotos(id) {
+      const host = document.getElementById(`photos-${id}`);
+      if (!host) return;
+      try {
+        const data = await api(`/api/me/map-places/${id}/photos`);
+        host.replaceChildren();
+        for (const url of photoUrls.get(id) || []) URL.revokeObjectURL(url);
+        photoUrls.set(id, []);
+        for (const photo of data.items) {
+          const response = await fetch(`/api/me/map-place-photos/${photo.id}`, { headers:{ Authorization:'Bearer ' + token } });
+          if (!response.ok) continue;
+          const url = URL.createObjectURL(await response.blob());
+          photoUrls.get(id).push(url);
+          const row = document.createElement('div');
+          const image = document.createElement('img');
+          image.src = url; image.alt = photo.caption || 'Фотография'; image.style.maxWidth = '180px'; image.style.maxHeight = '120px';
+          const caption = document.createElement('span');
+          caption.textContent = photo.caption || 'Фотография';
+          const remove = document.createElement('button');
+          remove.type = 'button'; remove.className = 'danger'; remove.textContent = 'Удалить';
+          remove.addEventListener('click', async () => { try { await api(`/api/me/map-place-photos/${photo.id}`, { method:'DELETE' }); await showPhotos(id); } catch (error) { alert(error.message); } });
+          row.append(image, caption, remove); host.append(row);
+        }
+      } catch (error) { host.textContent = error.message; }
+    }
+    map.on('click', event => {
+      const lat = event.latlng.lat.toFixed(6), lon = event.latlng.lng.toFixed(6);
+      const defaultStatus = startNewVisit ? 'visited' : 'planned';
+      const date = startNewVisit ? today : '';
+      const popup = L.popup().setLatLng(event.latlng).setContent(`<form class="place-form" id="new-place">
+        <strong>${startNewVisit ? 'Новое посещение' : 'Добавить своё место'}</strong>
+        <input name="name" maxlength="150" placeholder="Название места" required>
+        ${statusControls(defaultStatus)}
+        <label class="field-label">Дата посещения</label><input name="date" type="date" max="${today}" value="${date}"><label class="field-label">Оценка</label>
+        <select name="rating"><option value="">Выберите оценку</option>${[1,2,3,4,5].map(n => `<option value="${n}" ${n === 5 && startNewVisit ? 'selected' : ''}>${n} / 5</option>`).join('')}</select>
+        <textarea name="impressions" maxlength="10000" placeholder="Впечатления"></textarea>
+        <textarea name="notes" maxlength="10000" placeholder="Личные заметки"></textarea>
+        <label>Фотографии <input name="photos" type="file" accept="image/*" multiple></label>
+        <button type="submit">${defaultStatus === 'visited' ? 'Сохранить посещение' : 'Сохранить в планы'}</button>
+      </form>`).openOn(map);
+      setTimeout(() => {
+        const form = document.getElementById('new-place');
+        if (!form) return;
+        bindStatusFields(form);
+        form.querySelectorAll('input[name="status"]').forEach(input => input.addEventListener('change', () => {
+          form.querySelector('button[type="submit"]').textContent = getStatus(form) === 'visited' ? 'Сохранить посещение' : 'Сохранить в планы';
+        }));
+        form.addEventListener('submit', async submitEvent => {
+          submitEvent.preventDefault();
+          const status = getStatus(form);
+          if (status === 'visited' && (!form.elements.date.value || !form.elements.rating.value)) { alert('Укажите дату и оценку посещения.'); return; }
+          let place;
+          try {
+            place = await api('/api/me/map-places', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({
+              name:form.elements.name.value, latitude:Number(lat), longitude:Number(lon), status,
+              visitDate:form.elements.date.value, rating:Number(form.elements.rating.value),
+              impressions:form.elements.impressions.value, notes:form.elements.notes.value
+            }) });
+          }
+          catch (error) { alert(error.message); return; }
+          let photoError = '';
+          try { await uploadPlacePhotos(place.id, form.elements.photos.files); }
+          catch (error) { photoError = error.message; }
+          map.closePopup(popup);
+          await loadMarkers();
+          if (photoError) alert(`Посещение сохранено, но фотографии не добавлены: ${photoError}`);
+        });
+      }, 0);
+    });
+    async function loadMarkers() {
+      try {
+        for (const urls of photoUrls.values()) for (const url of urls) URL.revokeObjectURL(url);
+        photoUrls.clear();
+        markers.clearLayers();
+        const data = await api('/api/me/map-markers');
+        const bounds = [];
+        data.items.forEach(item => {
+          const color = item.visited ? palette.visited : (item.wished ? palette.wished : palette.normal);
+          const marker = L.marker([item.latitude, item.longitude], { icon:markerIcon(color) }).addTo(markers);
+          if (item.userPlaceId) bindPlaceEditor(marker, item);
+          else marker.bindPopup(`<b>${escapeHtml(item.name)}</b><br>${item.visited ? 'Посещено' : (item.wished ? 'Хочу посетить' : 'В каталоге')}`);
+          bounds.push([item.latitude, item.longitude]);
+        });
+        if (bounds.length) map.fitBounds(bounds, { padding:[35,35], maxZoom:6 });
+      } catch (e) { alert(e.message); }
+    }
+    function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    loadMarkers();
+  </script>
+</body>
+</html>

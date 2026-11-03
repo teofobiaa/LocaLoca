@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/.vs/
+Builds/
+publish/
+*.csproj.user
+LocaLoca/Server/*
+!LocaLoca/Server/.gitkeep
