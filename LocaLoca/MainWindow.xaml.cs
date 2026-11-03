@@ -40,7 +40,9 @@ public sealed partial class MainWindow : Window
         Title = "Loca Loca";
         var hwnd = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
-        AppWindow.GetFromWindowId(windowId).Resize(new SizeInt32(1360, 880));
+        var appWindow = AppWindow.GetFromWindowId(windowId);
+        appWindow.Resize(new SizeInt32(1360, 880));
+        appWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "loca-loca.ico"));
         Closed += MainWindow_Closed;
     }
 

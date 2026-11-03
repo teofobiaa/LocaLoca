@@ -77,13 +77,15 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="10">
-                    <Border Width="36" Height="36" CornerRadius="12" Background="{StaticResource AccentBrush}">
-                        <FontIcon Glyph="&#xE707;" FontSize="18" Foreground="#172521" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Image Source="Assets/loca-loca-icon.png" Width="36" Height="36" Stretch="Uniform" />
                     <TextBlock Text="loca loca" FontSize="24" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
                 </StackPanel>
-                <StackPanel Grid.Row="1" VerticalAlignment="Center" MaxWidth="600" Spacing="20">
+                <StackPanel Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" MaxWidth="600" Spacing="20">
                     <Border Background="#29443D" CornerRadius="20" Padding="14,8" HorizontalAlignment="Left">
                         <TextBlock Text="ДНЕВНИК ПУТЕШЕСТВИЙ" FontSize="10" FontWeight="Bold" Foreground="#D8E7CD" />
                     </Border>
@@ -94,7 +96,9 @@
                         <Border Background="#314C43" CornerRadius="14" Padding="14,10"><TextBlock Text="⌖  Карта" Foreground="#E3EBD8" /></Border>
                         <Border Background="#314C43" CornerRadius="14" Padding="14,10"><TextBlock Text="♡  Избранное" Foreground="#E3EBD8" /></Border>
                     </StackPanel>
+                    <TextBlock Text="Малыш-путешественник уже собирает маршрут вместе с тобой." FontSize="12" Foreground="#C4D2C8" TextWrapping="Wrap" MaxWidth="420" />
                 </StackPanel>
+                <Image Grid.Row="1" Grid.Column="1" Source="Assets/Mascot/mascot-map.png" Width="156" Height="156" Stretch="Uniform" VerticalAlignment="Center" Margin="4,0,0,0" />
                 <TextBlock Grid.Row="2" Text="Твоя история путешествий начинается здесь" FontSize="11" Foreground="#8FA79A" />
                 </Grid>
             </Border>
@@ -137,9 +141,7 @@
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="4,0,0,34">
-                    <Border Width="36" Height="36" CornerRadius="12" Background="{StaticResource AccentBrush}">
-                        <FontIcon Glyph="&#xE707;" FontSize="18" Foreground="#172521" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
+                    <Image Source="Assets/loca-loca-icon.png" Width="36" Height="36" Stretch="Uniform" />
                     <StackPanel VerticalAlignment="Center" Spacing="0">
                         <TextBlock Text="loca loca" FontSize="22" FontWeight="Bold" Foreground="#FFFFFF" />
                         <TextBlock Text="ДНЕВНИК ПУТЕШЕСТВИЙ" FontSize="9" Foreground="#9BB1A3" />
@@ -204,9 +206,7 @@
                                         <TextBlock Text="Собирай впечатления,&#x0a;а не вкладки." FontSize="32" FontWeight="SemiBold" Foreground="#20352A" LineHeight="36" />
                                         <TextBlock Text="Сохраняй любимые места, фотографии и истории каждого путешествия." FontSize="13" Foreground="#5D715F" TextWrapping="Wrap" />
                                     </StackPanel>
-                                    <Border Grid.Column="1" Width="116" Height="116" CornerRadius="58" Background="#C9F27A" VerticalAlignment="Center" Margin="18,0,12,0">
-                                        <FontIcon Glyph="&#xE709;" FontSize="52" Foreground="#48613A" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                    </Border>
+                                    <Image Grid.Column="1" Source="Assets/Mascot/mascot-celebrate.png" Width="176" Height="176" Stretch="Uniform" VerticalAlignment="Center" Margin="12,0,4,0" />
                                 </Grid>
                             </Border>
                             <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="13">

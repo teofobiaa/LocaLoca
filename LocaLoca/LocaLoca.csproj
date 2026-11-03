@@ -5,6 +5,7 @@
 		<TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
 
 		<RootNamespace>LocaLoca</RootNamespace>
+		<ApplicationIcon>Assets\loca-loca.ico</ApplicationIcon>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 
 		<Platforms>x64</Platforms>
@@ -31,6 +32,12 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Content Include="Assets\loca-loca.ico;Assets\loca-loca-icon.png;Assets\Mascot\mascot-map.png;Assets\Mascot\mascot-celebrate.png"
+				 CopyToOutputDirectory="PreserveNewest"
+				 CopyToPublishDirectory="PreserveNewest" />
 	</ItemGroup>
 
 	<!-- Server files -->
