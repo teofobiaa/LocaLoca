@@ -1,4 +1,4 @@
-# Настройка подключения к удалённому PostgreSQL для Loca Loca.
+﻿# Настройка подключения к удалённому PostgreSQL для Loca Loca.
 # Скрипт не создаёт БД/пользователя на хостинге и не запускает pgAdmin.
 # Он сохраняет строку подключения локального API в %LOCALAPPDATA%\LocaLoca\server-config.json.
 
