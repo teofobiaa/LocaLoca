@@ -105,7 +105,51 @@
 
             <Border Grid.Column="1" Padding="52,40" Background="#F4F5F1">
                 <Grid>
-                <StackPanel VerticalAlignment="Center" MaxWidth="420" HorizontalAlignment="Center" Spacing="16">
+                <ScrollViewer VerticalAlignment="Center" HorizontalAlignment="Center" MaxWidth="420" MaxHeight="800">
+                <StackPanel Spacing="16">
+                    <StackPanel x:Name="ConnectionConfigPanel" Visibility="Collapsed" Spacing="12">
+                        <TextBlock Text="Подключение к базе" FontSize="28" FontWeight="SemiBold" Foreground="#1A2C26" />
+                        <TextBlock Text="Проверь параметры PostgreSQL. Пароль вводится здесь и сохраняется только на этом компьютере." FontSize="13" Foreground="#7A8880" TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,120" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="Хост" FontSize="12" FontWeight="SemiBold" Foreground="#53645B" />
+                                <TextBox x:Name="DbHostBox" Height="42" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                                <TextBlock Text="Порт" FontSize="12" FontWeight="SemiBold" Foreground="#53645B" />
+                                <TextBox x:Name="DbPortBox" Height="42" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="База данных" FontSize="12" FontWeight="SemiBold" Foreground="#53645B" />
+                                <TextBox x:Name="DbNameBox" Height="42" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="5">
+                                <TextBlock Text="Пользователь БД" FontSize="12" FontWeight="SemiBold" Foreground="#53645B" />
+                                <TextBox x:Name="DbUserBox" Height="42" />
+                            </StackPanel>
+                        </Grid>
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Пароль базы данных" FontSize="12" FontWeight="SemiBold" Foreground="#53645B" />
+                            <PasswordBox x:Name="DbPasswordBox" Height="42" />
+                        </StackPanel>
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="Режим SSL" FontSize="12" FontWeight="SemiBold" Foreground="#53645B" />
+                            <ComboBox x:Name="DbSslModeBox" Height="42" SelectedIndex="2">
+                                <ComboBoxItem Content="Disable" />
+                                <ComboBoxItem Content="Allow" />
+                                <ComboBoxItem Content="Prefer" />
+                                <ComboBoxItem Content="Require" />
+                                <ComboBoxItem Content="VerifyCA" />
+                                <ComboBoxItem Content="VerifyFull" />
+                            </ComboBox>
+                        </StackPanel>
+                        <Button x:Name="SaveDbConfigButton" Content="Сохранить и проверить подключение" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="SaveDbConfig_Click" />
+                        <TextBlock x:Name="DbConfigStatusText" TextWrapping="Wrap" Foreground="#7A8880" FontSize="12" TextAlignment="Center" />
+                        <Button x:Name="RetryConnectionButton" Content="Повторить подключение" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Center" Visibility="Collapsed" Click="RetryConnection_Click" />
+                    </StackPanel>
+                    <StackPanel x:Name="AuthFormPanel" Visibility="Collapsed" VerticalAlignment="Center" Spacing="16">
                     <TextBlock x:Name="AuthEyebrow" Text="С возвращением" FontSize="12" FontWeight="SemiBold" Foreground="#809087" />
                     <TextBlock x:Name="AuthTitle" Text="С возвращением" FontSize="34" FontWeight="SemiBold" Foreground="#1A2C26" />
                     <TextBlock x:Name="AuthSubtitle" Text="Войди, чтобы продолжить свою историю." FontSize="14" Foreground="#7A8880" TextWrapping="Wrap" />
@@ -124,8 +168,9 @@
                     <Button x:Name="AuthSubmitButton" Content="Войти в аккаунт" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="AuthSubmit_Click" Margin="0,12,0,0" />
                     <Button x:Name="AuthModeButton" Content="Создать новый аккаунт" Background="Transparent" BorderThickness="0" Foreground="#52665A" HorizontalAlignment="Center" Click="AuthModeButton_Click" />
                     <TextBlock x:Name="AuthStatusText" Text="Проверяем локальное подключение…" TextWrapping="Wrap" Foreground="#86948B" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center" />
-                    <Button x:Name="RetryConnectionButton" Content="Повторить подключение" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Center" Visibility="Collapsed" Click="RetryConnection_Click" />
                 </StackPanel>
+                </StackPanel>
+                </ScrollViewer>
                 </Grid>
             </Border>
         </Grid>

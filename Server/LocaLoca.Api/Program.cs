@@ -9,6 +9,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls("http://127.0.0.1:5181");
 builder.Services.AddSingleton<SessionStore>();
 var app = builder.Build();
+var dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocaLoca");
+var localConfigPath = Path.Combine(dataRoot, "server-config.json");
+var connectionString = Environment.GetEnvironmentVariable("LOCA_DB_CONNECTION")
+    ?? ReadLocalConnectionString(localConfigPath)
+    ?? builder.Configuration.GetConnectionString("LocaLoca");
+var photosRoot = Path.Combine(dataRoot, "Photos");
+Directory.CreateDirectory(photosRoot);
 
 app.Use(async (context, next) =>
 {
@@ -44,14 +51,13 @@ app.Use(async (context, next) =>
     }
 });
 
-var dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocaLoca");
-var localConfigPath = Path.Combine(dataRoot, "server-config.json");
-var localConfigConnectionString = ReadLocalConnectionString(localConfigPath);
-var connectionString = Environment.GetEnvironmentVariable("LOCA_DB_CONNECTION")
-    ?? localConfigConnectionString
-    ?? builder.Configuration.GetConnectionString("LocaLoca");
-var photosRoot = Path.Combine(dataRoot, "Photos");
-Directory.CreateDirectory(photosRoot);
+app.Use(async (context, next) =>
+{
+    connectionString = Environment.GetEnvironmentVariable("LOCA_DB_CONNECTION")
+        ?? ReadLocalConnectionString(localConfigPath)
+        ?? builder.Configuration.GetConnectionString("LocaLoca");
+    await next();
+});
 
 app.MapGet("/health", async Task<IResult> () =>
 {

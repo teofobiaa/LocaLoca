@@ -53,8 +53,15 @@ public sealed partial class MainWindow : Window
     {
         if (_initialized) return;
         _initialized = true;
-        await EnsureDatabaseConfigReadyAsync();
-        await InitializeConnectionAsync();
+        try
+        {
+            await EnsureDatabaseConfigReadyAsync();
+            await InitializeConnectionAsync();
+        }
+        catch (Exception ex)
+        {
+            ShowConnectionConfig(ex.Message);
+        }
     }
 
     private static string GetServerConfigPath() => Path.Combine(
@@ -86,11 +93,13 @@ public sealed partial class MainWindow : Window
                 connectionString = value.GetString() ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(connectionString))
                 {
-                    DbHostBox.Text = ExtractConnectionStringValue(connectionString, "Host");
-                    DbPortBox.Text = ExtractConnectionStringValue(connectionString, "Port");
-                    DbNameBox.Text = ExtractConnectionStringValue(connectionString, "Database");
-                    DbUserBox.Text = ExtractConnectionStringValue(connectionString, "Username");
-                    var sslValue = ExtractConnectionStringValue(connectionString, "SSL Mode");
+                    var builder = new DbConnectionStringBuilder { ConnectionString = connectionString };
+                    DbHostBox.Text = ReadConnectionStringValue(builder, "Host");
+                    DbPortBox.Text = ReadConnectionStringValue(builder, "Port");
+                    DbNameBox.Text = ReadConnectionStringValue(builder, "Database");
+                    DbUserBox.Text = ReadConnectionStringValue(builder, "Username");
+                    DbPasswordBox.Password = ReadConnectionStringValue(builder, "Password");
+                    var sslValue = ReadConnectionStringValue(builder, "SSL Mode");
                     if (!string.IsNullOrWhiteSpace(sslValue))
                     {
                         var selectedIndex = Array.IndexOf(new[] { "Disable", "Allow", "Prefer", "Require", "VerifyCA", "VerifyFull" }, sslValue);
@@ -100,43 +109,30 @@ public sealed partial class MainWindow : Window
                 }
             }
         }
-        catch (Exception)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException or ArgumentException or InvalidOperationException)
         {
-            return false;
+            throw new InvalidDataException("Не удалось прочитать сохранённые настройки подключения. Проверьте файл %LOCALAPPDATA%\\LocaLoca\\server-config.json или введите параметры заново.", ex);
         }
 
         return false;
     }
 
-    private static string ExtractConnectionStringValue(string connectionString, string key)
-    {
-        foreach (var part in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
-        {
-            var idx = part.IndexOf('=');
-            if (idx <= 0) continue;
-            if (string.Equals(part[..idx].Trim(), key, StringComparison.OrdinalIgnoreCase))
-                return part[(idx + 1)..].Trim();
-        }
-        return string.Empty;
-    }
+    private static string ReadConnectionStringValue(DbConnectionStringBuilder builder, string key) =>
+        builder.TryGetValue(key, out var value) ? Convert.ToString(value) ?? string.Empty : string.Empty;
 
-    private async Task EnsureDatabaseConfigReadyAsync()
+    private Task EnsureDatabaseConfigReadyAsync()
     {
-        var configPath = GetServerConfigPath();
-        if (File.Exists(configPath))
+        if (TryLoadStoredConnectionConfig(out _))
         {
-            if (TryLoadStoredConnectionConfig(out _))
-            {
-                DbConfigStatusText.Text = "Подключение к PostgreSQL сохранено локально.";
-                return;
-            }
+            DbConfigStatusText.Text = "Настройки подключения загружены. Проверяю соединение…";
+            ConnectionConfigPanel.Visibility = Visibility.Visible;
+            AuthFormPanel.Visibility = Visibility.Collapsed;
+            return Task.CompletedTask;
         }
 
         DbConfigStatusText.Text = "Нужно указать параметры подключения к удалённой БД.";
-        ConnectionConfigPanel.Visibility = Visibility.Visible;
-        AuthStatusText.Text = "Подключение к PostgreSQL не настроено.";
-        AuthStatusText.Foreground = Brush("#B85D4D");
-        await Task.CompletedTask;
+        ShowConnectionConfig("Подключение к PostgreSQL ещё не настроено.");
+        return Task.CompletedTask;
     }
 
     private async Task SaveDbConfigAsync()
@@ -179,31 +175,53 @@ public sealed partial class MainWindow : Window
         var configuration = new { connectionString = builder.ConnectionString };
         var configPath = GetServerConfigPath();
         var configDir = Path.GetDirectoryName(configPath)!;
-        Directory.CreateDirectory(configDir);
-        await File.WriteAllTextAsync(configPath, JsonSerializer.Serialize(configuration, new JsonSerializerOptions { WriteIndented = true }));
+        var temporaryPath = configPath + ".tmp";
+        try
+        {
+            Directory.CreateDirectory(configDir);
+            await File.WriteAllTextAsync(temporaryPath, JsonSerializer.Serialize(configuration, new JsonSerializerOptions { WriteIndented = true }));
+            File.Move(temporaryPath, configPath, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            DbConfigStatusText.Text = $"Не удалось сохранить настройки подключения: {ex.Message}";
+            DbConfigStatusText.Foreground = Brush("#B85D4D");
+            return;
+        }
 
         DbConfigStatusText.Text = "Параметры подключения сохранены. Проверяю соединение…";
         DbConfigStatusText.Foreground = Brush("#4F8758");
-        ConnectionConfigPanel.Visibility = Visibility.Collapsed;
         await InitializeConnectionAsync();
     }
 
     private async void SaveDbConfig_Click(object sender, RoutedEventArgs e)
     {
-        await SaveDbConfigAsync();
+        SaveDbConfigButton.IsEnabled = false;
+        try { await SaveDbConfigAsync(); }
+        finally { SaveDbConfigButton.IsEnabled = true; }
+    }
+
+    private void ShowConnectionConfig(string message)
+    {
+        ConnectionConfigPanel.Visibility = Visibility.Visible;
+        AuthFormPanel.Visibility = Visibility.Collapsed;
+        DbConfigStatusText.Text = message;
+        DbConfigStatusText.Foreground = Brush("#B85D4D");
     }
 
     private async Task InitializeConnectionAsync()
     {
         if (!TryLoadStoredConnectionConfig(out _))
         {
-            ConnectionConfigPanel.Visibility = Visibility.Visible;
-            AuthStatusText.Text = "Введите параметры PostgreSQL для про��олжения.";
-            AuthStatusText.Foreground = Brush("#B85D4D");
+            ShowConnectionConfig("Введите параметры PostgreSQL для продолжения.");
             RetryConnectionButton.Visibility = Visibility.Collapsed;
             return;
         }
 
+        AuthFormPanel.Visibility = Visibility.Collapsed;
+        ConnectionConfigPanel.Visibility = Visibility.Visible;
+        DbConfigStatusText.Text = "Проверяю подключение к PostgreSQL…";
+        DbConfigStatusText.Foreground = Brush("#7A8880");
         AuthStatusText.Text = "Подключаем локальный API и PostgreSQL…";
         AuthStatusText.Foreground = Brush("#7A8980");
         try
@@ -214,16 +232,16 @@ public sealed partial class MainWindow : Window
             RetryConnectionButton.Visibility = Visibility.Collapsed;
             ConnectionStatusText.Text = "Локальная база подключена";
             ConnectionConfigPanel.Visibility = Visibility.Collapsed;
+            AuthFormPanel.Visibility = Visibility.Visible;
         }
         catch (Exception ex)
         {
-            ConnectionConfigPanel.Visibility = Visibility.Visible;
             AuthStatusText.Text = ex.Message;
             AuthStatusText.Foreground = Brush("#B85D4D");
             RetryConnectionButton.Visibility = Visibility.Visible;
             ConnectionStatusText.Text = "Нет подключения";
-            DbConfigStatusText.Text = "Проверьте параметры PostgreSQL и повторите попытку.";
-            DbConfigStatusText.Foreground = Brush("#B85D4D");
+            ShowConnectionConfig($"Не удалось подключиться: {ex.Message}");
+            RetryConnectionButton.Visibility = Visibility.Visible;
         }
     }
 
