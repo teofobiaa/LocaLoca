@@ -1,5 +1,7 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
+using System.Data.Common;
 using System.Diagnostics;
+using System.Text.Json;
 using LocaLoca.Models;
 using LocaLoca.Services;
 using Microsoft.UI.Xaml;
@@ -44,17 +46,164 @@ public sealed partial class MainWindow : Window
         appWindow.Resize(new SizeInt32(1360, 880));
         appWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "loca-loca.ico"));
         Closed += MainWindow_Closed;
+        PrefillDbSettings();
     }
 
     private async void Root_Loaded(object sender, RoutedEventArgs e)
     {
         if (_initialized) return;
         _initialized = true;
+        await EnsureDatabaseConfigReadyAsync();
         await InitializeConnectionAsync();
+    }
+
+    private static string GetServerConfigPath() => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "LocaLoca",
+        "server-config.json");
+
+    private void PrefillDbSettings()
+    {
+        DbHostBox.Text = "pg4.sweb.ru";
+        DbPortBox.Text = "5433";
+        DbNameBox.Text = "teofobia";
+        DbUserBox.Text = "teofobia";
+        DbSslModeBox.SelectedIndex = 2;
+        DbConfigStatusText.Text = "Сначала сохраните параметры подключения к PostgreSQL.";
+    }
+
+    private bool TryLoadStoredConnectionConfig(out string connectionString)
+    {
+        connectionString = string.Empty;
+        var configPath = GetServerConfigPath();
+        if (!File.Exists(configPath)) return false;
+        try
+        {
+            using var stream = File.OpenRead(configPath);
+            using var doc = JsonDocument.Parse(stream);
+            if (doc.RootElement.TryGetProperty("connectionString", out var value))
+            {
+                connectionString = value.GetString() ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(connectionString))
+                {
+                    DbHostBox.Text = ExtractConnectionStringValue(connectionString, "Host");
+                    DbPortBox.Text = ExtractConnectionStringValue(connectionString, "Port");
+                    DbNameBox.Text = ExtractConnectionStringValue(connectionString, "Database");
+                    DbUserBox.Text = ExtractConnectionStringValue(connectionString, "Username");
+                    var sslValue = ExtractConnectionStringValue(connectionString, "SSL Mode");
+                    if (!string.IsNullOrWhiteSpace(sslValue))
+                    {
+                        var selectedIndex = Array.IndexOf(new[] { "Disable", "Allow", "Prefer", "Require", "VerifyCA", "VerifyFull" }, sslValue);
+                        DbSslModeBox.SelectedIndex = selectedIndex >= 0 ? selectedIndex : 2;
+                    }
+                    return true;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+
+        return false;
+    }
+
+    private static string ExtractConnectionStringValue(string connectionString, string key)
+    {
+        foreach (var part in connectionString.Split(';', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var idx = part.IndexOf('=');
+            if (idx <= 0) continue;
+            if (string.Equals(part[..idx].Trim(), key, StringComparison.OrdinalIgnoreCase))
+                return part[(idx + 1)..].Trim();
+        }
+        return string.Empty;
+    }
+
+    private async Task EnsureDatabaseConfigReadyAsync()
+    {
+        var configPath = GetServerConfigPath();
+        if (File.Exists(configPath))
+        {
+            if (TryLoadStoredConnectionConfig(out _))
+            {
+                DbConfigStatusText.Text = "Подключение к PostgreSQL сохранено локально.";
+                return;
+            }
+        }
+
+        DbConfigStatusText.Text = "Нужно указать параметры подключения к удалённой БД.";
+        ConnectionConfigPanel.Visibility = Visibility.Visible;
+        AuthStatusText.Text = "Подключение к PostgreSQL не настроено.";
+        AuthStatusText.Foreground = Brush("#B85D4D");
+        await Task.CompletedTask;
+    }
+
+    private async Task SaveDbConfigAsync()
+    {
+        var host = DbHostBox.Text.Trim();
+        var portText = DbPortBox.Text.Trim();
+        var dbName = DbNameBox.Text.Trim();
+        var userName = DbUserBox.Text.Trim();
+        var password = DbPasswordBox.Password;
+        var sslMode = ((ComboBoxItem)DbSslModeBox.SelectedItem)?.Content?.ToString() ?? "Prefer";
+
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(dbName) ||
+            string.IsNullOrWhiteSpace(userName) || string.IsNullOrWhiteSpace(password))
+        {
+            DbConfigStatusText.Text = "Заполните хост, базу, пользователя и пароль.";
+            DbConfigStatusText.Foreground = Brush("#B85D4D");
+            return;
+        }
+
+        if (!int.TryParse(portText, out var port) || port is < 1 or > 65535)
+        {
+            DbConfigStatusText.Text = "Порт должен быть числом от 1 до 65535.";
+            DbConfigStatusText.Foreground = Brush("#B85D4D");
+            return;
+        }
+
+        var builder = new DbConnectionStringBuilder
+        {
+            ["Host"] = host,
+            ["Port"] = port,
+            ["Database"] = dbName,
+            ["Username"] = userName,
+            ["Password"] = password,
+            ["SSL Mode"] = sslMode,
+            ["Timeout"] = 15,
+            ["Command Timeout"] = 30,
+            ["Pooling"] = true
+        };
+
+        var configuration = new { connectionString = builder.ConnectionString };
+        var configPath = GetServerConfigPath();
+        var configDir = Path.GetDirectoryName(configPath)!;
+        Directory.CreateDirectory(configDir);
+        await File.WriteAllTextAsync(configPath, JsonSerializer.Serialize(configuration, new JsonSerializerOptions { WriteIndented = true }));
+
+        DbConfigStatusText.Text = "Параметры подключения сохранены. Проверяю соединение…";
+        DbConfigStatusText.Foreground = Brush("#4F8758");
+        ConnectionConfigPanel.Visibility = Visibility.Collapsed;
+        await InitializeConnectionAsync();
+    }
+
+    private async void SaveDbConfig_Click(object sender, RoutedEventArgs e)
+    {
+        await SaveDbConfigAsync();
     }
 
     private async Task InitializeConnectionAsync()
     {
+        if (!TryLoadStoredConnectionConfig(out _))
+        {
+            ConnectionConfigPanel.Visibility = Visibility.Visible;
+            AuthStatusText.Text = "Введите параметры PostgreSQL для про��олжения.";
+            AuthStatusText.Foreground = Brush("#B85D4D");
+            RetryConnectionButton.Visibility = Visibility.Collapsed;
+            return;
+        }
+
         AuthStatusText.Text = "Подключаем локальный API и PostgreSQL…";
         AuthStatusText.Foreground = Brush("#7A8980");
         try
@@ -64,13 +213,17 @@ public sealed partial class MainWindow : Window
             AuthStatusText.Foreground = Brush("#4F8758");
             RetryConnectionButton.Visibility = Visibility.Collapsed;
             ConnectionStatusText.Text = "Локальная база подключена";
+            ConnectionConfigPanel.Visibility = Visibility.Collapsed;
         }
         catch (Exception ex)
         {
+            ConnectionConfigPanel.Visibility = Visibility.Visible;
             AuthStatusText.Text = ex.Message;
             AuthStatusText.Foreground = Brush("#B85D4D");
             RetryConnectionButton.Visibility = Visibility.Visible;
             ConnectionStatusText.Text = "Нет подключения";
+            DbConfigStatusText.Text = "Проверьте параметры PostgreSQL и повторите попытку.";
+            DbConfigStatusText.Foreground = Brush("#B85D4D");
         }
     }
 
@@ -233,7 +386,7 @@ public sealed partial class MainWindow : Window
         SelectedAttractionName.Text = hasSelection ? attraction!.Name : "Твоя следующая история";
         SelectedAttractionCategory.Text = hasSelection ? attraction!.Category : "Выбери место в каталоге";
         SelectedAttractionLocation.Text = hasSelection ? $"{attraction!.City} · {attraction.Country}" : "Город · Страна";
-        SelectedAttractionDescription.Text = hasSelection ? attraction!.Description : "Выбери достопримечательность слева, чтобы посмотреть описание и историческую справку.";
+        SelectedAttractionDescription.Text = hasSelection ? attraction!.Description : "Выбери достопримечательность слева, чтобы посмотреть описание.";
         SelectedAttractionHistory.Text = hasSelection ? attraction!.History : string.Empty;
         AddVisitButton.IsEnabled = hasSelection;
         WishlistButton.IsEnabled = hasSelection;
