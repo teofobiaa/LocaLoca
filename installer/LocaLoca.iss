@@ -9,7 +9,7 @@ AppPublisher=Loca Loca
 DefaultDirName={localappdata}\Programs\LocaLoca
 DefaultGroupName=Loca Loca
 DisableProgramGroupPage=yes
-PrivilegesRequired=admin
+PrivilegesRequired=lowest
 Uninstallable=yes
 UninstallDisplayName=Loca Loca
 ArchitecturesAllowed=x64compatible
@@ -39,7 +39,7 @@ Name: "{autoprograms}\Loca Loca"; Filename: "{app}\LocaLoca.exe"
 Name: "{autodesktop}\Loca Loca"; Filename: "{app}\LocaLoca.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\LocaLoca.exe"; Description: "Запустить Loca Loca"; Flags: postinstall nowait skipifsilent runasoriginaluser
+Filename: "{app}\LocaLoca.exe"; Description: "Запустить Loca Loca"; Flags: postinstall nowait skipifsilent
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
