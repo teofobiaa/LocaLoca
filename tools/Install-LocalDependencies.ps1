@@ -15,7 +15,7 @@ $PostgresInstallerSha256 = '612C7F5400A003AAFFA0372CB273EED52278F93C680AB911EB9C
 $PostgresServiceName = 'LocaLocaPostgreSQL17'
 $PostgresInstallRoot = Join-Path $env:ProgramFiles 'LocaLoca\PostgreSQL\17'
 $PostgresDataRoot = Join-Path $env:ProgramData 'LocaLoca\PostgreSQL\data'
-$BootstrapRoot = Join-Path $env:ProgramData 'LocaLoca'
+$BootstrapRoot = Join-Path $env:ProgramData 'LocaLoca\Bootstrap'
 $BootstrapFile = Join-Path $BootstrapRoot 'postgres-bootstrap.json'
 $ConfigDirectory = Split-Path -Parent $UserConfigPath
 $ConfigFile = $UserConfigPath
@@ -239,6 +239,11 @@ if (Test-Path -LiteralPath $ConfigFile) {
 $service = Get-Service -Name $PostgresServiceName -ErrorAction SilentlyContinue
 $hasBootstrapState = Test-Path -LiteralPath $BootstrapFile
 
+if (-not $service -and -not $hasBootstrapState -and
+    ((Test-Path -LiteralPath $PostgresInstallRoot) -or (Test-Path -LiteralPath $PostgresDataRoot))) {
+    throw 'Обнаружены каталоги PostgreSQL Loca Loca без служебной записи восстановления. Они не будут удалены автоматически.'
+}
+
 if ($service -and -not $hasBootstrapState) {
     throw "Служба $PostgresServiceName уже существует, но файл восстановления настройки отсутствует. Чтобы не повредить существующую базу, автоматическая переинициализация остановлена."
 }
@@ -248,12 +253,16 @@ if ($hasBootstrapState) {
     if (-not $bootstrap.PostgresPassword -or -not $bootstrap.AppPassword -or -not $bootstrap.Port) {
         throw "Файл восстановления PostgreSQL повреждён: $BootstrapFile"
     }
+    if ($null -eq $bootstrap.PSObject.Properties['InstallStarted']) {
+        $bootstrap | Add-Member -NotePropertyName InstallStarted -NotePropertyValue $false
+    }
 }
 else {
     $bootstrap = [pscustomobject]@{
         PostgresPassword = New-RandomPassword
         AppPassword      = New-RandomPassword
         Port             = Find-AvailablePostgresPort
+        InstallStarted   = $false
         CreatedUtc       = [DateTime]::UtcNow.ToString('o')
     }
     Save-BootstrapState -State $bootstrap
@@ -279,8 +288,8 @@ if (-not $service) {
 
     Test-AuthenticodePublisher -Path $installerPath -Publisher 'EnterpriseDB'
 
-    # Удаляем только незавершённые каталоги нашей выделенной установки.
-    if ($hasBootstrapState) {
+    # Удаляем каталоги только после доказанного старта нашей предыдущей попытки установки.
+    if ($bootstrap.InstallStarted -eq $true) {
         if (Test-Path -LiteralPath $PostgresInstallRoot) {
             Remove-Item -LiteralPath $PostgresInstallRoot -Recurse -Force
         }
@@ -289,7 +298,7 @@ if (-not $service) {
         }
     }
     elseif ((Test-Path -LiteralPath $PostgresInstallRoot) -or (Test-Path -LiteralPath $PostgresDataRoot)) {
-        throw 'Обнаружены каталоги PostgreSQL Loca Loca без служебной записи восстановления. Они не будут удалены автоматически.'
+        throw 'Каталоги PostgreSQL появились до начала установки и не будут удалены автоматически.'
     }
 
     Write-Step 'Установка PostgreSQL (может занять несколько минут)...'
@@ -307,6 +316,9 @@ if (-not $service) {
         '--install_runtimes', '1',
         '--create_shortcuts', '0'
     )
+
+    $bootstrap.InstallStarted = $true
+    Save-BootstrapState -State $bootstrap
 
     & $installerPath @installerArguments
     if ($LASTEXITCODE -ne 0) {
