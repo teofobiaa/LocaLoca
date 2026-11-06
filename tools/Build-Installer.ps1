@@ -42,7 +42,7 @@ foreach ($sqlFile in @('01_schema.sql', '02_seed.sql', '03_migrate_wishlist.sql'
 }
 
 $seedPath = Join-Path $DatabaseDirectory '02_seed.sql'
-$seedContent = Get-Content -LiteralPath $seedPath -Raw
+$seedContent = [System.IO.File]::ReadAllText($seedPath, [System.Text.Encoding]::UTF8)
 if (-not $seedContent.Contains('-- Loca Loca: начальные справочные данные (44 достопримечательностей).')) {
     throw 'В database/02_seed.sql пока нет полного каталога из 44 достопримечательностей. Подключись к базе с полным каталогом и выполни tools/Export-AttractionsSeed.ps1, затем повтори сборку.'
 }
