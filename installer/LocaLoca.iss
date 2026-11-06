@@ -50,7 +50,7 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    PowerShellPath := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+    PowerShellPath := ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe');
     Parameters :=
       '-NoProfile -ExecutionPolicy Bypass -File "' +
       ExpandConstant('{app}\tools\Install-LocalDependencies.ps1') +
