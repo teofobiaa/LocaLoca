@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$DatabaseScriptsPath
+    [string]$DatabaseScriptsPath,
+
+    [string]$UserConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -15,8 +17,8 @@ $PostgresInstallRoot = Join-Path $env:ProgramFiles 'LocaLoca\PostgreSQL\17'
 $PostgresDataRoot = Join-Path $env:ProgramData 'LocaLoca\PostgreSQL\data'
 $BootstrapRoot = Join-Path $env:ProgramData 'LocaLoca'
 $BootstrapFile = Join-Path $BootstrapRoot 'postgres-bootstrap.json'
-$ConfigDirectory = Join-Path $env:LOCALAPPDATA 'LocaLoca'
-$ConfigFile = Join-Path $ConfigDirectory 'server-config.json'
+$ConfigDirectory = Split-Path -Parent $UserConfigPath
+$ConfigFile = $UserConfigPath
 $WebViewRuntimeGuid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
 
 function Write-Step {
@@ -179,8 +181,31 @@ function Invoke-Psql {
     }
 }
 
+
+# Повышаем права только для системных компонентов. Путь конфигурации передаётся
+# из исходного пользовательского сеанса, даже если UAC запросит другую учётную запись.
 if (-not (Test-IsAdministrator)) {
-    throw 'Для первичной установки PostgreSQL нужны права администратора Windows. Подтверди запрос контроля учётных записей Windows и повтори установку.'
+    $powershellPath = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $arguments = @(
+        '-NoProfile',
+        '-ExecutionPolicy', 'Bypass',
+        '-File', ('"{0}"' -f $PSCommandPath),
+        '-DatabaseScriptsPath', ('"{0}"' -f $DatabaseScriptsPath),
+        '-UserConfigPath', ('"{0}"' -f $UserConfigPath)
+    )
+
+    try {
+        $elevatedProcess = Start-Process -FilePath $powershellPath -ArgumentList ($arguments -join ' ') -Verb RunAs -Wait -PassThru
+    }
+    catch {
+        throw "Не удалось получить права администратора Windows. Первичная установка PostgreSQL отменена. $($_.Exception.Message)"
+    }
+
+    if ($elevatedProcess.ExitCode -ne 0) {
+        throw "Настройка PostgreSQL завершилась с кодом $($elevatedProcess.ExitCode). Запусти установщик повторно."
+    }
+
+    exit 0
 }
 
 if (-not [Environment]::Is64BitOperatingSystem -or -not [Environment]::Is64BitProcess) {
@@ -227,7 +252,7 @@ if ($hasBootstrapState) {
 else {
     $bootstrap = [pscustomobject]@{
         PostgresPassword = New-RandomPassword
-            AppPassword      = New-RandomPassword
+        AppPassword      = New-RandomPassword
         Port             = Find-AvailablePostgresPort
         CreatedUtc       = [DateTime]::UtcNow.ToString('o')
     }
