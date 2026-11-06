@@ -42,11 +42,14 @@ jobs:
             'tools/Build-Installer.ps1'
           )
           foreach ($file in $files) {
+            Write-Host "Checking PowerShell syntax: $file"
             $tokens = $null
             $errors = $null
             [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file), [ref]$tokens, [ref]$errors) | Out-Null
             if ($errors.Count -gt 0) {
-              $errors | ForEach-Object { Write-Error $_.Message }
+              $errors | ForEach-Object {
+                Write-Error ("{0}:{1}:{2}: {3}" -f $file, $_.Extent.StartLineNumber, $_.Extent.StartColumnNumber, $_.Message)
+              }
               throw "PowerShell syntax validation failed: $file"
             }
           }
