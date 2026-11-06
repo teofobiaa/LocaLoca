@@ -29,13 +29,21 @@ if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) {
     throw "Не найден файл конфигурации активной базы Loca Loca: $ConfigPath"
 }
 
-$config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
-if ([string]::IsNullOrWhiteSpace($config.connectionString)) {
-    throw "В файле $ConfigPath отсутствует connectionString."
+$connectionString = [Environment]::GetEnvironmentVariable('LOCA_DB_CONNECTION', 'Process')
+if ([string]::IsNullOrWhiteSpace($connectionString)) {
+    if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) {
+        throw "Не найден файл конфигурации активной базы Loca Loca: $ConfigPath"
+    }
+
+    $config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
+    $connectionString = [string]$config.connectionString
+}
+if ([string]::IsNullOrWhiteSpace($connectionString)) {
+    throw "Не найдена строка подключения ни в LOCA_DB_CONNECTION, ни в файле $ConfigPath."
 }
 
 $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
-$builder.ConnectionString = [string]$config.connectionString
+$builder.ConnectionString = $connectionString
 
 foreach ($requiredKey in @('Host', 'Database', 'Username', 'Password')) {
     if (-not $builder.ContainsKey($requiredKey) -or [string]::IsNullOrWhiteSpace([string]$builder[$requiredKey])) {
@@ -50,16 +58,18 @@ $password = [string]$builder['Password']
 $port = if ($builder.ContainsKey('Port')) { [string]$builder['Port'] } else { '5432' }
 
 $psqlCommand = Get-Command psql.exe -ErrorAction SilentlyContinue
-if (-not $psqlCommand) {
+$psqlPath = if ($psqlCommand) { $psqlCommand.Source } else { $null }
+if (-not $psqlPath) {
     $postgresRoot = Join-Path $env:ProgramFiles 'PostgreSQL'
     if (Test-Path -LiteralPath $postgresRoot) {
-        $psqlCommand = Get-ChildItem -LiteralPath $postgresRoot -Filter psql.exe -Recurse -ErrorAction SilentlyContinue |
+        $candidate = Get-ChildItem -LiteralPath $postgresRoot -Filter psql.exe -Recurse -ErrorAction SilentlyContinue |
             Where-Object { $_.Directory.Name -eq 'bin' } |
             Sort-Object FullName -Descending |
             Select-Object -First 1
+        if ($candidate) { $psqlPath = $candidate.FullName }
     }
 }
-if (-not $psqlCommand) {
+if (-not $psqlPath) {
     throw 'Не найден psql.exe. Установи PostgreSQL Command Line Tools или добавь папку PostgreSQL\bin в PATH.'
 }
 
@@ -85,6 +95,17 @@ FROM (
 $previousPassword = [Environment]::GetEnvironmentVariable('PGPASSWORD', 'Process')
 try {
     $env:PGPASSWORD = $password
+    if ($builder.ContainsKey('SSL Mode')) {
+        $sslMode = ([string]$builder['SSL Mode']).ToLowerInvariant().Replace('_', '-')
+        if ($sslMode -in @('disable', 'allow', 'prefer', 'require', 'verify-ca', 'verify-full')) {
+            $env:PGSSLMODE = $sslMode
+        }
+    }
+    if ($builder.ContainsKey('Timeout')) {
+        $timeoutSeconds = [int]$builder['Timeout']
+        if ($timeoutSeconds -gt 0) { $env:PGCONNECT_TIMEOUT = [string]$timeoutSeconds }
+    }
+
     $psqlArgs = @(
         '--no-psqlrc', '--quiet', '--tuples-only', '--no-align',
         '--host', $hostName,
@@ -94,7 +115,7 @@ try {
         '--command', $query
     )
 
-    $output = & $psqlCommand.Source @psqlArgs 2>&1
+    $output = & $psqlPath @psqlArgs 2>&1
     $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
         throw "Не удалось прочитать каталог из PostgreSQL (код $exitCode): $(($output | Out-String).Trim())"
@@ -108,7 +129,10 @@ finally {
     else {
         $env:PGPASSWORD = $previousPassword
     }
+    Remove-Item Env:PGSSLMODE -ErrorAction SilentlyContinue
+    Remove-Item Env:PGCONNECT_TIMEOUT -ErrorAction SilentlyContinue
     $password = $null
+    $connectionString = $null
     $config = $null
     $builder = $null
 }
@@ -129,7 +153,7 @@ $cities = @($items | ForEach-Object {
 } | Sort-Object Country, City -Unique)
 
 $lines = [System.Collections.Generic.List[string]]::new()
-$lines.Add("-- Loca Loca: начальные справочные данные ($($items.Count) достопримечательностей.")
+$lines.Add("-- Loca Loca: начальные справочные данные ($($items.Count) достопримечательностей).")
 $lines.Add('-- Сформировано из активной базы Loca Loca. Повторный запуск не дублирует места.')
 $lines.Add('')
 $lines.Add('INSERT INTO categories (name) VALUES')
