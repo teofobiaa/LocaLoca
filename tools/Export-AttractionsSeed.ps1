@@ -25,10 +25,6 @@ function ConvertTo-SqlNumber {
     return $number.ToString([Globalization.CultureInfo]::InvariantCulture) + '::numeric'
 }
 
-if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) {
-    throw "Не найден файл конфигурации активной базы Loca Loca: $ConfigPath"
-}
-
 $connectionString = [Environment]::GetEnvironmentVariable('LOCA_DB_CONNECTION', 'Process')
 if ([string]::IsNullOrWhiteSpace($connectionString)) {
     if (-not (Test-Path -LiteralPath $ConfigPath -PathType Leaf)) {
@@ -93,6 +89,8 @@ FROM (
 '@
 
 $previousPassword = [Environment]::GetEnvironmentVariable('PGPASSWORD', 'Process')
+$previousSslMode = [Environment]::GetEnvironmentVariable('PGSSLMODE', 'Process')
+$previousConnectTimeout = [Environment]::GetEnvironmentVariable('PGCONNECT_TIMEOUT', 'Process')
 try {
     $env:PGPASSWORD = $password
     if ($builder.ContainsKey('SSL Mode')) {
@@ -129,8 +127,18 @@ finally {
     else {
         $env:PGPASSWORD = $previousPassword
     }
-    Remove-Item Env:PGSSLMODE -ErrorAction SilentlyContinue
-    Remove-Item Env:PGCONNECT_TIMEOUT -ErrorAction SilentlyContinue
+    if ($null -eq $previousSslMode) {
+        Remove-Item Env:PGSSLMODE -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:PGSSLMODE = $previousSslMode
+    }
+    if ($null -eq $previousConnectTimeout) {
+        Remove-Item Env:PGCONNECT_TIMEOUT -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:PGCONNECT_TIMEOUT = $previousConnectTimeout
+    }
     $password = $null
     $connectionString = $null
     $config = $null
