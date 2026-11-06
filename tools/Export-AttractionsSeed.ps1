@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$ConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json'),
     [string]$OutputPath = (Join-Path $PSScriptRoot '..\database\02_seed.sql'),
