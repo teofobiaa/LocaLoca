@@ -19,7 +19,7 @@
 		<!-- Self-contained Windows App SDK -->
 		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 
-		<!-- Single EXE publishing -->
+		<!-- The client is single-file; path-based assets and the API are published separately. -->
 		<SelfContained>true</SelfContained>
 		<EnableMsixTooling>true</EnableMsixTooling>
 		<IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
@@ -37,13 +37,13 @@
 	<ItemGroup>
 		<Content Include="Assets\loca-loca.ico;Assets\loca-loca-icon.png;Assets\Mascot\mascot-map.png;Assets\Mascot\mascot-celebrate.png"
 				 CopyToOutputDirectory="PreserveNewest"
-				 CopyToPublishDirectory="PreserveNewest" />
+				 CopyToPublishDirectory="Never" />
 	</ItemGroup>
 
 	<!-- Server files -->
 	<ItemGroup>
 		<Content Include="Server\**\*"
 				 CopyToOutputDirectory="PreserveNewest"
-				 CopyToPublishDirectory="PreserveNewest" />
+				 CopyToPublishDirectory="Never" />
 	</ItemGroup>
 </Project>
