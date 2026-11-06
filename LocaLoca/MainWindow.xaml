@@ -96,7 +96,7 @@
                         <Border Background="#314C43" CornerRadius="14" Padding="14,10"><TextBlock Text="⌖  Карта" Foreground="#E3EBD8" /></Border>
                         <Border Background="#314C43" CornerRadius="14" Padding="14,10"><TextBlock Text="♡  Избранное" Foreground="#E3EBD8" /></Border>
                     </StackPanel>
-                    <TextBlock Text="Малыш-путешественник уже собирает маршрут вместе с тобой." FontSize="12" Foreground="#C4D2C8" TextWrapping="Wrap" MaxWidth="420" />
+                    <TextBlock Text="Путешественник уже собирает маршрут вместе с тобой." FontSize="12" Foreground="#C4D2C8" TextWrapping="Wrap" MaxWidth="420" />
                 </StackPanel>
                 <Image Grid.Row="1" Grid.Column="1" Source="Assets/Mascot/mascot-map.png" Width="156" Height="156" Stretch="Uniform" VerticalAlignment="Center" Margin="4,0,0,0" />
                 <TextBlock Grid.Row="2" Text="Твоя история путешествий начинается здесь" FontSize="11" Foreground="#8FA79A" />
