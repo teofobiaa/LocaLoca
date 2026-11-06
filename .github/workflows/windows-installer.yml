@@ -33,6 +33,24 @@ jobs:
         shell: powershell
         run: choco install innosetup --yes --no-progress
 
+      - name: Validate PowerShell scripts
+        shell: pwsh
+        run: |
+          $files = @(
+            'tools/Install-LocalDependencies.ps1',
+            'tools/Export-AttractionsSeed.ps1',
+            'tools/Build-Installer.ps1'
+          )
+          foreach ($file in $files) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PWD $file), [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              throw "PowerShell syntax validation failed: $file"
+            }
+          }
+
       - name: Build application and installer
         shell: pwsh
         run: .\tools\Build-Installer.ps1
