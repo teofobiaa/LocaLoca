@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $BuildScript = Join-Path $PSScriptRoot 'Build-Windows.ps1'
 $InstallerScript = Join-Path $ProjectRoot 'installer/LocaLoca.iss'
