@@ -11,7 +11,6 @@ $PostgresVersion = '17.11'
 $PostgresInstallerUrl = 'https://get.enterprisedb.com/postgresql/postgresql-17.11-5-windows-x64.exe'
 $PostgresInstallerSha256 = '612C7F5400A003AAFFA0372CB273EED52278F93C680AB911EB9CB2229E329072'
 $PostgresServiceName = 'LocaLocaPostgreSQL17'
-$PostgresServiceAccount = 'LocaLocaDb'
 $PostgresInstallRoot = Join-Path $env:ProgramFiles 'LocaLoca\PostgreSQL\17'
 $PostgresDataRoot = Join-Path $env:ProgramData 'LocaLoca\PostgreSQL\data'
 $BootstrapRoot = Join-Path $env:ProgramData 'LocaLoca'
@@ -192,15 +191,25 @@ if (-not (Test-Path -LiteralPath $DatabaseScriptsPath -PathType Container)) {
     throw "Не найдена папка SQL-скриптов приложения: $DatabaseScriptsPath"
 }
 
+Write-Step 'Подготовка локальной базы данных Loca Loca...'
+Ensure-WebView2
+
 # Не затрагиваем базу, которую пользователь уже настроил вручную.
 if (Test-Path -LiteralPath $ConfigFile) {
+    try {
+        $existingConfig = Get-Content -LiteralPath $ConfigFile -Raw | ConvertFrom-Json
+        if ([string]::IsNullOrWhiteSpace($existingConfig.connectionString)) {
+            throw 'В файле отсутствует connectionString.'
+        }
+    }
+    catch {
+        throw "Файл конфигурации Loca Loca существует, но не читается. Он не будет перезаписан автоматически: $ConfigFile. $($_.Exception.Message)"
+    }
+
     Write-Host 'Найдена существующая конфигурация Loca Loca. Она сохранена без изменений.' -ForegroundColor Yellow
     Write-Host "Файл: $ConfigFile"
     exit 0
 }
-
-Write-Step 'Подготовка локальной базы данных Loca Loca...'
-Ensure-WebView2
 
 $service = Get-Service -Name $PostgresServiceName -ErrorAction SilentlyContinue
 $hasBootstrapState = Test-Path -LiteralPath $BootstrapFile
@@ -211,15 +220,14 @@ if ($service -and -not $hasBootstrapState) {
 
 if ($hasBootstrapState) {
     $bootstrap = Get-Content -LiteralPath $BootstrapFile -Raw | ConvertFrom-Json
-    if (-not $bootstrap.PostgresPassword -or -not $bootstrap.ServicePassword -or -not $bootstrap.AppPassword -or -not $bootstrap.Port) {
+    if (-not $bootstrap.PostgresPassword -or -not $bootstrap.AppPassword -or -not $bootstrap.Port) {
         throw "Файл восстановления PostgreSQL повреждён: $BootstrapFile"
     }
 }
 else {
     $bootstrap = [pscustomobject]@{
         PostgresPassword = New-RandomPassword
-        ServicePassword  = New-RandomPassword
-        AppPassword      = New-RandomPassword
+            AppPassword      = New-RandomPassword
         Port             = Find-AvailablePostgresPort
         CreatedUtc       = [DateTime]::UtcNow.ToString('o')
     }
@@ -267,8 +275,6 @@ if (-not $service) {
         '--datadir', $PostgresDataRoot,
         '--serverport', [string]$script:PostgresPort,
         '--servicename', $PostgresServiceName,
-        '--serviceaccount', $PostgresServiceAccount,
-        '--servicepassword', $bootstrap.ServicePassword,
         '--superaccount', 'postgres',
         '--superpassword', $bootstrap.PostgresPassword,
         '--enable-components', 'server,commandlinetools',
