@@ -41,6 +41,32 @@ foreach ($sqlFile in @('01_schema.sql', '02_seed.sql', '03_migrate_wishlist.sql'
     }
 }
 
+$seedPath = Join-Path $DatabaseDirectory '02_seed.sql'
+$seedContent = Get-Content -LiteralPath $seedPath -Raw
+if ($seedContent -notmatch '(?m)^-- Loca Loca: начальные справочные данные \(44 достопримечательностей\)\.
+& $BuildScript
+if ($LASTEXITCODE -ne 0) { throw 'Сборка приложения завершилась ошибкой.' }
+if (-not (Test-Path -LiteralPath (Join-Path $WindowsOutput 'LocaLoca.exe'))) {
+	throw 'Не найден Builds/Windows/LocaLoca.exe после сборки.'
+}
+if (-not (Test-Path -LiteralPath (Join-Path $WindowsOutput 'Server/LocaLoca.Api.exe'))) {
+	throw 'Не найден Builds/Windows/Server/LocaLoca.Api.exe после сборки.'
+}
+if (-not (Test-Path -LiteralPath (Join-Path $WindowsOutput 'Assets/loca-loca.ico'))) {
+	throw 'Не найдена иконка приложения в Builds/Windows/Assets.'
+}
+
+New-Item -ItemType Directory -Path $InstallerOutput -Force | Out-Null
+& $isccPath $InstallerScript
+if ($LASTEXITCODE -ne 0) { throw 'Компиляция установщика завершилась ошибкой.' }
+
+$installer = Join-Path $InstallerOutput 'LocaLoca-Setup.exe'
+if (-not (Test-Path -LiteralPath $installer)) { throw "Установщик не создан: $installer" }
+Write-Host "Готовый установщик: $installer" -ForegroundColor Green
+) {
+    throw 'В database/02_seed.sql пока нет полного каталога из 44 достопримечательностей. Подключись к базе с полным каталогом и выполни tools/Export-AttractionsSeed.ps1, затем повтори сборку.'
+}
+
 & $BuildScript
 if ($LASTEXITCODE -ne 0) { throw 'Сборка приложения завершилась ошибкой.' }
 if (-not (Test-Path -LiteralPath (Join-Path $WindowsOutput 'LocaLoca.exe'))) {
