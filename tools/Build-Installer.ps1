@@ -43,7 +43,10 @@ foreach ($sqlFile in @('01_schema.sql', '02_seed.sql', '03_migrate_wishlist.sql'
 
 $seedPath = Join-Path $DatabaseDirectory '02_seed.sql'
 $seedContent = Get-Content -LiteralPath $seedPath -Raw
-if ($seedContent -notmatch '(?m)^-- Loca Loca: начальные справочные данные \(44 достопримечательностей\)\.
+if (-not $seedContent.Contains('-- Loca Loca: начальные справочные данные (44 достопримечательностей).')) {
+    throw 'В database/02_seed.sql пока нет полного каталога из 44 достопримечательностей. Подключись к базе с полным каталогом и выполни tools/Export-AttractionsSeed.ps1, затем повтори сборку.'
+}
+
 & $BuildScript
 if ($LASTEXITCODE -ne 0) { throw 'Сборка приложения завершилась ошибкой.' }
 if (-not (Test-Path -LiteralPath (Join-Path $WindowsOutput 'LocaLoca.exe'))) {
