@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $BuildScript = Join-Path $PSScriptRoot 'Build-Windows.ps1'
 $InstallerScript = Join-Path $ProjectRoot 'installer/LocaLoca.iss'
@@ -39,6 +39,12 @@ foreach ($sqlFile in @('01_schema.sql', '02_seed.sql', '03_migrate_wishlist.sql'
     if (-not (Test-Path -LiteralPath (Join-Path $DatabaseDirectory $sqlFile))) {
         throw "Не найден SQL-файл для установщика: $sqlFile"
     }
+}
+
+$seedPath = Join-Path $DatabaseDirectory '02_seed.sql'
+$seedContent = Get-Content -LiteralPath $seedPath -Raw
+if (-not $seedContent.Contains('-- Loca Loca: начальные справочные данные (44 достопримечательностей).')) {
+    throw 'В database/02_seed.sql пока нет полного каталога из 44 достопримечательностей. Подключись к базе с полным каталогом и выполни tools/Export-AttractionsSeed.ps1, затем повтори сборку.'
 }
 
 & $BuildScript
