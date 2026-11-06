@@ -13,6 +13,7 @@ $PostgresVersion = '17.11'
 $PostgresInstallerUrl = 'https://get.enterprisedb.com/postgresql/postgresql-17.11-5-windows-x64.exe'
 $PostgresInstallerSha256 = '612C7F5400A003AAFFA0372CB273EED52278F93C680AB911EB9CB2229E329072'
 $PostgresServiceName = 'LocaLocaPostgreSQL17'
+$PostgresServiceAccount = 'LocaLocaDb'
 $PostgresInstallRoot = Join-Path $env:ProgramFiles 'LocaLoca\PostgreSQL\17'
 $PostgresDataRoot = Join-Path $env:ProgramData 'LocaLoca\PostgreSQL\data'
 $BootstrapRoot = Join-Path $env:ProgramData 'LocaLoca\Bootstrap'
@@ -250,7 +251,7 @@ if ($service -and -not $hasBootstrapState) {
 
 if ($hasBootstrapState) {
     $bootstrap = Get-Content -LiteralPath $BootstrapFile -Raw | ConvertFrom-Json
-    if (-not $bootstrap.PostgresPassword -or -not $bootstrap.AppPassword -or -not $bootstrap.Port) {
+    if (-not $bootstrap.PostgresPassword -or -not $bootstrap.ServicePassword -or -not $bootstrap.AppPassword -or -not $bootstrap.Port) {
         throw "Файл восстановления PostgreSQL повреждён: $BootstrapFile"
     }
     if ($null -eq $bootstrap.PSObject.Properties['InstallStarted']) {
@@ -260,6 +261,7 @@ if ($hasBootstrapState) {
 else {
     $bootstrap = [pscustomobject]@{
         PostgresPassword = New-RandomPassword
+        ServicePassword  = New-RandomPassword
         AppPassword      = New-RandomPassword
         Port             = Find-AvailablePostgresPort
         InstallStarted   = $false
@@ -309,6 +311,8 @@ if (-not $service) {
         '--datadir', $PostgresDataRoot,
         '--serverport', [string]$script:PostgresPort,
         '--servicename', $PostgresServiceName,
+        '--serviceaccount', $PostgresServiceAccount,
+        '--servicepassword', $bootstrap.ServicePassword,
         '--superaccount', 'postgres',
         '--superpassword', $bootstrap.PostgresPassword,
         '--enable-components', 'server,commandlinetools',
