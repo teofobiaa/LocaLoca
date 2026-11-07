@@ -307,7 +307,7 @@ if (Test-Path -LiteralPath $ConfigFile) {
     }
 
     $script:PostgresPort = $configuredPort
-    $script:PsqlPath = Join-Path $PostgresInstallRoot 'bin\\psql.exe'
+    $script:PsqlPath = Join-Path $PostgresInstallRoot 'bin\psql.exe'
     if (-not (Test-Path -LiteralPath $script:PsqlPath -PathType Leaf)) {
         throw "Не найден psql.exe для существующей локальной базы: $script:PsqlPath"
     }
