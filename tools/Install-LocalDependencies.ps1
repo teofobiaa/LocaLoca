@@ -388,11 +388,15 @@ if (Test-Path -LiteralPath $ConfigFile) {
     $script:PostgresPort = $configuredPort
     $script:PsqlPath = Find-PsqlExecutable
 
-    # Управляем службой только тогда, когда найденный psql.exe находится внутри
-    # каталога PostgreSQL, который установщик Loca Loca создал сам.
-    $managedInstallRoot = [IO.Path]::GetFullPath($PostgresInstallRoot + [IO.Path]::DirectorySeparatorChar)
-    $selectedPsqlPath = [IO.Path]::GetFullPath($script:PsqlPath)
-    if ($selectedPsqlPath.StartsWith($managedInstallRoot, [StringComparison]::OrdinalIgnoreCase)) {
+    # Управляем службой только если её системная запись указывает на каталог
+    # данных, созданный установщиком Loca Loca. Одного имени службы недостаточно.
+    $managedServiceRegistryPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$PostgresServiceName"
+    $managedServiceImage = (Get-ItemProperty -LiteralPath $managedServiceRegistryPath -Name ImagePath -ErrorAction SilentlyContinue).ImagePath
+    $managedDataRoot = [IO.Path]::GetFullPath($PostgresDataRoot)
+    $isLocaLocaManagedService = -not [string]::IsNullOrWhiteSpace($managedServiceImage) -and
+        $managedServiceImage.IndexOf($managedDataRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0
+
+    if ($isLocaLocaManagedService) {
         $managedService = Get-Service -Name $PostgresServiceName -ErrorAction SilentlyContinue
         if (-not $managedService) {
             throw "Найден встроенный psql.exe, но служба $PostgresServiceName отсутствует. Конфигурация и данные не изменены."
