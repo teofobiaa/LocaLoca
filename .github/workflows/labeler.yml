@@ -20,7 +20,6 @@ jobs:
     - uses: actions/labeler@v4
       with:
         repo-token: "${{ secrets.GITHUB_TOKEN }}"
-# Пример конфигурации для .github/labeler.yml
 frontend:
   - changed-files:
         - any-glob-to-any-file: 'frontend/**/*'
