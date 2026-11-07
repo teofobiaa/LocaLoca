@@ -269,10 +269,18 @@ if (Test-Path -LiteralPath $ConfigFile) {
         throw "Файл конфигурации Loca Loca существует, но не читается. Он не будет перезаписан автоматически: $ConfigFile. $($_.Exception.Message)"
     }
 
+    $hasStandardConnectionKeys = $true
     foreach ($requiredKey in @('Host', 'Port', 'Database', 'Username', 'Password')) {
         if (-not $connectionBuilder.ContainsKey($requiredKey)) {
-            throw "В существующей строке подключения отсутствует параметр $requiredKey. Конфигурация не изменена: $ConfigFile"
+            $hasStandardConnectionKeys = $false
+            break
         }
+    }
+
+    if (-not $hasStandardConnectionKeys) {
+        Write-Host 'Найдена пользовательская строка подключения нестандартного формата. Она сохранена; автоматическое изменение базы пропущено.' -ForegroundColor Yellow
+        Write-Host "Файл: $ConfigFile"
+        exit 0
     }
 
     $configuredHost = [string]$connectionBuilder['Host']
