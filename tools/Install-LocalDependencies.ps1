@@ -388,18 +388,49 @@ if (Test-Path -LiteralPath $ConfigFile) {
     $script:PostgresPort = $configuredPort
     $script:PsqlPath = Find-PsqlExecutable
 
-    # Управляем службой только если её системная запись указывает на каталог
-    # данных, созданный установщиком Loca Loca. Одного имени службы недостаточно.
-    $managedServiceRegistryPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$PostgresServiceName"
-    $managedServiceImage = (Get-ItemProperty -LiteralPath $managedServiceRegistryPath -Name ImagePath -ErrorAction SilentlyContinue).ImagePath
-    $managedDataRoot = [IO.Path]::GetFullPath($PostgresDataRoot)
-    $isLocaLocaManagedService = -not [string]::IsNullOrWhiteSpace($managedServiceImage) -and
-        $managedServiceImage.IndexOf($managedDataRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    Write-Step "Проверка существующего PostgreSQL ($($configuredHost):$configuredPort)..."
+    $connectionReady = $false
+    $connectionError = $null
+    try {
+        # Если сервер уже доступен, не запускаем и не перенастраиваем никакие службы.
+        Invoke-Psql -DatabaseUser $configuredUser -DatabaseName $configuredDatabase -Password $configuredPassword -PsqlArguments @('-c', 'SELECT 1') | Out-Null
+        $connectionReady = $true
+    }
+    catch {
+        $connectionError = $_.Exception.Message
+    }
 
-    if ($isLocaLocaManagedService) {
+    if (-not $connectionReady) {
+        # Запускаем только службу, чья запись Windows указывает именно на каталог
+        # данных Loca Loca, и только если порт в её postgresql.conf совпадает
+        # с портом из пользовательской строки подключения.
+        $managedServiceRegistryPath = "HKLM:\SYSTEM\CurrentControlSet\Services\$PostgresServiceName"
+        $managedServiceImage = (Get-ItemProperty -LiteralPath $managedServiceRegistryPath -Name ImagePath -ErrorAction SilentlyContinue).ImagePath
+        $managedDataRoot = [IO.Path]::GetFullPath($PostgresDataRoot)
+        $ownsManagedData = -not [string]::IsNullOrWhiteSpace($managedServiceImage) -and
+            $managedServiceImage.IndexOf($managedDataRoot, [StringComparison]::OrdinalIgnoreCase) -ge 0
+
+        $managedPort = 5432
+        $managedConfigPath = Join-Path $PostgresDataRoot 'postgresql.conf'
+        if (Test-Path -LiteralPath $managedConfigPath -PathType Leaf) {
+            $portSetting = Select-String -LiteralPath $managedConfigPath -Pattern '^\s*port\s*=\s*(\d+)' |
+                Select-Object -First 1
+            if ($portSetting) {
+                $parsedManagedPort = 0
+                if ([int]::TryParse($portSetting.Matches[0].Groups[1].Value, [ref]$parsedManagedPort)) {
+                    $managedPort = $parsedManagedPort
+                }
+            }
+        }
+
+        $isMatchingManagedService = $ownsManagedData -and ($managedPort -eq $configuredPort)
+        if (-not $isMatchingManagedService) {
+            throw "Не удалось подключиться к PostgreSQL по адресу $configuredHost`:$configuredPort. Служба не изменялась, так как не удалось подтвердить, что она принадлежит Loca Loca. Проверь службу PostgreSQL и строку подключения. Подробности: $connectionError"
+        }
+
         $managedService = Get-Service -Name $PostgresServiceName -ErrorAction SilentlyContinue
         if (-not $managedService) {
-            throw "Найден встроенный psql.exe, но служба $PostgresServiceName отсутствует. Конфигурация и данные не изменены."
+            throw "Не удалось подключиться к базе, а служба $PostgresServiceName не найдена. Конфигурация и данные не изменены. Подробности: $connectionError"
         }
 
         if ($managedService.Status -ne 'Running') {
@@ -419,12 +450,15 @@ if (Test-Path -LiteralPath $ConfigFile) {
             throw "Не удалось запустить службу PostgreSQL $PostgresServiceName. Конфигурация и данные не изменены."
         }
 
+        try {
+            Invoke-Psql -DatabaseUser $configuredUser -DatabaseName $configuredDatabase -Password $configuredPassword -PsqlArguments @('-c', 'SELECT 1') | Out-Null
+        }
+        catch {
+            throw "Служба PostgreSQL Loca Loca запущена, но подключение к базе не удалось. Проверь пароль и настройки подключения. Подробности: $($_.Exception.Message)"
+        }
+
         Set-Service -Name $PostgresServiceName -StartupType Automatic
     }
-
-    Write-Step "Проверка существующего PostgreSQL ($($configuredHost):$configuredPort)..."
-    # Для сторонней установки службу не трогаем: проверяем только реальное подключение.
-    Invoke-Psql -DatabaseUser $configuredUser -DatabaseName $configuredDatabase -Password $configuredPassword -PsqlArguments @('-c', 'SELECT 1') | Out-Null
 
     Write-Step 'Обновление схемы существующей базы данных...'
     Invoke-DatabaseScripts -DatabaseUser $configuredUser -DatabaseName $configuredDatabase -Password $configuredPassword
