@@ -15,6 +15,7 @@ $PostgresInstallerSha256 = '612C7F5400A003AAFFA0372CB273EED52278F93C680AB911EB9C
 $PostgresServiceName = 'LocaLocaPostgreSQL17'
 $PostgresServiceAccount = 'LocaLocaDb'
 $PostgresInstallRoot = Join-Path $env:ProgramFiles 'LocaLoca\PostgreSQL\17'
+$script:PostgresHost = '127.0.0.1'
 $PostgresDataRoot = Join-Path $env:ProgramData 'LocaLoca\PostgreSQL\data'
 $BootstrapRoot = Join-Path $env:ProgramData 'LocaLoca\Bootstrap'
 $BootstrapFile = Join-Path $BootstrapRoot 'postgres-bootstrap.json'
@@ -163,7 +164,7 @@ function Invoke-Psql {
     $previousPassword = [Environment]::GetEnvironmentVariable('PGPASSWORD', 'Process')
     $env:PGPASSWORD = $Password
     try {
-        $output = & $script:PsqlPath -X -w -v 'ON_ERROR_STOP=1' -h '127.0.0.1' -p ([string]$script:PostgresPort) -U $DatabaseUser -d $DatabaseName @PsqlArguments 2>&1
+        $output = & $script:PsqlPath -X -w -v 'ON_ERROR_STOP=1' -h $script:PostgresHost -p ([string]$script:PostgresPort) -U $DatabaseUser -d $DatabaseName @PsqlArguments 2>&1
         $exitCode = $LASTEXITCODE
         if ($exitCode -ne 0) {
             $details = ($output | Out-String).Trim()
@@ -182,6 +183,47 @@ function Invoke-Psql {
     }
 }
 
+function Find-PsqlExecutable {
+    # Сначала используем psql из PATH, затем стандартные каталоги PostgreSQL
+    # и только после этого — каталог встроенной установки Loca Loca.
+    $command = Get-Command psql.exe -ErrorAction SilentlyContinue
+    if (-not $command) {
+        $command = Get-Command psql -ErrorAction SilentlyContinue
+    }
+    if ($command -and $command.Source -and (Test-Path -LiteralPath $command.Source -PathType Leaf)) {
+        return $command.Source
+    }
+
+    $programFilesX86 = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)
+    $roots = @(
+        (Join-Path $env:ProgramFiles 'PostgreSQL'),
+        (Join-Path $programFilesX86 'PostgreSQL'),
+        $PostgresInstallRoot
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+
+    foreach ($root in $roots) {
+        if (-not (Test-Path -LiteralPath $root -PathType Container)) {
+            continue
+        }
+
+        if ((Get-Item -LiteralPath $root).Name -eq '17' -and
+            (Test-Path -LiteralPath (Join-Path $root 'bin\psql.exe') -PathType Leaf)) {
+            return (Join-Path $root 'bin\psql.exe')
+        }
+
+        $versions = Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue |
+            Sort-Object Name -Descending
+        foreach ($versionDirectory in $versions) {
+            $candidate = Join-Path $versionDirectory.FullName 'bin\psql.exe'
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                return $candidate
+            }
+        }
+    }
+
+    throw 'Не найден psql.exe. Проверь установку PostgreSQL или добавь каталог bin PostgreSQL в PATH. Существующая база и конфигурация не изменены.'
+}
+
 function Invoke-DatabaseScripts {
     param(
         [Parameter(Mandatory = $true)][string]$DatabaseUser,
@@ -189,15 +231,45 @@ function Invoke-DatabaseScripts {
         [Parameter(Mandatory = $true)][string]$Password
     )
 
-    Write-Step 'Создание таблиц и применение миграций...'
-    $schemaExists = Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-A', '-t', '-c', "SELECT CASE WHEN to_regclass('public.users') IS NULL THEN '0' ELSE '1' END")
+    Write-Step 'Проверка существующей схемы и применение миграций...'
 
-    if ($schemaExists -ne '1') {
+    # Не запускаем 01_schema.sql поверх частично созданной базы: этот файл
+    # предназначен для пустой базы и содержит обычные CREATE TABLE.
+    $coreTableCount = Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @(
+        '-A', '-t', '-c',
+        "SELECT count(*) FROM (VALUES ('users'), ('categories'), ('countries'), ('cities'), ('attractions'), ('visits'), ('photos')) AS required(name) WHERE to_regclass('public.' || quote_ident(required.name)) IS NOT NULL"
+    )
+
+    if ($coreTableCount -eq '0') {
+        $canCreateSchema = Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @(
+            '-A', '-t', '-c',
+            "SELECT CASE WHEN has_schema_privilege(current_user, 'public', 'CREATE') THEN '1' ELSE '0' END"
+        )
+        if ($canCreateSchema -ne '1') {
+            throw "У пользователя PostgreSQL '$DatabaseUser' нет права CREATE на схему public. База пуста, но создать начальную схему невозможно. Администратор PostgreSQL должен выполнить: GRANT CREATE ON SCHEMA public TO $DatabaseUser;"
+        }
+
         $schemaFile = Join-Path $DatabaseScriptsPath '01_schema.sql'
         if (-not (Test-Path -LiteralPath $schemaFile)) {
             throw "Не найден файл схемы базы данных: $schemaFile"
         }
-        Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-f', $schemaFile) | Out-Null
+
+        # -1 выполняет весь SQL-файл в одной транзакции: при ошибке не остаётся
+        # частично созданной базовой схемы.
+        Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-1', '-f', $schemaFile) | Out-Null
+    }
+    elseif ($coreTableCount -ne '7') {
+        throw "Обнаружена неполная базовая схема PostgreSQL: найдено $coreTableCount из 7 обязательных таблиц. Автоматическое восстановление остановлено, чтобы не затронуть существующие данные. Требуется проверить базу loca_loca вручную."
+    }
+
+    # Миграции создают таблицы и индексы. Проверяем эффективное право CREATE
+    # заранее, чтобы выдать понятную инструкцию вместо неясной ошибки psql.
+    $canCreateSchema = Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @(
+        '-A', '-t', '-c',
+        "SELECT CASE WHEN has_schema_privilege(current_user, 'public', 'CREATE') THEN '1' ELSE '0' END"
+    )
+    if ($canCreateSchema -ne '1') {
+        throw "У пользователя PostgreSQL '$DatabaseUser' нет права CREATE на схему public, поэтому миграции не применены. Администратор PostgreSQL должен выполнить: GRANT CREATE ON SCHEMA public TO $DatabaseUser; После этого повтори установку. Существующие данные не изменены."
     }
 
     foreach ($migrationName in @('02_seed.sql', '03_migrate_wishlist.sql', '04_migrate_user_map_places.sql')) {
@@ -206,14 +278,14 @@ function Invoke-DatabaseScripts {
             throw "Не найден SQL-файл $migrationName в $DatabaseScriptsPath"
         }
 
-        Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-f', $migrationPath) | Out-Null
+        # Каждый SQL-файл атомарен: ошибка не оставляет половину миграции.
+        Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-1', '-f', $migrationPath) | Out-Null
     }
 
     Write-Step 'Проверка подключения приложения к базе...'
     Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-c', 'SELECT count(*) AS attraction_count FROM attractions') |
         ForEach-Object { Write-Host $_ }
 }
-
 
 
 # Повышаем права только для системных компонентов. Путь конфигурации передаётся
@@ -253,8 +325,8 @@ if (-not (Test-Path -LiteralPath $DatabaseScriptsPath -PathType Container)) {
 Write-Step 'Подготовка локальной базы данных Loca Loca...'
 Ensure-WebView2
 
-# Существующую конфигурацию не перезаписываем. Для штатной локальной БД
-# применяем недостающие идемпотентные миграции от имени пользователя приложения.
+# Существующую конфигурацию не перезаписываем. Подключаемся именно к тому
+# локальному серверу, который указан в ней; не предполагаем имя службы или путь установки.
 if (Test-Path -LiteralPath $ConfigFile) {
     try {
         $existingConfig = Get-Content -LiteralPath $ConfigFile -Raw | ConvertFrom-Json
@@ -287,7 +359,8 @@ if (Test-Path -LiteralPath $ConfigFile) {
     $configuredDatabase = [string]$connectionBuilder['Database']
     $configuredUser = [string]$connectionBuilder['Username']
 
-    # Пользовательские подключения к внешним или нестандартным БД не изменяем.
+    # Скрипт обновляет только локальную базу Loca Loca. Внешние серверы,
+    # другие базы и другие роли не изменяются.
     if ($configuredHost -notin @('127.0.0.1', 'localhost', '::1') -or
         $configuredDatabase -ne 'loca_loca' -or $configuredUser -ne 'loca_app') {
         Write-Host 'Найдена пользовательская конфигурация PostgreSQL. Она сохранена; автоматическое изменение этой базы пропущено.' -ForegroundColor Yellow
@@ -306,40 +379,18 @@ if (Test-Path -LiteralPath $ConfigFile) {
         throw "В существующей конфигурации отсутствует пароль пользователя loca_app. Конфигурация не изменена: $ConfigFile"
     }
 
+    $script:PostgresHost = $configuredHost
     $script:PostgresPort = $configuredPort
-    $script:PsqlPath = Join-Path $PostgresInstallRoot 'bin\psql.exe'
-    if (-not (Test-Path -LiteralPath $script:PsqlPath -PathType Leaf)) {
-        throw "Не найден psql.exe для существующей локальной базы: $script:PsqlPath"
-    }
+    $script:PsqlPath = Find-PsqlExecutable
 
-    $existingService = Get-Service -Name $PostgresServiceName -ErrorAction SilentlyContinue
-    if (-not $existingService) {
-        throw "Не найдена служба $PostgresServiceName, указанная для локальной базы Loca Loca. Конфигурация и данные не изменены."
-    }
-
-    if ($existingService.Status -ne 'Running') {
-        Write-Step 'Запуск существующей службы PostgreSQL...'
-        Start-Service -Name $PostgresServiceName
-        $serviceDeadline = (Get-Date).AddMinutes(3)
-        do {
-            Start-Sleep -Seconds 2
-            $existingService = Get-Service -Name $PostgresServiceName
-            if ($existingService.Status -eq 'Running') {
-                break
-            }
-        } while ((Get-Date) -lt $serviceDeadline)
-    }
-
-    if ((Get-Service -Name $PostgresServiceName).Status -ne 'Running') {
-        throw "Не удалось запустить службу PostgreSQL $PostgresServiceName. Конфигурация и данные не изменены."
-    }
-
-    Set-Service -Name $PostgresServiceName -StartupType Automatic
+    Write-Step "Проверка существующего PostgreSQL ($($configuredHost):$configuredPort)..."
+    # Проверяем соединение, но не запускаем и не перенастраиваем неизвестную службу.
+    Invoke-Psql -DatabaseUser $configuredUser -DatabaseName $configuredDatabase -Password $configuredPassword -PsqlArguments @('-c', 'SELECT 1') | Out-Null
 
     Write-Step 'Обновление схемы существующей базы данных...'
     Invoke-DatabaseScripts -DatabaseUser $configuredUser -DatabaseName $configuredDatabase -Password $configuredPassword
 
-    Write-Host 'Существующая конфигурация сохранена. Проверка и применение миграций завершены.' -ForegroundColor Green
+    Write-Host 'Существующая конфигурация сохранена. Проверка подключения и применение миграций завершены.' -ForegroundColor Green
     Write-Host "Файл: $ConfigFile"
     exit 0
 }
@@ -377,6 +428,7 @@ else {
     Save-BootstrapState -State $bootstrap
 }
 
+$script:PostgresHost = '127.0.0.1'
 $script:PostgresPort = [int]$bootstrap.Port
 $script:PsqlPath = Join-Path $PostgresInstallRoot 'bin\psql.exe'
 
