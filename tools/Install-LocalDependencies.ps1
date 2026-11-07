@@ -182,6 +182,39 @@ function Invoke-Psql {
     }
 }
 
+function Invoke-DatabaseScripts {
+    param(
+        [Parameter(Mandatory = $true)][string]$DatabaseUser,
+        [Parameter(Mandatory = $true)][string]$DatabaseName,
+        [Parameter(Mandatory = $true)][string]$Password
+    )
+
+    Write-Step 'Создание таблиц и применение миграций...'
+    $schemaExists = Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-A', '-t', '-c', "SELECT CASE WHEN to_regclass('public.users') IS NULL THEN '0' ELSE '1' END")
+
+    if ($schemaExists -ne '1') {
+        $schemaFile = Join-Path $DatabaseScriptsPath '01_schema.sql'
+        if (-not (Test-Path -LiteralPath $schemaFile)) {
+            throw "Не найден файл схемы базы данных: $schemaFile"
+        }
+        Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-f', $schemaFile) | Out-Null
+    }
+
+    foreach ($migrationName in @('02_seed.sql', '03_migrate_wishlist.sql', '04_migrate_user_map_places.sql')) {
+        $migrationPath = Join-Path $DatabaseScriptsPath $migrationName
+        if (-not (Test-Path -LiteralPath $migrationPath)) {
+            throw "Не найден SQL-файл $migrationName в $DatabaseScriptsPath"
+        }
+
+        Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-f', $migrationPath) | Out-Null
+    }
+
+    Write-Step 'Проверка подключения приложения к базе...'
+    Invoke-Psql -DatabaseUser $DatabaseUser -DatabaseName $DatabaseName -Password $Password -PsqlArguments @('-c', 'SELECT count(*) AS attraction_count FROM attractions') |
+        ForEach-Object { Write-Host $_ }
+}
+
+
 
 # Повышаем права только для системных компонентов. Путь конфигурации передаётся
 # из исходного пользовательского сеанса, даже если UAC запросит другую учётную запись.
@@ -220,19 +253,85 @@ if (-not (Test-Path -LiteralPath $DatabaseScriptsPath -PathType Container)) {
 Write-Step 'Подготовка локальной базы данных Loca Loca...'
 Ensure-WebView2
 
-# Не затрагиваем базу, которую пользователь уже настроил вручную.
+# Существующую конфигурацию не перезаписываем. Для штатной локальной БД
+# применяем недостающие идемпотентные миграции от имени пользователя приложения.
 if (Test-Path -LiteralPath $ConfigFile) {
     try {
         $existingConfig = Get-Content -LiteralPath $ConfigFile -Raw | ConvertFrom-Json
         if ([string]::IsNullOrWhiteSpace($existingConfig.connectionString)) {
             throw 'В файле отсутствует connectionString.'
         }
+
+        $connectionBuilder = [System.Data.Common.DbConnectionStringBuilder]::new()
+        $connectionBuilder.ConnectionString = [string]$existingConfig.connectionString
     }
     catch {
         throw "Файл конфигурации Loca Loca существует, но не читается. Он не будет перезаписан автоматически: $ConfigFile. $($_.Exception.Message)"
     }
 
-    Write-Host 'Найдена существующая конфигурация Loca Loca. Она сохранена без изменений.' -ForegroundColor Yellow
+    foreach ($requiredKey in @('Host', 'Port', 'Database', 'Username', 'Password')) {
+        if (-not $connectionBuilder.ContainsKey($requiredKey)) {
+            throw "В существующей строке подключения отсутствует параметр $requiredKey. Конфигурация не изменена: $ConfigFile"
+        }
+    }
+
+    $configuredHost = [string]$connectionBuilder['Host']
+    $configuredDatabase = [string]$connectionBuilder['Database']
+    $configuredUser = [string]$connectionBuilder['Username']
+
+    # Пользовательские подключения к внешним или нестандартным БД не изменяем.
+    if ($configuredHost -notin @('127.0.0.1', 'localhost', '::1') -or
+        $configuredDatabase -ne 'loca_loca' -or $configuredUser -ne 'loca_app') {
+        Write-Host 'Найдена пользовательская конфигурация PostgreSQL. Она сохранена; автоматическое изменение этой базы пропущено.' -ForegroundColor Yellow
+        Write-Host "Файл: $ConfigFile"
+        exit 0
+    }
+
+    $configuredPort = 0
+    if (-not [int]::TryParse([string]$connectionBuilder['Port'], [ref]$configuredPort) -or
+        $configuredPort -lt 1 -or $configuredPort -gt 65535) {
+        throw "В существующей конфигурации указан некорректный порт PostgreSQL. Конфигурация не изменена: $ConfigFile"
+    }
+
+    $configuredPassword = [string]$connectionBuilder['Password']
+    if ([string]::IsNullOrWhiteSpace($configuredPassword)) {
+        throw "В существующей конфигурации отсутствует пароль пользователя loca_app. Конфигурация не изменена: $ConfigFile"
+    }
+
+    $script:PostgresPort = $configuredPort
+    $script:PsqlPath = Join-Path $PostgresInstallRoot 'bin\\psql.exe'
+    if (-not (Test-Path -LiteralPath $script:PsqlPath -PathType Leaf)) {
+        throw "Не найден psql.exe для существующей локальной базы: $script:PsqlPath"
+    }
+
+    $existingService = Get-Service -Name $PostgresServiceName -ErrorAction SilentlyContinue
+    if (-not $existingService) {
+        throw "Не найдена служба $PostgresServiceName, указанная для локальной базы Loca Loca. Конфигурация и данные не изменены."
+    }
+
+    if ($existingService.Status -ne 'Running') {
+        Write-Step 'Запуск существующей службы PostgreSQL...'
+        Start-Service -Name $PostgresServiceName
+        $serviceDeadline = (Get-Date).AddMinutes(3)
+        do {
+            Start-Sleep -Seconds 2
+            $existingService = Get-Service -Name $PostgresServiceName
+            if ($existingService.Status -eq 'Running') {
+                break
+            }
+        } while ((Get-Date) -lt $serviceDeadline)
+    }
+
+    if ((Get-Service -Name $PostgresServiceName).Status -ne 'Running') {
+        throw "Не удалось запустить службу PostgreSQL $PostgresServiceName. Конфигурация и данные не изменены."
+    }
+
+    Set-Service -Name $PostgresServiceName -StartupType Automatic
+
+    Write-Step 'Обновление схемы существующей базы данных...'
+    Invoke-DatabaseScripts -DatabaseUser $configuredUser -DatabaseName $configuredDatabase -Password $configuredPassword
+
+    Write-Host 'Существующая конфигурация сохранена. Проверка и применение миграций завершены.' -ForegroundColor Green
     Write-Host "Файл: $ConfigFile"
     exit 0
 }
@@ -376,29 +475,7 @@ else {
     Invoke-Psql -DatabaseUser 'postgres' -DatabaseName 'postgres' -Password $bootstrap.PostgresPassword -PsqlArguments @('-c', 'ALTER DATABASE loca_loca OWNER TO loca_app') | Out-Null
 }
 
-Write-Step 'Создание таблиц и применение миграций...'
-$schemaExists = Invoke-Psql -DatabaseUser 'loca_app' -DatabaseName 'loca_loca' -Password $bootstrap.AppPassword -PsqlArguments @('-A', '-t', '-c', "SELECT CASE WHEN to_regclass('public.users') IS NULL THEN '0' ELSE '1' END")
-
-if ($schemaExists -ne '1') {
-    $schemaFile = Join-Path $DatabaseScriptsPath '01_schema.sql'
-    if (-not (Test-Path -LiteralPath $schemaFile)) {
-        throw "Не найден файл схемы базы данных: $schemaFile"
-    }
-    Invoke-Psql -DatabaseUser 'loca_app' -DatabaseName 'loca_loca' -Password $bootstrap.AppPassword -PsqlArguments @('-f', $schemaFile) | Out-Null
-}
-
-foreach ($migrationName in @('02_seed.sql', '03_migrate_wishlist.sql', '04_migrate_user_map_places.sql')) {
-    $migrationPath = Join-Path $DatabaseScriptsPath $migrationName
-    if (-not (Test-Path -LiteralPath $migrationPath)) {
-        throw "Не найден SQL-файл $migrationName в $DatabaseScriptsPath"
-    }
-
-    Invoke-Psql -DatabaseUser 'loca_app' -DatabaseName 'loca_loca' -Password $bootstrap.AppPassword -PsqlArguments @('-f', $migrationPath) | Out-Null
-}
-
-Write-Step 'Проверка подключения приложения к базе...'
-Invoke-Psql -DatabaseUser 'loca_app' -DatabaseName 'loca_loca' -Password $bootstrap.AppPassword -PsqlArguments @('-c', 'SELECT count(*) AS attraction_count FROM attractions') |
-    ForEach-Object { Write-Host $_ }
+Invoke-DatabaseScripts -DatabaseUser 'loca_app' -DatabaseName 'loca_loca' -Password $bootstrap.AppPassword
 
 New-Item -ItemType Directory -Path $ConfigDirectory -Force | Out-Null
 $connectionString = "Host=127.0.0.1;Port=$($script:PostgresPort);Database=loca_loca;Username=loca_app;Password=$($bootstrap.AppPassword);Pooling=true;Timeout=5;Command Timeout=15"
