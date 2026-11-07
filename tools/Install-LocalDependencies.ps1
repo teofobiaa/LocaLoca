@@ -383,8 +383,38 @@ if (Test-Path -LiteralPath $ConfigFile) {
     $script:PostgresPort = $configuredPort
     $script:PsqlPath = Find-PsqlExecutable
 
+    # Управляем службой только тогда, когда найденный psql.exe находится внутри
+    # каталога PostgreSQL, который установщик Loca Loca создал сам.
+    $managedInstallRoot = [IO.Path]::GetFullPath($PostgresInstallRoot + [IO.Path]::DirectorySeparatorChar)
+    $selectedPsqlPath = [IO.Path]::GetFullPath($script:PsqlPath)
+    if ($selectedPsqlPath.StartsWith($managedInstallRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        $managedService = Get-Service -Name $PostgresServiceName -ErrorAction SilentlyContinue
+        if (-not $managedService) {
+            throw "Найден встроенный psql.exe, но служба $PostgresServiceName отсутствует. Конфигурация и данные не изменены."
+        }
+
+        if ($managedService.Status -ne 'Running') {
+            Write-Step 'Запуск службы PostgreSQL Loca Loca...'
+            Start-Service -Name $PostgresServiceName
+            $serviceDeadline = (Get-Date).AddMinutes(3)
+            do {
+                Start-Sleep -Seconds 2
+                $managedService = Get-Service -Name $PostgresServiceName
+                if ($managedService.Status -eq 'Running') {
+                    break
+                }
+            } while ((Get-Date) -lt $serviceDeadline)
+        }
+
+        if ((Get-Service -Name $PostgresServiceName).Status -ne 'Running') {
+            throw "Не удалось запустить службу PostgreSQL $PostgresServiceName. Конфигурация и данные не изменены."
+        }
+
+        Set-Service -Name $PostgresServiceName -StartupType Automatic
+    }
+
     Write-Step "Проверка существующего PostgreSQL ($($configuredHost):$configuredPort)..."
-    # Проверяем соединение, но не запускаем и не перенастраиваем неизвестную службу.
+    # Для сторонней установки службу не трогаем: проверяем только реальное подключение.
     Invoke-Psql -DatabaseUser $configuredUser -DatabaseName $configuredDatabase -Password $configuredPassword -PsqlArguments @('-c', 'SELECT 1') | Out-Null
 
     Write-Step 'Обновление схемы существующей базы данных...'
