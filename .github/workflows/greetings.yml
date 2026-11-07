@@ -1,16 +1,40 @@
 name: Greetings
 
-on: [pull_request_target, issues]
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+permissions:
+  issues: write
+  pull-requests: write
 
 jobs:
   greeting:
     runs-on: ubuntu-latest
-    permissions:
-      issues: write
-      pull-requests: write
     steps:
-    - uses: actions/first-interaction@v1
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        issue-message: "Message that will be displayed on users' first issue"
-        pr-message: "Message that will be displayed on users' first pull request"
+      - name: Welcome first-time contributors
+        uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: |
+            Спасибо, что сообщил(а) о проблеме в Loca Loca!
+
+            Чтобы быстрее разобраться, по возможности добавь:
+            - версию приложения и Windows;
+            - последовательность действий для воспроизведения;
+            - ожидаемый и фактический результат;
+            - текст ошибки или лог (предварительно удали пароли, токены и другие личные данные).
+
+            Мы рассмотрим обращение и при необходимости зададим уточняющие вопросы.
+          pr-message: |
+            Спасибо за первый Pull Request в Loca Loca!
+
+            Перед слиянием, пожалуйста, проверь:
+            - соответствует ли изменение назначению Pull Request;
+            - проходит ли сборка;
+            - добавлены или обновлены ли тесты, если они применимы;
+            - не попали ли в коммит пароли, токены, локальные настройки и пользовательские данные.
+
+            Мы проверим изменения и оставим обратную связь здесь.
