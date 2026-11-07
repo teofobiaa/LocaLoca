@@ -1,15 +1,19 @@
-# This workflow applies labels to pull requests based on changed file paths.
+# This workflow applies labels to pull requests based on changed paths and branch names.
 
 name: Labeler
-on: [pull_request_target]
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
   label:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
-      - uses: actions/labeler@v4
+      - uses: actions/labeler@v7
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
