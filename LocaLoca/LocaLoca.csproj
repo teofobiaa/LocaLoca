@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
 		<TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
@@ -35,15 +35,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Content Include="Assets\loca-loca.ico;Assets\loca-loca-icon.png;Assets\Mascot\mascot-map.png;Assets\Mascot\mascot-celebrate.png"
-				 CopyToOutputDirectory="PreserveNewest"
-				 CopyToPublishDirectory="Never" />
+		<Content Include="Assets\loca-loca.ico;Assets\loca-loca-icon.png;Assets\Mascot\mascot-map.png;Assets\Mascot\mascot-celebrate.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
 	</ItemGroup>
 
 	<!-- Server files -->
 	<ItemGroup>
-		<Content Include="Server\**\*"
-				 CopyToOutputDirectory="PreserveNewest"
-				 CopyToPublishDirectory="Never" />
+		<Content Include="Server\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
 	</ItemGroup>
 </Project>
