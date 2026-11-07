@@ -1,7 +1,58 @@
-frontend:
-  - changed-files:
-      - any-glob-to-any-file: 'frontend/**/*'
+# Labels are applied from changed paths and branch naming conventions.
+# Repository labels must exist before the workflow can apply them.
 
-backend:
+changed-files-labels-limit: 10
+
+"area: client":
   - changed-files:
-      - any-glob-to-any-file: 'backend/**/*'
+      - any-glob-to-any-file: "LocaLoca/**"
+
+"area: api":
+  - changed-files:
+      - any-glob-to-any-file: "Server/LocaLoca.Api/**"
+
+"area: database":
+  - changed-files:
+      - any-glob-to-any-file: "**/*.sql"
+
+"area: installer":
+  - changed-files:
+      - any-glob-to-any-file:
+          - "tools/**"
+          - "**/*.iss"
+
+"area: ci":
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+"area: docs":
+  - changed-files:
+      - any-glob-to-any-file: "**/*.md"
+
+"area: map":
+  - changed-files:
+      - any-glob-to-any-file: "Server/LocaLoca.Api/wwwroot/**"
+
+bug:
+  - head-branch:
+      - "^(bug|fix)(/|-|$)"
+
+feature:
+  - head-branch:
+      - "^feature(/|-|$)"
+
+refactoring:
+  - head-branch:
+      - "^(refactor|refactoring)(/|-|$)"
+
+security:
+  - head-branch:
+      - "^security(/|-|$)"
+
+dependencies:
+  - head-branch:
+      - "^(deps|dependencies)(/|-|$)"
+
+breaking-change:
+  - head-branch:
+      - "^(breaking|breaking-change)(/|-|$)"
