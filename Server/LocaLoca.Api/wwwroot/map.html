@@ -22,7 +22,8 @@
     const params = new URLSearchParams(location.search);
     const token = params.get('token') || sessionStorage.getItem('ll_token') || '';
     const startNewVisit = params.get('mode') === 'visit';
-    const today = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
     document.getElementById('map-hint').textContent = startNewVisit
       ? 'Выберите точку на карте, чтобы записать посещение'
       : 'Нажмите на карту, чтобы добавить своё место';
