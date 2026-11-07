@@ -4,7 +4,7 @@
 [Setup]
 AppId={{1A6F10BC-6F72-4E6F-A481-C47C3B32A8DA}
 AppName=Loca Loca
-AppVersion=1.0.0
+AppVersion=1.0.2
 AppPublisher=Loca Loca
 DefaultDirName={localappdata}\Programs\LocaLoca
 DefaultGroupName=Loca Loca
