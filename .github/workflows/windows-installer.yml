@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - feature/one-click-windows-installer
+      - feature/dark-theme
+      - feature/change-username
   pull_request:
     branches:
       - main
