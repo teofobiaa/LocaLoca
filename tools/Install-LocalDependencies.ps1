@@ -184,8 +184,14 @@ function Invoke-Psql {
 }
 
 function Find-PsqlExecutable {
-    # Сначала используем psql из PATH, затем стандартные каталоги PostgreSQL
-    # и только после этого — каталог встроенной установки Loca Loca.
+    # Если установлен собственный PostgreSQL Loca Loca, используем его клиент,
+    # чтобы однозначно определить, какой службой можно управлять далее.
+    $managedCandidate = Join-Path $PostgresInstallRoot 'bin\psql.exe'
+    if (Test-Path -LiteralPath $managedCandidate -PathType Leaf) {
+        return $managedCandidate
+    }
+
+    # Для ручной установки ищем psql в PATH и стандартных каталогах PostgreSQL.
     $command = Get-Command psql.exe -ErrorAction SilentlyContinue
     if (-not $command) {
         $command = Get-Command psql -ErrorAction SilentlyContinue
@@ -197,8 +203,7 @@ function Find-PsqlExecutable {
     $programFilesX86 = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)
     $roots = @(
         (Join-Path $env:ProgramFiles 'PostgreSQL'),
-        (Join-Path $programFilesX86 'PostgreSQL'),
-        $PostgresInstallRoot
+        (Join-Path $programFilesX86 'PostgreSQL')
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
 
     foreach ($root in $roots) {
