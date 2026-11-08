@@ -62,7 +62,11 @@ public sealed class LocaLocaApiClient : IDisposable
                 "Облачный API недоступен. Проверь интернет и адрес LOCA_API_BASE_URL.");
 
         // If something already answers on localhost, don't start a second API process.
-        if (firstHealth is not null || localApiIsResponding)
+        if (localApiIsResponding && firstHealth is null)
+            throw new TimeoutException(
+                "Локальный API отвечает на /health, но /ready не вернул ответ за 10 секунд. Проверь подключение к Supabase.");
+
+        if (firstHealth is not null)
         {
             for (var i = 0; i < 12; i++)
             {
@@ -71,8 +75,7 @@ public sealed class LocaLocaApiClient : IDisposable
                 if (current is { ApiConfigured: true, DatabaseConnected: true }) return current;
                 if (current is not null) firstHealth = current;
             }
-            throw new InvalidOperationException(firstHealth?.Message ??
-                "Локальный API отвечает на /health, но /ready не вернул корректный ответ. Проверь подключение к Supabase.");
+            throw new InvalidOperationException(firstHealth.Message);
         }
 
         var apiPath = Path.Combine(AppContext.BaseDirectory, "Server", "LocaLoca.Api.exe");
@@ -94,7 +97,6 @@ public sealed class LocaLocaApiClient : IDisposable
         _apiProcess = Process.Start(info) ?? throw new InvalidOperationException("Windows не смогла запустить локальный API.");
         _ownsApiProcess = true;
 
-        string lastMessage = "Локальный API запускается…";
         for (var i = 0; i < 50; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -103,12 +105,16 @@ public sealed class LocaLocaApiClient : IDisposable
             if (_apiProcess.HasExited)
                 throw new InvalidOperationException($"Локальный API завершился с кодом {_apiProcess.ExitCode}. Проверь облачную конфигурацию Supabase в %LOCALAPPDATA%\\LocaLoca\\server-config.json.");
 
+            // Wait for the process to bind its local port before checking the database.
+            if (!await TryLivenessAsync(cancellationToken)) continue;
+
             var health = await TryReadinessAsync(cancellationToken);
             if (health is { ApiConfigured: true, DatabaseConnected: true }) return health;
-            if (health is not null) lastMessage = health.Message;
+            throw new InvalidOperationException(health?.Message ??
+                "Локальный API отвечает на /health, но /ready не вернул ответ за 10 секунд. Проверь подключение к Supabase.");
         }
 
-        throw new TimeoutException($"Не удалось подключить локальный API к облачной PostgreSQL за 20 секунд. {lastMessage}");
+        throw new TimeoutException("Не удалось запустить локальный API и получить ответ от /health за 20 секунд.");
     }
 
     public async Task<AuthResponse> LoginAsync(string login, string password, CancellationToken cancellationToken = default)
