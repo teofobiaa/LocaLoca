@@ -47,13 +47,19 @@ var
   ResultCode: Integer;
   PowerShellPath: string;
   Parameters: string;
+  SetupLogPath: string;
+  SetupLogContent: AnsiString;
+  ErrorMessage: string;
 begin
   if CurStep = ssPostInstall then
   begin
     PowerShellPath := ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe');
+    SetupLogPath := ExpandConstant('{tmp}\LocaLoca-CloudSetup.log');
+    DeleteFile(SetupLogPath);
     Parameters :=
       '-NoProfile -ExecutionPolicy Bypass -File "' +
-      ExpandConstant('{app}\tools\Install-CloudDependencies.ps1') + '"';
+      ExpandConstant('{app}\tools\Install-CloudDependencies.ps1') +
+      '" -LogPath "' + SetupLogPath + '"';
 
     WizardForm.StatusLabel.Caption :=
       'Настраиваем подключение к Supabase и проверяем компоненты первого запуска.';
@@ -68,11 +74,17 @@ begin
 
     if ResultCode <> 0 then
     begin
-      RaiseException(
-        'Не удалось настроить облачную БД. Код ошибки: ' +
-        IntToStr(ResultCode) +
-        '. Исправьте указанную проблему и запустите установщик повторно.'
-      );
+      ErrorMessage :=
+        'Не удалось завершить настройку Loca Loca. Код ошибки PowerShell: ' +
+        IntToStr(ResultCode) + '.';
+
+      if LoadStringFromFile(SetupLogPath, SetupLogContent) then
+        ErrorMessage := ErrorMessage + #13#10#13#10 + UTF8Decode(SetupLogContent)
+      else
+        ErrorMessage := ErrorMessage + #13#10 +
+          'Диагностический журнал не создан. Путь: ' + SetupLogPath;
+
+      RaiseException(ErrorMessage);
     end;
 
     WizardForm.ProgressGauge.Style := npbstNormal;
