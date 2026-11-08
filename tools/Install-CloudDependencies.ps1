@@ -201,7 +201,7 @@ try {
     Write-Host 'Настройки Supabase сохранены.' -ForegroundColor Green
     Write-Host "Файл конфигурации: $UserConfigPath"
     Write-Host 'Пароль зашифрован Windows DPAPI для текущей учётной записи и не записывался в репозиторий.'
-    Write-Host 'Запусти Loca Loca и проверь http://127.0.0.1:5181/health.'
+    Write-Host 'Запусти Loca Loca и проверь подключение к БД: http://127.0.0.1:5181/ready.'
 }
 finally {
     if ($pointer -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
