@@ -584,20 +584,21 @@ public sealed partial class MainWindow : Window
         ShowPage("map");
         try
         {
-            var webViewDataPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LocaLoca",
-                "WebView2");
-            Directory.CreateDirectory(webViewDataPath);
-            var webViewEnvironment = await CoreWebView2Environment.CreateAsync(
-                browserExecutableFolder: null,
-                userDataFolder: webViewDataPath);
-            await MapWebView.EnsureCoreWebView2Async(webViewEnvironment);
             if (!_mapInitialized)
             {
+                var webViewDataPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "LocaLoca",
+                    "WebView2");
+                Directory.CreateDirectory(webViewDataPath);
+                var webViewEnvironment = await CoreWebView2Environment.CreateAsync(
+                    browserExecutableFolder: null,
+                    userDataFolder: webViewDataPath);
+                await MapWebView.EnsureCoreWebView2Async(webViewEnvironment);
                 MapWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
                 _mapInitialized = true;
             }
+
             MapWebView.Source = _api.GetMapUri(startNewVisit);
         }
         catch (Exception ex)
