@@ -7,7 +7,13 @@ using Npgsql;
 using NpgsqlTypes;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.UseUrls("http://127.0.0.1:5181");
+// Local development keeps the loopback endpoint. Render supplies PORT; in the
+// container the API must listen on all interfaces so the platform can reach it.
+var renderPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(renderPort))
+    builder.WebHost.UseUrls($"http://0.0.0.0:{renderPort}");
+else
+    builder.WebHost.UseUrls("http://127.0.0.1:5181");
 builder.Services.AddSingleton<SessionStore>();
 var app = builder.Build();
 
@@ -47,11 +53,12 @@ app.Use(async (context, next) =>
 
 var dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocaLoca");
 var userConfigPath = Path.Combine(dataRoot, "server-config.json");
-var userConfigConnectionString = ReadUserConnectionString(userConfigPath);
+// Prefer server environment variables. Do not attempt to decrypt a Windows
+// DPAPI config in Linux containers when the cloud connection string is set.
 var connectionString = Environment.GetEnvironmentVariable("LOCA_DB_CONNECTION")
     ?? Environment.GetEnvironmentVariable("ConnectionStrings__LocaLoca")
-    ?? userConfigConnectionString
-    ?? builder.Configuration.GetConnectionString("LocaLoca");
+    ?? builder.Configuration.GetConnectionString("LocaLoca")
+    ?? ReadUserConnectionString(userConfigPath);
 string? connectionConfigurationError = null;
 
 // PostgreSQL is shared in Supabase. Keep 127.0.0.1 only for the local
