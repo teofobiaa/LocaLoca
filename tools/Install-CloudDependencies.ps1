@@ -80,6 +80,7 @@ function Read-ExistingConfig {
 
 function Protect-Password {
     param([Parameter(Mandatory = $true)][string]$Password)
+    Add-Type -AssemblyName System.Security
     $bytes = [Text.Encoding]::UTF8.GetBytes($Password)
     try {
         $protected = [Security.Cryptography.ProtectedData]::Protect(
