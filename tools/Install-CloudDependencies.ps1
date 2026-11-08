@@ -76,7 +76,7 @@ function Read-ExistingConnectionString {
         $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
         $builder.ConnectionString = [string]$json.connectionString
         if (-not $builder.ContainsKey('Host') -or -not $builder.ContainsKey('Password')) { return $null }
-        return $builder
+        return ,$builder
     }
     catch {
         throw "Не удалось прочитать существующий файл конфигурации. Он не будет перезаписан автоматически: $Path. $($_.Exception.Message)"
@@ -136,6 +136,7 @@ try {
     $builder['Username'] = $username
     $builder['Password'] = $password
     $builder['SSL Mode'] = 'Require'
+    $builder['Trust Server Certificate'] = $true
     $builder['Pooling'] = $true
     $builder['Timeout'] = 15
     $builder['Command Timeout'] = 30
@@ -155,4 +156,5 @@ try {
 finally {
     if ($pointer -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
     $password = $null
+    if ($securePassword) { $securePassword.Dispose() }
 }
