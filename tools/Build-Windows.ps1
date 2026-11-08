@@ -5,11 +5,6 @@ $WinUiProject = Join-Path $ProjectRoot 'LocaLoca/LocaLoca.csproj'
 $ApiOutput = Join-Path $ProjectRoot 'LocaLoca/Server'
 $Output = Join-Path $ProjectRoot 'Builds/Windows'
 
-# Remove only generated build output so stale files cannot enter a new package.
-if (Test-Path -LiteralPath $Output) {
-    Remove-Item -LiteralPath $Output -Recurse -Force
-}
-
 $dotnetCommand = Get-Command dotnet -ErrorAction SilentlyContinue
 if (-not $dotnetCommand) { throw 'Не найден .NET SDK. Установи стабильный .NET 10 SDK.' }
 $dotnetVersion = (& $dotnetCommand.Source --version).Trim()
@@ -20,6 +15,10 @@ if ($dotnetVersion -notmatch '^10\.\d+\.\d+$') {
 & $ApiPublishScript
 if ($LASTEXITCODE -ne 0) { throw 'Не удалось опубликовать локальный API.' }
 
+# Remove generated output only after prerequisites and API publication succeeded.
+if (Test-Path -LiteralPath $Output) {
+    Remove-Item -LiteralPath $Output -Recurse -Force
+}
 New-Item -ItemType Directory -Path $Output -Force | Out-Null
 & dotnet publish $WinUiProject -c Release -r win-x64 --self-contained true -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true -o $Output
 if ($LASTEXITCODE -ne 0) { throw 'Сборка WinUI 3 завершилась ошибкой.' }
