@@ -31,6 +31,7 @@ public sealed partial class MainWindow : Window
     private bool _initialized;
     private bool _mapInitialized;
     private bool _isDarkTheme;
+    private ContentDialog? _activeProfileDialog;
 
     public ObservableCollection<AttractionDto> Attractions => _attractions;
     public ObservableCollection<VisitDto> Visits => _visits;
@@ -436,6 +437,7 @@ public sealed partial class MainWindow : Window
             PrimaryButtonText = "Сохранить",
             CloseButtonText = "Отмена",
             DefaultButton = ContentDialogButton.Primary,
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
@@ -511,6 +513,7 @@ public sealed partial class MainWindow : Window
             PrimaryButtonText = "Сохранить",
             CloseButtonText = "Отмена",
             DefaultButton = ContentDialogButton.Primary,
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
@@ -676,9 +679,19 @@ public sealed partial class MainWindow : Window
             SecondaryButtonText = "Выйти из аккаунта",
             CloseButtonText = "Закрыть",
             DefaultButton = ContentDialogButton.Primary,
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
-        var result = await dialog.ShowAsync();
+        _activeProfileDialog = dialog;
+        ContentDialogResult result;
+        try
+        {
+            result = await dialog.ShowAsync();
+        }
+        finally
+        {
+            _activeProfileDialog = null;
+        }
 
         if (result == ContentDialogResult.Secondary)
         {
@@ -716,6 +729,8 @@ public sealed partial class MainWindow : Window
 
         _isDarkTheme = themeToggle.IsOn;
         Root.RequestedTheme = _isDarkTheme ? ElementTheme.Dark : ElementTheme.Light;
+        if (_activeProfileDialog is not null)
+            _activeProfileDialog.RequestedTheme = Root.RequestedTheme;
         SaveThemePreference();
         await UpdateMapThemeAsync();
     }
@@ -795,6 +810,7 @@ public sealed partial class MainWindow : Window
             PrimaryButtonText = "Удалить",
             CloseButtonText = "Отмена",
             DefaultButton = ContentDialogButton.Close,
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
         return await dialog.ShowAsync();
@@ -807,6 +823,7 @@ public sealed partial class MainWindow : Window
             Title = title,
             Content = message,
             CloseButtonText = "Понятно",
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
         await dialog.ShowAsync();
