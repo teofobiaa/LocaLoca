@@ -7,6 +7,7 @@ on:
       - feature/one-click-windows-installer
       - feature/dark-theme
       - feature/change-username
+      - feature/supabase-cloud-postgres
   pull_request:
     branches:
       - main
@@ -39,7 +40,7 @@ jobs:
         shell: pwsh
         run: |
           $files = @(
-            'tools/Install-LocalDependencies.ps1',
+            'tools/Install-CloudDependencies.ps1',
             'tools/Export-AttractionsSeed.ps1',
             'tools/Build-Installer.ps1'
           )
