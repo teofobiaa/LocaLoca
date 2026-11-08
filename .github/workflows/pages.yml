@@ -5,7 +5,6 @@ on:
     branches: [main]
     paths:
       - 'site/**'
-      - 'site/**'
       - '.github/workflows/pages.yml'
       - 'LocaLoca/Assets/**'
   workflow_dispatch:
