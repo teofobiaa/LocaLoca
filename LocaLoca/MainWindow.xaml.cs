@@ -4,6 +4,7 @@ using LocaLoca.Models;
 using LocaLoca.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -583,7 +584,15 @@ public sealed partial class MainWindow : Window
         ShowPage("map");
         try
         {
-            await MapWebView.EnsureCoreWebView2Async();
+            var webViewDataPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "LocaLoca",
+                "WebView2");
+            Directory.CreateDirectory(webViewDataPath);
+            var webViewEnvironment = await CoreWebView2Environment.CreateAsync(
+                browserExecutableFolder: null,
+                userDataFolder: webViewDataPath);
+            await MapWebView.EnsureCoreWebView2Async(webViewEnvironment);
             if (!_mapInitialized)
             {
                 MapWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
