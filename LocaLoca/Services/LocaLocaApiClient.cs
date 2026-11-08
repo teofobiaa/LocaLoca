@@ -285,7 +285,7 @@ public sealed class LocaLocaApiClient : IDisposable
     {
         if (string.IsNullOrWhiteSpace(_token)) throw new InvalidOperationException("Сначала выполни вход в аккаунт.");
         var mode = startNewVisit ? "&mode=visit" : string.Empty;
-        return new Uri(_http.BaseAddress!, $"map?token={Uri.EscapeDataString(_token)}{mode}");
+        return new Uri(_http.BaseAddress!, $"map#token={Uri.EscapeDataString(_token)}{mode}");
     }
 
     public void Logout() => _token = null;
