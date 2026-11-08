@@ -25,6 +25,9 @@ public sealed class LocaLocaApiClient : IDisposable
     public LocaLocaApiClient()
     {
         var configuredBaseUrl = Environment.GetEnvironmentVariable("LOCA_API_BASE_URL");
+        if (string.IsNullOrWhiteSpace(configuredBaseUrl))
+            configuredBaseUrl = ReadConfiguredApiBaseUrl();
+
         if (!string.IsNullOrWhiteSpace(configuredBaseUrl))
         {
             if (!Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var remoteUri) ||
@@ -41,6 +44,30 @@ public sealed class LocaLocaApiClient : IDisposable
                 BaseAddress = new Uri("http://127.0.0.1:5181/"),
                 Timeout = TimeSpan.FromSeconds(60)
             };
+        }
+    }
+
+    private static string? ReadConfiguredApiBaseUrl()
+    {
+        var configPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "LocaLoca",
+            "client-config.json");
+
+        if (!File.Exists(configPath)) return null;
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(configPath));
+            return document.RootElement.TryGetProperty("apiBaseUrl", out var value) &&
+                   value.ValueKind == JsonValueKind.String
+                ? value.GetString()
+                : null;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException(
+                $"Файл облачной конфигурации повреждён: {configPath}. Переустанови Loca Loca.", ex);
         }
     }
 
