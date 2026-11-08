@@ -794,53 +794,6 @@ static string? ReadUserConnectionString(string configPath)
     }
 }
 
-static class Dpapi
-{
-    [StructLayout(LayoutKind.Sequential)]
-    private struct DataBlob
-    {
-        public int Length;
-        public IntPtr Data;
-    }
-
-    [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool CryptUnprotectData(
-        ref DataBlob input, IntPtr description, IntPtr entropy, IntPtr reserved,
-        IntPtr prompt, int flags, out DataBlob output);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr LocalFree(IntPtr memory);
-
-    public static byte[] Unprotect(byte[] encrypted)
-    {
-        var inputPointer = Marshal.AllocHGlobal(encrypted.Length);
-        try
-        {
-            Marshal.Copy(encrypted, 0, inputPointer, encrypted.Length);
-            var input = new DataBlob { Length = encrypted.Length, Data = inputPointer };
-            if (!CryptUnprotectData(ref input, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero,
-                IntPtr.Zero, 0, out var output))
-                throw new CryptographicException(Marshal.GetLastWin32Error());
-
-            try
-            {
-                var clear = new byte[output.Length];
-                Marshal.Copy(output.Data, clear, 0, output.Length);
-                return clear;
-            }
-            finally
-            {
-                if (output.Data != IntPtr.Zero) LocalFree(output.Data);
-            }
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(inputPointer);
-        }
-    }
-}
-
 static async Task<NpgsqlConnection> OpenAsync(string? connectionString)
 {
     if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
@@ -944,6 +897,54 @@ static string ContentTypeFor(string path) => Path.GetExtension(path).ToLowerInva
 {
     ".png" => "image/png", ".webp" => "image/webp", ".gif" => "image/gif", ".bmp" => "image/bmp", _ => "image/jpeg"
 };
+
+
+static class Dpapi
+{
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DataBlob
+    {
+        public int Length;
+        public IntPtr Data;
+    }
+
+    [DllImport("crypt32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CryptUnprotectData(
+        ref DataBlob input, IntPtr description, IntPtr entropy, IntPtr reserved,
+        IntPtr prompt, int flags, out DataBlob output);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr LocalFree(IntPtr memory);
+
+    public static byte[] Unprotect(byte[] encrypted)
+    {
+        var inputPointer = Marshal.AllocHGlobal(encrypted.Length);
+        try
+        {
+            Marshal.Copy(encrypted, 0, inputPointer, encrypted.Length);
+            var input = new DataBlob { Length = encrypted.Length, Data = inputPointer };
+            if (!CryptUnprotectData(ref input, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero,
+                IntPtr.Zero, 0, out var output))
+                throw new CryptographicException(Marshal.GetLastWin32Error());
+
+            try
+            {
+                var clear = new byte[output.Length];
+                Marshal.Copy(output.Data, clear, 0, output.Length);
+                return clear;
+            }
+            finally
+            {
+                if (output.Data != IntPtr.Zero) LocalFree(output.Data);
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(inputPointer);
+        }
+    }
+}
 
 sealed class SessionStore
 {
