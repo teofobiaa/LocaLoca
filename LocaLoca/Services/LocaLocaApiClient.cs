@@ -16,15 +16,33 @@ public sealed class LocaLocaApiClient : IDisposable
         PropertyNameCaseInsensitive = true
     };
 
-    private readonly HttpClient _http = new()
-    {
-        BaseAddress = new Uri("http://127.0.0.1:5181/"),
-        Timeout = TimeSpan.FromSeconds(60)
-    };
-
+    private readonly HttpClient _http;
+    private readonly bool _useRemoteApi;
     private Process? _apiProcess;
     private string? _token;
     private bool _ownsApiProcess;
+
+    public LocaLocaApiClient()
+    {
+        var configuredBaseUrl = Environment.GetEnvironmentVariable("LOCA_API_BASE_URL");
+        if (!string.IsNullOrWhiteSpace(configuredBaseUrl))
+        {
+            if (!Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var remoteUri) ||
+                remoteUri.Scheme != Uri.UriSchemeHttps)
+                throw new InvalidOperationException("LOCA_API_BASE_URL должен содержать корректный HTTPS-адрес облачного API.");
+
+            _http = new HttpClient { BaseAddress = new Uri(remoteUri.ToString().TrimEnd('/') + "/"), Timeout = TimeSpan.FromSeconds(90) };
+            _useRemoteApi = true;
+        }
+        else
+        {
+            _http = new HttpClient
+            {
+                BaseAddress = new Uri("http://127.0.0.1:5181/"),
+                Timeout = TimeSpan.FromSeconds(60)
+            };
+        }
+    }
 
     public string? Token => _token;
 
@@ -33,6 +51,12 @@ public sealed class LocaLocaApiClient : IDisposable
         HealthDto? firstHealth = await TryHealthAsync(cancellationToken);
         if (firstHealth is { ApiConfigured: true, DatabaseConnected: true })
             return firstHealth;
+
+        // A configured cloud endpoint is authoritative: never silently fall
+        // back to starting a local API when the remote service is unavailable.
+        if (_useRemoteApi)
+            throw new InvalidOperationException(firstHealth?.Message ??
+                "Облачный API недоступен. Проверь интернет и адрес LOCA_API_BASE_URL.");
 
         // If something already answers on localhost, don't start a second API process.
         if (firstHealth is not null)
@@ -261,7 +285,7 @@ public sealed class LocaLocaApiClient : IDisposable
     {
         if (string.IsNullOrWhiteSpace(_token)) throw new InvalidOperationException("Сначала выполни вход в аккаунт.");
         var mode = startNewVisit ? "&mode=visit" : string.Empty;
-        return new Uri($"http://127.0.0.1:5181/map?token={Uri.EscapeDataString(_token)}{mode}");
+        return new Uri(_http.BaseAddress!, $"map#token={Uri.EscapeDataString(_token)}{mode}");
     }
 
     public void Logout() => _token = null;
@@ -274,7 +298,7 @@ public sealed class LocaLocaApiClient : IDisposable
             shortTimeout.CancelAfter(TimeSpan.FromSeconds(1.5));
             using var response = await _http.GetAsync("health", shortTimeout.Token);
             return await response.Content.ReadFromJsonAsync<HealthDto>(JsonOptions, shortTimeout.Token)
-                   ?? new HealthDto(false, false, "Локальный API вернул пустой ответ.");
+                   ?? new HealthDto(false, false, "API вернул пустой ответ.");
         }
         catch (HttpRequestException) { return null; }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { return null; }
@@ -327,8 +351,8 @@ public sealed class LocaLocaApiClient : IDisposable
         catch (JsonException) { }
 
         if (response.StatusCode == HttpStatusCode.Unauthorized)
-            throw new InvalidOperationException("Неверный логин или пароль либо истекла локальная сессия.");
-        if (string.IsNullOrWhiteSpace(message)) message = $"Ошибка локального API: {(int)response.StatusCode} {response.ReasonPhrase}";
+            throw new InvalidOperationException("Неверный логин или пароль либо истекла сессия.");
+        if (string.IsNullOrWhiteSpace(message)) message = $"Ошибка API: {(int)response.StatusCode} {response.ReasonPhrase}";
         throw new InvalidOperationException(message);
     }
 
