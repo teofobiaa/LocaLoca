@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - feature/render-cloud-server
     paths:
       - "Server/LocaLoca.Api/**"
       - "global.json"
