@@ -4,7 +4,7 @@
 [Setup]
 AppId={{1A6F10BC-6F72-4E6F-A481-C47C3B32A8DA}
 AppName=Loca Loca
-AppVersion=1.0.4
+AppVersion=1.0.5
 AppPublisher=Loca Loca
 DefaultDirName={localappdata}\Programs\LocaLoca
 DefaultGroupName=Loca Loca
@@ -40,6 +40,13 @@ Name: "{autodesktop}\Loca Loca"; Filename: "{app}\LocaLoca.exe"; Tasks: desktopi
 
 [Run]
 Filename: "{app}\LocaLoca.exe"; Description: "Запустить Loca Loca"; Flags: postinstall nowait skipifsilent
+
+
+[UninstallDelete]
+; Remove all per-user Loca Loca settings, local photos, temp images and WebView2 profile.
+Type: filesandordirs; Name: "{localappdata}\\LocaLoca"
+; Remove the default WebView2 profile created by older installer versions.
+Type: filesandordirs; Name: "{app}\\LocaLoca.exe.WebView2"
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -89,5 +96,24 @@ begin
     end;
 
     WizardForm.ProgressGauge.Style := npbstNormal;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  ConfiguredApiUrl: string;
+begin
+  if CurUninstallStep = usPostUninstall then
+  begin
+    // Remove only the environment value owned by this installer. Preserve a
+    // custom LOCA_API_BASE_URL if the user changed it to another endpoint.
+    if RegQueryStringValue(HKCU, 'Environment', 'LOCA_API_BASE_URL', ConfiguredApiUrl) then
+    begin
+      if Lowercase(Trim(ConfiguredApiUrl)) = 'https://localoca-api.onrender.com' then
+      begin
+        if RegDeleteValue(HKCU, 'Environment', 'LOCA_API_BASE_URL') then
+          Log('Removed Loca Loca LOCA_API_BASE_URL user environment variable.');
+      end;
+    end;
   end;
 end;
