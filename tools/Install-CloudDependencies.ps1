@@ -87,7 +87,7 @@ function Protect-Password {
         return [Convert]::ToBase64String($protected)
     }
     finally {
-        [Security.Cryptography.CryptographicOperations]::ZeroMemory($bytes)
+        [Array]::Clear($bytes, 0, $bytes.Length)
     }
 }
 
