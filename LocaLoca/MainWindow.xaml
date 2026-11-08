@@ -5,8 +5,6 @@
     xmlns:controls="using:Microsoft.UI.Xaml.Controls"
     xmlns:models="using:LocaLoca.Models">
 
-
-
     <Grid x:Name="Root" Background="{StaticResource CanvasBrush}" Loaded="Root_Loaded">
         <Grid.Resources>
             <Style x:Key="PrimaryButtonStyle" TargetType="Button">
@@ -124,8 +122,8 @@
                     <Button x:Name="AuthSubmitButton" Content="Войти в аккаунт" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="AuthSubmit_Click" Margin="0,12,0,0" />
                     <Button x:Name="AuthModeButton" Content="Создать новый аккаунт" Background="Transparent" BorderThickness="0" Foreground="#52665A" HorizontalAlignment="Center" Click="AuthModeButton_Click" />
                     <TextBlock x:Name="AuthStatusText" Text="Проверяем локальное подключение…" TextWrapping="Wrap" Foreground="#86948B" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center" />
-                    <Button x:Name="RetryConnectionButton" Content="Повторить подключение" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Center" Visibility="Collapsed" Click="RetryConnection_Click" />
-                </StackPanel>
+                        <Button x:Name="RetryConnectionButton" Content="Повторить подключение" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Center" Visibility="Collapsed" Click="RetryConnection_Click" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

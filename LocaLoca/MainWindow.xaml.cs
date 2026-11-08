@@ -33,7 +33,6 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<AttractionDto> Attractions => _attractions;
     public ObservableCollection<VisitDto> Visits => _visits;
     public ObservableCollection<AttractionDto> WishlistAttractions => _wishlistAttractions;
-
     public MainWindow()
     {
         InitializeComponent();
