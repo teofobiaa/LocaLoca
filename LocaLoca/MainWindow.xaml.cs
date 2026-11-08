@@ -591,10 +591,10 @@ public sealed partial class MainWindow : Window
                     "LocaLoca",
                     "WebView2");
                 Directory.CreateDirectory(webViewDataPath);
-                var webViewEnvironment = await CoreWebView2Environment.CreateAsync(
+                var webViewEnvironment = await CoreWebView2Environment.CreateWithOptionsAsync(
                     null,
                     webViewDataPath,
-                    null);
+                    new CoreWebView2EnvironmentOptions());
                 await MapWebView.EnsureCoreWebView2Async(webViewEnvironment);
                 MapWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
                 _mapInitialized = true;
