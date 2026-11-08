@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: windows-installer-${{ github.ref }}
@@ -67,3 +67,15 @@ jobs:
           name: LocaLoca-Setup
           path: Builds/Installer/LocaLoca-Setup.exe
           if-no-files-found: error
+
+      - name: Publish latest public installer
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Loca Loca build
+          make_latest: true
+          files: Builds/Installer/LocaLoca-Setup.exe
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
