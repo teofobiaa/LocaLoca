@@ -106,7 +106,12 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
 var photosRoot = Path.Combine(dataRoot, "Photos");
 Directory.CreateDirectory(photosRoot);
 
-app.MapGet("/health", async Task<IResult> () =>
+// Render uses this lightweight liveness endpoint. It must not depend on Supabase,
+// because the platform needs to know whether the API process itself is responsive.
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+// Desktop clients use /ready to verify the database connection and application-role permissions.
+app.MapGet("/ready", async Task<IResult> (CancellationToken cancellationToken) =>
 {
     if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
         return Results.Json(new HealthDto(false, false,
@@ -115,7 +120,7 @@ app.MapGet("/health", async Task<IResult> () =>
     try
     {
         await using var connection = new NpgsqlConnection(connectionString);
-        await connection.OpenAsync();
+        await connection.OpenAsync(cancellationToken);
         const string permissionCheck = @"
 SELECT
     has_table_privilege(current_user, 'public.users', 'SELECT')
@@ -148,7 +153,7 @@ SELECT
     AND has_sequence_privilege(current_user, 'public.user_map_places_user_map_place_id_seq', 'USAGE')
     AND has_sequence_privilege(current_user, 'public.user_map_place_photos_photo_id_seq', 'USAGE')";
         await using var command = new NpgsqlCommand(permissionCheck, connection);
-        var hasPermissions = Equals(await command.ExecuteScalarAsync(), true);
+        var hasPermissions = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
         if (!hasPermissions)
             return Results.Json(new HealthDto(true, false,
                 "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Выполни database/05_create_app_role.sql и проверь имя роли."),
@@ -157,7 +162,7 @@ SELECT
     }
     catch (Exception ex)
     {
-        app.Logger.LogWarning(ex, "Health check failed.");
+        app.Logger.LogWarning(ex, "Readiness check failed.");
         return Results.Json(new HealthDto(true, false, "Supabase PostgreSQL недоступна. Проверь интернет и параметры подключения."), statusCode: 503);
     }
 });
