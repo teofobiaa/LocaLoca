@@ -167,6 +167,7 @@
                     <StackPanel Spacing="8">
                         <TextBlock Text="Мой профиль" FontSize="11" Foreground="#A6BAAD" />
                         <TextBlock x:Name="ProfileNameText" Text="Путешественник" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFF" />
+                        <Button Content="Изменить имя" Background="Transparent" BorderThickness="0" Foreground="#C4D3C8" HorizontalAlignment="Left" Padding="0,6" Click="ChangeDisplayName_Click" />
                         <Button Content="Выйти из аккаунта" Background="Transparent" BorderThickness="0" Foreground="#C4D3C8" HorizontalAlignment="Left" Padding="0,6" Click="Logout_Click" />
                     </StackPanel>
                 </Border>
