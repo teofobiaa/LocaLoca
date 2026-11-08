@@ -4,7 +4,7 @@
 [Setup]
 AppId={{1A6F10BC-6F72-4E6F-A481-C47C3B32A8DA}
 AppName=Loca Loca
-AppVersion=1.0.3
+AppVersion=1.0.4
 AppPublisher=Loca Loca
 DefaultDirName={localappdata}\Programs\LocaLoca
 DefaultGroupName=Loca Loca
@@ -59,10 +59,11 @@ begin
     Parameters :=
       '-NoProfile -ExecutionPolicy Bypass -File "' +
       ExpandConstant('{app}\tools\Install-CloudDependencies.ps1') +
-      '" -LogPath "' + SetupLogPath + '"';
+      '" -CloudApiUrl "https://localoca-api.onrender.com" -LogPath "' +
+      SetupLogPath + '"';
 
     WizardForm.StatusLabel.Caption :=
-      'Настраиваем подключение к Supabase и проверяем компоненты первого запуска.';
+      'Настраиваем облачное подключение Loca Loca и проверяем WebView2.';
     WizardForm.ProgressGauge.Style := npbstMarquee;
     WizardForm.Update;
 
