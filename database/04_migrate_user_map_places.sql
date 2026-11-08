@@ -22,7 +22,14 @@ CREATE TABLE IF NOT EXISTS user_map_place_photos (
 	user_map_place_id integer      NOT NULL REFERENCES user_map_places (user_map_place_id) ON DELETE CASCADE,
 	file_path         varchar(500) NOT NULL,
 	caption           varchar(200) NOT NULL DEFAULT '',
-	added_at          timestamptz  NOT NULL DEFAULT now()
+	image_data        bytea,
+	content_type      varchar(100),
+	added_at          timestamptz  NOT NULL DEFAULT now(),
+	CONSTRAINT ck_user_map_place_photos_image_payload CHECK (
+		(image_data IS NULL AND content_type IS NULL) OR
+		(image_data IS NOT NULL AND octet_length(image_data) BETWEEN 1 AND 20971520
+			AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
+	)
 );
 
 CREATE INDEX IF NOT EXISTS ix_user_map_places_user ON user_map_places (user_id, created_at DESC);
