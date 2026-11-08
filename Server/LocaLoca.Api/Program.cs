@@ -11,8 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 var renderPort = Environment.GetEnvironmentVariable("PORT");
 if (!string.IsNullOrWhiteSpace(renderPort))
 {
-    if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("LOCA_SESSION_SECRET")))
-        throw new InvalidOperationException("LOCA_SESSION_SECRET must be configured for cloud hosting.");
+    var sessionSecret = Environment.GetEnvironmentVariable("LOCA_SESSION_SECRET");
+    if (string.IsNullOrWhiteSpace(sessionSecret) || sessionSecret.Length < 32)
+        throw new InvalidOperationException("LOCA_SESSION_SECRET must contain at least 32 characters for cloud hosting.");
     builder.WebHost.UseUrls($"http://0.0.0.0:{renderPort}");
 }
 else
