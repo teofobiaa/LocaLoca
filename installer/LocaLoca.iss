@@ -44,9 +44,9 @@ Filename: "{app}\LocaLoca.exe"; Description: "Запустить Loca Loca"; Fla
 
 [UninstallDelete]
 ; Remove all per-user Loca Loca settings, local photos, temp images and WebView2 profile.
-Type: filesandordirs; Name: "{localappdata}\\LocaLoca"
+Type: filesandordirs; Name: "{localappdata}\LocaLoca"
 ; Remove the default WebView2 profile created by older installer versions.
-Type: filesandordirs; Name: "{app}\\LocaLoca.exe.WebView2"
+Type: filesandordirs; Name: "{app}\LocaLoca.exe.WebView2"
 
 [Code]
 procedure CurStepChanged(CurStep: TSetupStep);
