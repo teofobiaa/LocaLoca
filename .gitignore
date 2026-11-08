@@ -4,5 +4,10 @@
 Builds/
 publish/
 *.csproj.user
+.env
+.env.*
+!.env.example
+**/server-config.json
+**/supabase-credentials.json
 LocaLoca/Server/*
 !LocaLoca/Server/.gitkeep
