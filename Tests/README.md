@@ -1,11 +1,32 @@
 # Loca Loca tests
 
-This directory is reserved for automated tests.
+Тестовый контур проекта. Цель — находить регрессии до объединения изменений в `main`, в первую очередь ошибки авторизации, утечки данных между аккаунтами, потерю фотографий и нарушения целостности БД.
 
-Planned projects:
+## Структура
 
-- `LocaLoca.Tests/` — unit tests for shared and client-side .NET logic where it can be tested independently of WinUI.
-- `LocaLoca.Api.Tests/` — API tests, including endpoint and application integration tests.
-- `LocaLoca.Database.Tests/` — PostgreSQL schema, migration, and database integration tests.
+- `LocaLoca.Api.Tests/` — исполняемые HTTP contract tests API на xUnit и WebApplicationFactory.
+- `TEST_PLAN.md` — стратегия, уровни тестирования и приоритеты.
+- `TEST_CASES.md` — каталог сценариев с ID, приоритетами и ожидаемыми результатами.
+- `TEST_ENVIRONMENT.md` — требования к изолированной среде и дальнейшему DB integration-этапу.
 
-Test projects and dependencies will be added in a separate implementation step. Database integration tests must use an isolated test database and must never target a user's local application database.
+## Что уже выполняется
+
+Первый набор API-тестов не требует PostgreSQL, Docker, Supabase, Render, сторонних сайтов или плагинов. Он проверяет:
+- liveness `/health` без доступной БД;
+- безопасный отказ `/ready`, когда строка подключения не настроена;
+- валидацию неправильного логина, короткого пароля и слишком длинного display name;
+- обязательную авторизацию на защищённых маршрутах.
+
+Запуск из корня репозитория:
+
+```powershell
+dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release
+```
+
+Для восстановления NuGet-пакетов нужен обычный доступ к NuGet.org или заранее заполненный локальный кэш. Во время выполнения этих тестов соединения с Supabase/Render и внешними сайтами не создаются.
+
+## Что пока не покрыто
+
+Успешные операции регистрации/входа, CRUD посещений и wishlist, сохранение фото, изоляция двух пользователей на уровне SQL, схема/миграции PostgreSQL и права роли требуют временной тестовой PostgreSQL. Это будет отдельный следующий слой. Рабочая Supabase не используется ни локально, ни в CI.
+
+UI WinUI 3, WebView2, установщик и деинсталлятор проверяются на Windows отдельно; первый этап не имитирует их автоматизацию.
