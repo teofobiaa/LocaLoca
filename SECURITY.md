@@ -26,7 +26,9 @@ When reporting, include as much of the following information as possible:
 - Any prerequisites or user interaction required to exploit the issue.
 - A suggested mitigation, if known.
 
-For Loca Loca, reports may concern the Windows desktop client, the local ASP.NET Core API, PostgreSQL setup and access, data or photo handling, installer scripts, and the project's GitHub Actions workflows. Please also indicate whether the issue requires local access or can be triggered remotely.
+For Loca Loca, reports may concern the Windows desktop client, the per-device local ASP.NET Core API, Supabase PostgreSQL access, data or photo handling, installer scripts, and the project's GitHub Actions workflows. Please also indicate whether the issue requires local access or can be triggered remotely.
+
+The Supabase PostgreSQL connection string is a secret. It must never be committed to the repository or embedded in the installer. Store it in the per-user `%LOCALAPPDATA%\LocaLoca\server-config.json` file or provide it through a protected environment variable. Rotate any database password that has appeared in a commit, even if the current file no longer contains it. The desktop build currently connects directly to PostgreSQL for this educational project; this is not a production-safe secret distribution model.
 
 ### Response and Disclosure
 

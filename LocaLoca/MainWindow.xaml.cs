@@ -55,15 +55,15 @@ public sealed partial class MainWindow : Window
 
     private async Task InitializeConnectionAsync()
     {
-        AuthStatusText.Text = "Подключаем локальный API и PostgreSQL…";
+        AuthStatusText.Text = "Подключаем локальный API и облачную PostgreSQL…";
         AuthStatusText.Foreground = Brush("#7A8980");
         try
         {
             var health = await _api.EnsureApiAndDatabaseAsync();
-            AuthStatusText.Text = "Локальная база подключена. Можно войти или создать аккаунт.";
+            AuthStatusText.Text = "Облачная база подключена. Можно войти или создать аккаунт.";
             AuthStatusText.Foreground = Brush("#4F8758");
             RetryConnectionButton.Visibility = Visibility.Collapsed;
-            ConnectionStatusText.Text = "Локальная база подключена";
+            ConnectionStatusText.Text = "Облачная база подключена";
         }
         catch (Exception ex)
         {
@@ -159,7 +159,7 @@ public sealed partial class MainWindow : Window
             CitiesCountText.Text = summary.Cities.ToString();
             CountriesCountText.Text = summary.Countries.ToString();
             DashboardAttractionsList.ItemsSource = _allAttractions.Take(4).ToList();
-            ConnectionStatusText.Text = "Локальная база подключена";
+            ConnectionStatusText.Text = "Облачная база подключена";
         }
         catch (Exception ex)
         {
@@ -615,7 +615,7 @@ public sealed partial class MainWindow : Window
         PasswordBox.Password = string.Empty;
         MainShell.Visibility = Visibility.Collapsed;
         AuthPage.Visibility = Visibility.Visible;
-        AuthStatusText.Text = "Локальная база готова. Войди в аккаунт.";
+        AuthStatusText.Text = "Облачная база готова. Войди в аккаунт.";
     }
 
     private async Task<ContentDialogResult> ConfirmAsync(string title, string message)

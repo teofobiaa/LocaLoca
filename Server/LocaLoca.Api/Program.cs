@@ -30,7 +30,7 @@ app.Use(async (context, next) =>
         if (!context.Response.HasStarted)
         {
             context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new { error = "Не удалось обратиться к PostgreSQL. Проверьте, запущена ли служба и верны ли настройки подключения." });
+            await context.Response.WriteAsJsonAsync(new { error = "Не удалось обратиться к Supabase PostgreSQL. Проверь интернет и параметры подключения." });
         }
     }
     catch (Exception ex)
@@ -45,30 +45,71 @@ app.Use(async (context, next) =>
 });
 
 var dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocaLoca");
-var localConfigPath = Path.Combine(dataRoot, "server-config.json");
-var localConfigConnectionString = ReadLocalConnectionString(localConfigPath);
+var userConfigPath = Path.Combine(dataRoot, "server-config.json");
+var userConfigConnectionString = ReadUserConnectionString(userConfigPath);
 var connectionString = Environment.GetEnvironmentVariable("LOCA_DB_CONNECTION")
-    ?? localConfigConnectionString
+    ?? Environment.GetEnvironmentVariable("ConnectionStrings__LocaLoca")
+    ?? userConfigConnectionString
     ?? builder.Configuration.GetConnectionString("LocaLoca");
+string? connectionConfigurationError = null;
+
+// PostgreSQL is shared in Supabase. Keep 127.0.0.1 only for the local
+// WinUI -> ASP.NET Core API connection; reject a local PostgreSQL endpoint.
+if (!string.IsNullOrWhiteSpace(connectionString) &&
+    !connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
+{
+    try
+    {
+        var connectionBuilder = new NpgsqlConnectionStringBuilder(connectionString);
+        var configuredHost = connectionBuilder.Host.Trim().Trim('[', ']');
+        var isLoopbackHost =
+            configuredHost.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
+            configuredHost.Equals("::1", StringComparison.OrdinalIgnoreCase) ||
+            configuredHost.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase);
+
+        if (isLoopbackHost)
+        {
+            connectionString = null;
+            connectionConfigurationError =
+                "Локальная PostgreSQL больше не используется. Настрой подключение к Supabase через tools\\Install-CloudDependencies.ps1.";
+        }
+        else
+        {
+            connectionBuilder.Pooling = true;
+            // Each desktop installation runs a local API process. Keep its
+            // pool small when connecting through Supabase Pooler.
+            connectionBuilder.MaxPoolSize = Math.Min(connectionBuilder.MaxPoolSize, 5);
+            connectionString = connectionBuilder.ConnectionString;
+        }
+    }
+    catch (ArgumentException)
+    {
+        connectionString = null;
+        connectionConfigurationError = "Строка подключения Supabase PostgreSQL имеет неверный формат.";
+    }
+}
+
 var photosRoot = Path.Combine(dataRoot, "Photos");
 Directory.CreateDirectory(photosRoot);
 
 app.MapGet("/health", async Task<IResult> () =>
 {
     if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
-        return Results.Json(new HealthDto(false, false, "Не настроена строка подключения PostgreSQL."), statusCode: 503);
+        return Results.Json(new HealthDto(false, false,
+            connectionConfigurationError ?? "Не настроена строка подключения Supabase PostgreSQL. Запусти tools\\Install-CloudDependencies.ps1."),
+            statusCode: 503);
     try
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
         await using var command = new NpgsqlCommand("SELECT 1", connection);
         await command.ExecuteScalarAsync();
-        return Results.Ok(new HealthDto(true, true, "Локальный API и PostgreSQL доступны."));
+        return Results.Ok(new HealthDto(true, true, "Локальный API подключён к облачной PostgreSQL Supabase."));
     }
     catch (Exception ex)
     {
         app.Logger.LogWarning(ex, "Health check failed.");
-        return Results.Json(new HealthDto(true, false, "PostgreSQL недоступен. Проверьте службу и параметры подключения."), statusCode: 503);
+        return Results.Json(new HealthDto(true, false, "Supabase PostgreSQL недоступна. Проверь интернет и параметры подключения."), statusCode: 503);
     }
 });
 
@@ -665,7 +706,7 @@ app.MapGet("/map", IResult () =>
 
 app.Run();
 
-static string? ReadLocalConnectionString(string configPath)
+static string? ReadUserConnectionString(string configPath)
 {
     try
     {

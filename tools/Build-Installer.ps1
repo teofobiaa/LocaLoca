@@ -3,8 +3,7 @@ $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $BuildScript = Join-Path $PSScriptRoot 'Build-Windows.ps1'
 $InstallerScript = Join-Path $ProjectRoot 'installer/LocaLoca.iss'
 $InstallerIcon = Join-Path $ProjectRoot 'installer/Assets/LocaLoca-Installer.ico'
-$BootstrapScript = Join-Path $ProjectRoot 'tools/Install-LocalDependencies.ps1'
-$DatabaseDirectory = Join-Path $ProjectRoot 'database'
+$BootstrapScript = Join-Path $ProjectRoot 'tools/Install-CloudDependencies.ps1'
 $WindowsOutput = Join-Path $ProjectRoot 'Builds/Windows'
 $InstallerOutput = Join-Path $ProjectRoot 'Builds/Installer'
 
@@ -34,18 +33,7 @@ if (-not $isccPath) {
 }
 if (-not (Test-Path -LiteralPath $InstallerScript)) { throw "Не найден сценарий установщика: $InstallerScript" }
 if (-not (Test-Path -LiteralPath $InstallerIcon)) { throw "Не найдена иконка установщика: $InstallerIcon" }
-if (-not (Test-Path -LiteralPath $BootstrapScript)) { throw "Не найден сценарий первичной установки: $BootstrapScript" }
-foreach ($sqlFile in @('01_schema.sql', '02_seed.sql', '03_migrate_wishlist.sql', '04_migrate_user_map_places.sql')) {
-    if (-not (Test-Path -LiteralPath (Join-Path $DatabaseDirectory $sqlFile))) {
-        throw "Не найден SQL-файл для установщика: $sqlFile"
-    }
-}
-
-$seedPath = Join-Path $DatabaseDirectory '02_seed.sql'
-$seedContent = [System.IO.File]::ReadAllText($seedPath, [System.Text.Encoding]::UTF8)
-if (-not $seedContent.Contains('-- Loca Loca: начальные справочные данные (44 достопримечательностей).')) {
-    throw 'В database/02_seed.sql пока нет полного каталога из 44 достопримечательностей. Подключись к базе с полным каталогом и выполни tools/Export-AttractionsSeed.ps1, затем повтори сборку.'
-}
+if (-not (Test-Path -LiteralPath $BootstrapScript)) { throw "Не найден сценарий настройки облачной БД: $BootstrapScript" }
 
 & $BuildScript
 if ($LASTEXITCODE -ne 0) { throw 'Сборка приложения завершилась ошибкой.' }

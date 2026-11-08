@@ -73,14 +73,14 @@ public sealed class LocaLocaApiClient : IDisposable
             await Task.Delay(400, cancellationToken);
 
             if (_apiProcess.HasExited)
-                throw new InvalidOperationException($"Локальный API завершился с кодом {_apiProcess.ExitCode}. Проверь конфигурацию PostgreSQL в %LOCALAPPDATA%\\LocaLoca\\server-config.json.");
+                throw new InvalidOperationException($"Локальный API завершился с кодом {_apiProcess.ExitCode}. Проверь облачную конфигурацию Supabase в %LOCALAPPDATA%\\LocaLoca\\server-config.json.");
 
             var health = await TryHealthAsync(cancellationToken);
             if (health is { ApiConfigured: true, DatabaseConnected: true }) return health;
             if (health is not null) lastMessage = health.Message;
         }
 
-        throw new TimeoutException($"Не удалось подключить локальный API к PostgreSQL за 20 секунд. {lastMessage}");
+        throw new TimeoutException($"Не удалось подключить локальный API к облачной PostgreSQL за 20 секунд. {lastMessage}");
     }
 
     public async Task<AuthResponse> LoginAsync(string login, string password, CancellationToken cancellationToken = default)
