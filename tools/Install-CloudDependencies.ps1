@@ -66,21 +66,49 @@ function Test-LoopbackHost {
     return $normalized -in @('localhost', '127.0.0.1', '::1')
 }
 
-function Read-ExistingConnectionString {
+function Read-ExistingConfig {
     param([string]$Path)
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
 
     try {
-        $json = Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
-        if ([string]::IsNullOrWhiteSpace([string]$json.connectionString)) { return $null }
-        $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
-        $builder.ConnectionString = [string]$json.connectionString
-        if (-not $builder.ContainsKey('Host') -or -not $builder.ContainsKey('Password')) { return $null }
-        return ,$builder
+        return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
     }
     catch {
         throw "Не удалось прочитать существующий файл конфигурации. Он не будет перезаписан автоматически: $Path. $($_.Exception.Message)"
     }
+}
+
+function Protect-Password {
+    param([Parameter(Mandatory = $true)][string]$Password)
+    $bytes = [Text.Encoding]::UTF8.GetBytes($Password)
+    try {
+        $protected = [Security.Cryptography.ProtectedData]::Protect(
+            $bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
+        return [Convert]::ToBase64String($protected)
+    }
+    finally {
+        [Security.Cryptography.CryptographicOperations]::ZeroMemory($bytes)
+    }
+}
+
+function Write-EncryptedConfig {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][System.Data.Common.DbConnectionStringBuilder]$Connection
+    )
+    $encryptedPassword = Protect-Password -Password ([string]$Connection['Password'])
+    $config = [ordered]@{
+        version = 2
+        host = [string]$Connection['Host']
+        port = [int]$Connection['Port']
+        database = [string]$Connection['Database']
+        username = [string]$Connection['Username']
+        encryptedPassword = $encryptedPassword
+    } | ConvertTo-Json -Compress
+
+    $temporaryPath = "$Path.tmp"
+    [IO.File]::WriteAllText($temporaryPath, $config, [Text.UTF8Encoding]::new($false))
+    Move-Item -LiteralPath $temporaryPath -Destination $Path -Force
 }
 
 Write-Host 'Настройка Loca Loca: Supabase PostgreSQL' -ForegroundColor Cyan
@@ -91,17 +119,35 @@ Ensure-WebView2
 $configDirectory = Split-Path -Parent $UserConfigPath
 New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
 
-$existing = Read-ExistingConnectionString -Path $UserConfigPath
-$existingHost = if ($existing -and $existing.ContainsKey('Host')) { [string]$existing['Host'] } else { '' }
-$existingIsSupabase = $existingHost -like '*.supabase.com' -or $existingHost -like '*.supabase.co'
+$existing = Read-ExistingConfig -Path $UserConfigPath
+$legacyConnection = $null
+$existingHost = ''
+if ($existing -and -not [string]::IsNullOrWhiteSpace([string]$existing.connectionString)) {
+    $legacyConnection = [System.Data.Common.DbConnectionStringBuilder]::new()
+    $legacyConnection.ConnectionString = [string]$existing.connectionString
+    if ($legacyConnection.ContainsKey('Host')) { $existingHost = [string]$legacyConnection['Host'] }
+}
+elseif ($existing -and -not [string]::IsNullOrWhiteSpace([string]$existing.host)) {
+    $existingHost = [string]$existing.host
+}
 
+$existingIsSupabase = $existingHost -like '*.supabase.com' -or $existingHost -like '*.supabase.co'
 if ($existing -and $existingIsSupabase -and -not (Test-LoopbackHost $existingHost)) {
-    Write-Host "Обнаружено готовое подключение к удалённой PostgreSQL ($existingHost). Текущие настройки сохранены." -ForegroundColor Green
+    if ($legacyConnection -and $legacyConnection.ContainsKey('Password')) {
+        Write-EncryptedConfig -Path $UserConfigPath -Connection $legacyConnection
+        Write-Host 'Существующий пароль Supabase зашифрован средствами Windows DPAPI.' -ForegroundColor Green
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace([string]$existing.encryptedPassword)) {
+        Write-Host 'Обнаружена готовая конфигурация Supabase с зашифрованным паролем.' -ForegroundColor Green
+    }
+    else {
+        throw 'Конфигурация Supabase найдена, но пароль отсутствует. Запусти установщик повторно и введи параметры подключения.'
+    }
     Write-Host "Файл конфигурации: $UserConfigPath"
     exit 0
 }
 
-if ($existing -and (Test-LoopbackHost $existingHost)) {
+if ($existingHost -and (Test-LoopbackHost $existingHost)) {
     Write-Host 'Обнаружена старая локальная PostgreSQL. Её настройки будут заменены подключением Supabase.' -ForegroundColor Yellow
 }
 
@@ -127,8 +173,8 @@ try {
     $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
     $password = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer)
 
-    # DbConnectionStringBuilder quotes special characters in the password.
-    # The secret is written only to the per-user config file, never to Git.
+    # Build a temporary connection builder so special characters in the
+    # password are handled consistently, then persist only a DPAPI-protected secret.
     $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
     $builder['Host'] = $hostName
     $builder['Port'] = $port
@@ -142,15 +188,12 @@ try {
     $builder['Command Timeout'] = 30
     $builder['Maximum Pool Size'] = 5
 
-    $config = @{ connectionString = $builder.ConnectionString } | ConvertTo-Json -Compress
-    $temporaryPath = "$UserConfigPath.tmp"
-    [IO.File]::WriteAllText($temporaryPath, $config, [Text.UTF8Encoding]::new($false))
-    Move-Item -LiteralPath $temporaryPath -Destination $UserConfigPath -Force
+    Write-EncryptedConfig -Path $UserConfigPath -Connection $builder
 
     Write-Host ''
     Write-Host 'Настройки Supabase сохранены.' -ForegroundColor Green
     Write-Host "Файл конфигурации: $UserConfigPath"
-    Write-Host 'Пароль не выводился на экран и не записывался в репозиторий.'
+    Write-Host 'Пароль зашифрован Windows DPAPI для текущей учётной записи и не записывался в репозиторий.'
     Write-Host 'Запусти Loca Loca и проверь http://127.0.0.1:5181/health.'
 }
 finally {
