@@ -41,7 +41,18 @@ public sealed partial class MainWindow : Window
         var hwnd = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
         var appWindow = AppWindow.GetFromWindowId(windowId);
-        appWindow.Resize(new SizeInt32(1360, 880));
+
+        // Keep the initial window fully inside the active monitor's work area.
+        // This also handles smaller displays and work areas reduced by the taskbar.
+        var displayArea = DisplayArea.GetFromWindowId(windowId, DisplayAreaFallback.Primary);
+        var workArea = displayArea.WorkArea;
+        const int edgePadding = 24;
+        var width = Math.Min(1360, Math.Max(1, workArea.Width - edgePadding * 2));
+        var height = Math.Min(880, Math.Max(1, workArea.Height - edgePadding * 2));
+        var x = workArea.X + (workArea.Width - width) / 2;
+        var y = workArea.Y + (workArea.Height - height) / 2;
+
+        appWindow.MoveAndResize(new RectInt32(x, y, width, height));
         appWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "loca-loca.ico"));
         Closed += MainWindow_Closed;
     }
