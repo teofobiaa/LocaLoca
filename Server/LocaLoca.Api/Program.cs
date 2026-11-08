@@ -185,7 +185,7 @@ SELECT
         var hasPermissions = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
         if (!hasPermissions)
             return Results.Json(new HealthDto(true, false,
-                "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Выполни database/security/05_create_app_role.sql и проверь имя роли."),
+                "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграции 04 и database/migrations/07_migrate_photo_storage.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql."),
                 statusCode: 503);
         return Results.Ok(new HealthDto(true, true, "Supabase PostgreSQL подключена; права роли LocaLoca проверены."));
     }
