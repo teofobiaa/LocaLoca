@@ -617,6 +617,61 @@ public sealed partial class MainWindow : Window
         HomeNavButton.Background = page == "home" ? Brush("#29443D") : Brush("Transparent");
     }
 
+    private async void ChangeDisplayName_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentUser is null) return;
+
+        var nameBox = new TextBox
+        {
+            Text = _currentUser.DisplayName,
+            PlaceholderText = "Как к тебе обращаться",
+            MaxLength = 40,
+            MinWidth = 300
+        };
+        var content = new StackPanel { Spacing = 8 };
+        content.Children.Add(new TextBlock
+        {
+            Text = "Это имя будет отображаться в приветствии и профиле. Логин для входа не изменится.",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brush("#718078")
+        });
+        content.Children.Add(nameBox);
+
+        var dialog = new ContentDialog
+        {
+            Title = "Изменить имя пользователя",
+            Content = content,
+            PrimaryButtonText = "Сохранить",
+            CloseButtonText = "Отмена",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = Root.XamlRoot
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+
+        var newName = nameBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            await ShowMessageAsync("Имя не указано", "Введи имя длиной от 1 до 40 символов.");
+            return;
+        }
+        if (string.Equals(newName, _currentUser.DisplayName, StringComparison.Ordinal))
+            return;
+
+        try
+        {
+            var updatedUser = await _api.UpdateDisplayNameAsync(newName);
+            _currentUser = updatedUser;
+            ProfileNameText.Text = updatedUser.DisplayName;
+            if (DashboardPage.Visibility == Visibility.Visible)
+                PageTitle.Text = $"Привет, {updatedUser.DisplayName}";
+            await ShowMessageAsync("Имя обновлено", "Новое имя сохранено в профиле.");
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось изменить имя", ex.Message);
+        }
+    }
+
     private void Logout_Click(object sender, RoutedEventArgs e)
     {
         _api.Logout();
