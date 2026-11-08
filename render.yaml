@@ -3,6 +3,7 @@ services:
     name: localoca-api
     runtime: docker
     plan: free
+    autoDeployTrigger: commit
     dockerfilePath: ./Server/LocaLoca.Api/Dockerfile
     dockerContext: .
     healthCheckPath: /health
