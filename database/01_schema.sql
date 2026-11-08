@@ -58,7 +58,14 @@ CREATE TABLE photos (
     visit_id       integer      NOT NULL REFERENCES visits (visit_id) ON DELETE CASCADE,
     file_path      varchar(500) NOT NULL,
     caption        varchar(200) NOT NULL DEFAULT '',
-    added_at       timestamptz  NOT NULL DEFAULT now()
+    image_data     bytea,
+    content_type   varchar(100),
+    added_at       timestamptz  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_photos_image_payload CHECK (
+        (image_data IS NULL AND content_type IS NULL) OR
+        (image_data IS NOT NULL AND octet_length(image_data) BETWEEN 1 AND 20971520
+            AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
+    )
 );
 
 -- Список мест, которые пользователь хочет посетить.
