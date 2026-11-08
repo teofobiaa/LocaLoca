@@ -107,6 +107,7 @@ app.MapGet("/health", async Task<IResult> () =>
 SELECT
     has_table_privilege(current_user, 'public.users', 'SELECT')
     AND has_table_privilege(current_user, 'public.users', 'INSERT')
+    AND has_column_privilege(current_user, 'public.users', 'display_name', 'UPDATE')
     AND has_table_privilege(current_user, 'public.categories', 'SELECT')
     AND has_table_privilege(current_user, 'public.countries', 'SELECT')
     AND has_table_privilege(current_user, 'public.cities', 'SELECT')
@@ -186,6 +187,25 @@ app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, Sessio
         return Results.Unauthorized();
     var user = new UserDto(reader.GetInt32(0), login, reader.GetString(2));
     return Results.Ok(new AuthResponse(user, sessions.Create(user.Id)));
+});
+
+app.MapPut("/api/me/profile/display-name", async Task<IResult> (UpdateDisplayNameRequest request, HttpContext context, SessionStore sessions) =>
+{
+    if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+
+    var displayName = (request.DisplayName ?? string.Empty).Trim();
+    if (displayName.Length is < 1 or > 40)
+        return Results.BadRequest(new ErrorDto("Имя должно содержать от 1 до 40 символов."));
+
+    await using var connection = await OpenAsync(connectionString);
+    await using var command = new NpgsqlCommand(
+        "UPDATE users SET display_name = @display WHERE user_id = @user RETURNING login", connection);
+    command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
+    command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
+    var login = await command.ExecuteScalarAsync() as string;
+    if (login is null) return Results.NotFound(new ErrorDto("Аккаунт не найден."));
+
+    return Results.Ok(new UserDto(userId, login, displayName));
 });
 
 app.MapGet("/api/catalog/categories", async Task<IResult> () =>
@@ -960,6 +980,7 @@ sealed class SessionStore
 
 record RegisterRequest(string Login, string Password, string DisplayName);
 record LoginRequest(string Login, string Password);
+record UpdateDisplayNameRequest(string? DisplayName);
 record UserDto(int Id, string Login, string DisplayName);
 record AuthResponse(UserDto User, string Token);
 record ErrorDto(string Error);
