@@ -48,6 +48,9 @@ public sealed class LocaLocaApiClient : IDisposable
 
     public async Task<HealthDto> EnsureApiAndDatabaseAsync(CancellationToken cancellationToken = default)
     {
+        // Check local process liveness separately: a slow /ready response must
+        // never make the client start a second API process on the same port.
+        var localApiIsResponding = !_useRemoteApi && await TryLivenessAsync(cancellationToken);
         HealthDto? firstHealth = await TryReadinessAsync(cancellationToken);
         if (firstHealth is { ApiConfigured: true, DatabaseConnected: true })
             return firstHealth;
@@ -59,7 +62,7 @@ public sealed class LocaLocaApiClient : IDisposable
                 "Облачный API недоступен. Проверь интернет и адрес LOCA_API_BASE_URL.");
 
         // If something already answers on localhost, don't start a second API process.
-        if (firstHealth is not null)
+        if (firstHealth is not null || localApiIsResponding)
         {
             for (var i = 0; i < 12; i++)
             {
@@ -68,7 +71,8 @@ public sealed class LocaLocaApiClient : IDisposable
                 if (current is { ApiConfigured: true, DatabaseConnected: true }) return current;
                 if (current is not null) firstHealth = current;
             }
-            throw new InvalidOperationException(firstHealth.Message);
+            throw new InvalidOperationException(firstHealth?.Message ??
+                "Локальный API отвечает на /health, но /ready не вернул корректный ответ. Проверь подключение к Supabase.");
         }
 
         var apiPath = Path.Combine(AppContext.BaseDirectory, "Server", "LocaLoca.Api.exe");
@@ -289,6 +293,19 @@ public sealed class LocaLocaApiClient : IDisposable
     }
 
     public void Logout() => _token = null;
+
+    private async Task<bool> TryLivenessAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var shortTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            shortTimeout.CancelAfter(TimeSpan.FromSeconds(1.5));
+            using var response = await _http.GetAsync("health", shortTimeout.Token);
+            return response.IsSuccessStatusCode;
+        }
+        catch (HttpRequestException) { return false; }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { return false; }
+    }
 
     private async Task<HealthDto?> TryReadinessAsync(CancellationToken cancellationToken)
     {
