@@ -4,7 +4,7 @@
 [Setup]
 AppId={{1A6F10BC-6F72-4E6F-A481-C47C3B32A8DA}
 AppName=Loca Loca
-AppVersion=1.0.2
+AppVersion=1.0.3
 AppPublisher=Loca Loca
 DefaultDirName={localappdata}\Programs\LocaLoca
 DefaultGroupName=Loca Loca
@@ -30,8 +30,7 @@ Name: "desktopicon"; Description: "Создать ярлык на рабочем
 
 [Files]
 Source: "{#BuildDir}\*"; DestDir: "{app}"; Excludes: "*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "..\tools\Install-LocalDependencies.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
-Source: "..\database\*.sql"; DestDir: "{app}\database"; Flags: ignoreversion
+Source: "..\tools\Install-CloudDependencies.ps1"; DestDir: "{app}\tools"; Flags: ignoreversion
 Source: "Assets\LocaLoca-Installer.ico"; DestDir: "{app}\Assets"; Flags: ignoreversion
 
 [Icons]
@@ -53,25 +52,23 @@ begin
     PowerShellPath := ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe');
     Parameters :=
       '-NoProfile -ExecutionPolicy Bypass -File "' +
-      ExpandConstant('{app}\tools\Install-LocalDependencies.ps1') +
-      '" -DatabaseScriptsPath "' +
-      ExpandConstant('{app}\database') + '"';
+      ExpandConstant('{app}\\tools\\Install-CloudDependencies.ps1') + '"';
 
     WizardForm.StatusLabel.Caption :=
-      'Подготавливаем PostgreSQL и компоненты первого запуска. Это может занять несколько минут.';
+      'Настраиваем подключение к Supabase и проверяем компоненты первого запуска.';
     WizardForm.ProgressGauge.Style := npbstMarquee;
     WizardForm.Update;
 
     if not Exec(PowerShellPath, Parameters, ExpandConstant('{app}'),
       SW_SHOW, ewWaitUntilTerminated, ResultCode) then
     begin
-      RaiseException('Не удалось запустить настройку базы данных Loca Loca.');
+      RaiseException('Не удалось запустить настройку Supabase для Loca Loca.');
     end;
 
     if ResultCode <> 0 then
     begin
       RaiseException(
-        'Не удалось подготовить PostgreSQL. Код ошибки: ' +
+        'Не удалось настроить облачную БД. Код ошибки: ' +
         IntToStr(ResultCode) +
         '. Исправьте указанную проблему и запустите установщик повторно.'
       );
