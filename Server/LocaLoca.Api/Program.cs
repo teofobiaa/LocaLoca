@@ -527,7 +527,7 @@ app.MapGet("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visit
 app.MapGet("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    string? relativePath;
+    string relativePath;
     byte[]? imageData;
     string contentType;
     await using (var connection = await OpenAsync(connectionString))
@@ -545,7 +545,7 @@ app.MapGet("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, Htt
     if (imageData is not null) return Results.File(imageData, contentType);
 
     // Backward compatibility for records created before the database migration.
-    var fullPath = relativePath is null ? null : SafePhotoPath(dataRoot, relativePath);
+    var fullPath = SafePhotoPath(dataRoot, relativePath);
     if (fullPath is null || !File.Exists(fullPath)) return Results.NotFound();
     return Results.File(fullPath, ContentTypeFor(fullPath));
 });
@@ -788,7 +788,7 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
 app.MapGet("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    string? relativePath;
+    string relativePath;
     byte[]? imageData;
     string contentType;
     await using (var connection = await OpenAsync(connectionString))
@@ -807,7 +807,7 @@ app.MapGet("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int ph
     if (imageData is not null) return Results.File(imageData, contentType);
 
     // Backward compatibility for records created before the database migration.
-    var fullPath = relativePath is null ? null : SafePhotoPath(dataRoot, relativePath);
+    var fullPath = SafePhotoPath(dataRoot, relativePath);
     if (fullPath is null || !File.Exists(fullPath)) return Results.NotFound();
     return Results.File(fullPath, ContentTypeFor(fullPath));
 });
