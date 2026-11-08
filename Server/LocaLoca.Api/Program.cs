@@ -61,7 +61,8 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
     try
     {
         var connectionBuilder = new NpgsqlConnectionStringBuilder(connectionString);
-        var configuredHost = (connectionBuilder.Host ?? string.Empty).Trim().Trim('[', ']');            
+        var configuredHost = (connectionBuilder.Host ?? string.Empty).Trim().Trim('[', ']');
+        var isLoopbackHost =
             configuredHost.Equals("localhost", StringComparison.OrdinalIgnoreCase) ||
             configuredHost.Equals("::1", StringComparison.OrdinalIgnoreCase) ||
             configuredHost.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase);
