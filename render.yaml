@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: localoca-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Server/LocaLoca.Api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: LOCA_DB_CONNECTION
+        sync: false
