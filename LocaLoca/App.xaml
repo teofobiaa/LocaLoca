@@ -225,6 +225,7 @@
                     <SolidColorBrush x:Key="SidebarBrush" Color="#111F1B" />
                     <SolidColorBrush x:Key="SidebarHoverBrush" Color="#2B4438" />
                     <SolidColorBrush x:Key="AccentBrush" Color="#C9F27A" />
+                    <SolidColorBrush x:Key="AccentForegroundBrush" Color="#172521" />
                     <SolidColorBrush x:Key="AccentDarkBrush" Color="#A5CF65" />
                     <SolidColorBrush x:Key="CoralBrush" Color="#D98D7D" />
                     <SolidColorBrush x:Key="LineBrush" Color="#35433B" />
