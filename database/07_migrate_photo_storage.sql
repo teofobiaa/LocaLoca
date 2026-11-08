@@ -15,36 +15,25 @@ ALTER TABLE public.user_map_place_photos
     ADD COLUMN IF NOT EXISTS image_data bytea,
     ADD COLUMN IF NOT EXISTS content_type varchar(100);
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conrelid = 'public.photos'::regclass
-          AND conname = 'ck_photos_image_payload'
-    ) THEN
-        ALTER TABLE public.photos
-            ADD CONSTRAINT ck_photos_image_payload CHECK (
-                (image_data IS NULL AND content_type IS NULL) OR
-                (image_data IS NOT NULL
-                    AND octet_length(image_data) BETWEEN 1 AND 20971520
-                    AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
-            );
-    END IF;
+ALTER TABLE public.photos
+    DROP CONSTRAINT IF EXISTS ck_photos_image_payload,
+    ADD CONSTRAINT ck_photos_image_payload CHECK (
+        (image_data IS NULL AND content_type IS NULL) OR
+        (image_data IS NOT NULL
+            AND octet_length(image_data) BETWEEN 1 AND 20971520
+            AND content_type IS NOT NULL
+            AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
+    );
 
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conrelid = 'public.user_map_place_photos'::regclass
-          AND conname = 'ck_user_map_place_photos_image_payload'
-    ) THEN
-        ALTER TABLE public.user_map_place_photos
-            ADD CONSTRAINT ck_user_map_place_photos_image_payload CHECK (
-                (image_data IS NULL AND content_type IS NULL) OR
-                (image_data IS NOT NULL
-                    AND octet_length(image_data) BETWEEN 1 AND 20971520
-                    AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
-            );
-    END IF;
-END $$;
+ALTER TABLE public.user_map_place_photos
+    DROP CONSTRAINT IF EXISTS ck_user_map_place_photos_image_payload,
+    ADD CONSTRAINT ck_user_map_place_photos_image_payload CHECK (
+        (image_data IS NULL AND content_type IS NULL) OR
+        (image_data IS NOT NULL
+            AND octet_length(image_data) BETWEEN 1 AND 20971520
+            AND content_type IS NOT NULL
+            AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
+    );
 
 -- Re-apply the least-privilege table grants so the runtime role can access the new columns.
 GRANT SELECT, INSERT, DELETE ON TABLE public.photos, public.user_map_place_photos TO localoca_app;
