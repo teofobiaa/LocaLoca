@@ -52,7 +52,7 @@ CREATE TABLE visits (
     created_at     timestamptz NOT NULL DEFAULT now()
 );
 
--- В базе хранится только путь к файлу; сами изображения лежат в папке на диске.
+-- Метаданные и бинарные данные фотографий хранятся вместе в PostgreSQL (bytea).
 CREATE TABLE photos (
     photo_id       integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     visit_id       integer      NOT NULL REFERENCES visits (visit_id) ON DELETE CASCADE,
