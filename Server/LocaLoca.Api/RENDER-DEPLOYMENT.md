@@ -34,7 +34,7 @@ Render provides the `PORT` environment variable. The API binds to
 `0.0.0.0:$PORT` in the container; local development retains
 `http://127.0.0.1:5181`.
 
-## Photos: known limitation
+## Photos: PostgreSQL storage
 
 Photo upload and retrieval use PostgreSQL `bytea` columns in
 `public.photos` and `public.user_map_place_photos`. The API stores image bytes
