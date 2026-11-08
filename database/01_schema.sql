@@ -64,7 +64,7 @@ CREATE TABLE photos (
     CONSTRAINT ck_photos_image_payload CHECK (
         (image_data IS NULL AND content_type IS NULL) OR
         (image_data IS NOT NULL AND octet_length(image_data) BETWEEN 1 AND 20971520
-            AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
+            AND content_type IS NOT NULL AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
     )
 );
 
@@ -106,7 +106,7 @@ CREATE TABLE user_map_place_photos (
     CONSTRAINT ck_user_map_place_photos_image_payload CHECK (
         (image_data IS NULL AND content_type IS NULL) OR
         (image_data IS NOT NULL AND octet_length(image_data) BETWEEN 1 AND 20971520
-            AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
+            AND content_type IS NOT NULL AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
     )
 );
 
