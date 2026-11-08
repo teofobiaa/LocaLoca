@@ -266,7 +266,6 @@ try {
     $builder['Username'] = $username
     $builder['Password'] = $password
     $builder['SSL Mode'] = 'Require'
-    $builder['Trust Server Certificate'] = $true
     $builder['Pooling'] = $true
     $builder['Timeout'] = 15
     $builder['Command Timeout'] = 30

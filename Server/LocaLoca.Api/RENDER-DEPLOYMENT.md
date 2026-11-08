@@ -41,7 +41,7 @@ Photo upload and retrieval use PostgreSQL `bytea` columns in
 and MIME type in the same transaction as the photo metadata. Render's ephemeral
 filesystem is no longer used for new uploads.
 
-For an existing database, run `database/07_migrate_photo_storage.sql` in the
+For an existing database, run `database/migrations/07_migrate_photo_storage.sql` in the
 Supabase SQL Editor as the database administrator **before deploying this API
 version**. The API readiness check returns HTTP 503 until both photo tables have
 the required columns and the runtime role has the required table/column grants.

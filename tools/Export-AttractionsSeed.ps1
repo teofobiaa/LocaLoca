@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [string]$ConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json'),
-    [string]$OutputPath = (Join-Path $PSScriptRoot '..\database\02_seed.sql'),
+    [string]$OutputPath = (Join-Path $PSScriptRoot '..\database\seed\02_seed.sql'),
     [int]$ExpectedCount = 44
 )
 
@@ -33,9 +33,49 @@ if ([string]::IsNullOrWhiteSpace($connectionString)) {
 
     $config = Get-Content -LiteralPath $ConfigPath -Raw | ConvertFrom-Json
     $connectionString = [string]$config.connectionString
+
+    if ([string]::IsNullOrWhiteSpace($connectionString) -and
+        -not [string]::IsNullOrWhiteSpace([string]$config.encryptedPassword)) {
+        Add-Type -AssemblyName System.Security
+
+        $encryptedBytes = $null
+        $passwordBytes = $null
+        $password = $null
+        try {
+            $encryptedBytes = [Convert]::FromBase64String([string]$config.encryptedPassword)
+            $passwordBytes = [Security.Cryptography.ProtectedData]::Unprotect(
+                $encryptedBytes,
+                $null,
+                [Security.Cryptography.DataProtectionScope]::CurrentUser
+            )
+            $password = [Text.Encoding]::UTF8.GetString($passwordBytes)
+
+            $connectionBuilder = [System.Data.Common.DbConnectionStringBuilder]::new()
+            $connectionBuilder['Host'] = [string]$config.host
+            $connectionBuilder['Port'] = if ($config.port) { [int]$config.port } else { 5432 }
+            $connectionBuilder['Database'] = if ($config.database) { [string]$config.database } else { 'postgres' }
+            $connectionBuilder['Username'] = [string]$config.username
+            $connectionBuilder['Password'] = $password
+            $connectionBuilder['SSL Mode'] = 'Require'
+            $connectionBuilder['Pooling'] = $true
+            $connectionBuilder['Timeout'] = 15
+            $connectionBuilder['Command Timeout'] = 30
+            $connectionBuilder['Maximum Pool Size'] = 5
+            $connectionString = $connectionBuilder.ConnectionString
+        }
+        catch {
+            throw "Не удалось расшифровать пароль из $ConfigPath. Запусти PowerShell под той же учётной записью Windows, под которой создавалась конфигурация. $($_.Exception.Message)"
+        }
+        finally {
+            if ($null -ne $encryptedBytes) { [Array]::Clear($encryptedBytes, 0, $encryptedBytes.Length) }
+            if ($null -ne $passwordBytes) { [Array]::Clear($passwordBytes, 0, $passwordBytes.Length) }
+            $password = $null
+            $connectionBuilder = $null
+        }
+    }
 }
 if ([string]::IsNullOrWhiteSpace($connectionString)) {
-    throw "Не найдена строка подключения ни в LOCA_DB_CONNECTION, ни в файле $ConfigPath."
+    throw "Не найдена строка подключения или DPAPI-конфигурация ни в LOCA_DB_CONNECTION, ни в файле $ConfigPath."
 }
 
 $builder = [System.Data.Common.DbConnectionStringBuilder]::new()
