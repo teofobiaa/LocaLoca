@@ -57,13 +57,13 @@ FROM pg_roles
 WHERE rolname = 'localoca_app';
 
 SELECT
-    has_table_privilege('localoca_app', 'public.users', 'SELECT,INSERT') AS users_ok,
+    (has_table_privilege('localoca_app', 'public.users', 'SELECT') AND has_table_privilege('localoca_app', 'public.users', 'INSERT')) AS users_ok,
     has_table_privilege('localoca_app', 'public.categories', 'SELECT') AS categories_ok,
     has_table_privilege('localoca_app', 'public.countries', 'SELECT') AS countries_ok,
     has_table_privilege('localoca_app', 'public.cities', 'SELECT') AS cities_ok,
     has_table_privilege('localoca_app', 'public.attractions', 'SELECT') AS attractions_ok,
-    has_table_privilege('localoca_app', 'public.visits', 'SELECT,INSERT,UPDATE,DELETE') AS visits_ok,
-    has_table_privilege('localoca_app', 'public.photos', 'SELECT,INSERT,DELETE') AS photos_ok,
-    has_table_privilege('localoca_app', 'public.wishlist', 'SELECT,INSERT,DELETE') AS wishlist_ok,
-    has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT,INSERT,UPDATE,DELETE') AS user_map_places_ok,
-    has_table_privilege('localoca_app', 'public.user_map_place_photos', 'SELECT,INSERT,DELETE') AS user_map_place_photos_ok;
+    (has_table_privilege('localoca_app', 'public.visits', 'SELECT') AND has_table_privilege('localoca_app', 'public.visits', 'INSERT') AND has_table_privilege('localoca_app', 'public.visits', 'UPDATE') AND has_table_privilege('localoca_app', 'public.visits', 'DELETE')) AS visits_ok,
+    (has_table_privilege('localoca_app', 'public.photos', 'SELECT') AND has_table_privilege('localoca_app', 'public.photos', 'INSERT') AND has_table_privilege('localoca_app', 'public.photos', 'DELETE')) AS photos_ok,
+    (has_table_privilege('localoca_app', 'public.wishlist', 'SELECT') AND has_table_privilege('localoca_app', 'public.wishlist', 'INSERT') AND has_table_privilege('localoca_app', 'public.wishlist', 'DELETE')) AS wishlist_ok,
+    (has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE') AND has_table_privilege('localoca_app', 'public.user_map_places', 'DELETE')) AS user_map_places_ok,
+    (has_table_privilege('localoca_app', 'public.user_map_place_photos', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE')) AS user_map_place_photos_ok;
