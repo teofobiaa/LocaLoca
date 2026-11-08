@@ -6,6 +6,8 @@ $InstallerIcon = Join-Path $ProjectRoot 'installer/Assets/LocaLoca-Installer.ico
 $BootstrapScript = Join-Path $ProjectRoot 'tools/Install-CloudDependencies.ps1'
 $WindowsOutput = Join-Path $ProjectRoot 'Builds/Windows'
 $InstallerOutput = Join-Path $ProjectRoot 'Builds/Installer'
+if (Test-Path -LiteralPath $InstallerOutput) { Remove-Item -LiteralPath $InstallerOutput -Recurse -Force }
+New-Item -ItemType Directory -Path $InstallerOutput -Force | Out-Null
 
 $iscc = Get-Command ISCC.exe -ErrorAction SilentlyContinue
 if ($iscc) {
@@ -47,7 +49,6 @@ if (-not (Test-Path -LiteralPath (Join-Path $WindowsOutput 'Assets/loca-loca.ico
 	throw 'Не найдена иконка приложения в Builds/Windows/Assets.'
 }
 
-New-Item -ItemType Directory -Path $InstallerOutput -Force | Out-Null
 & $isccPath $InstallerScript
 if ($LASTEXITCODE -ne 0) { throw 'Компиляция установщика завершилась ошибкой.' }
 
