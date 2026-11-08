@@ -1,11 +1,30 @@
 [CmdletBinding()]
 param(
-    [string]$UserConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json')
+    [string]$UserConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json'),
+    [string]$LogPath = (Join-Path $env:TEMP 'LocaLoca-CloudSetup.log')
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+if (Test-Path -LiteralPath $LogPath) { Remove-Item -LiteralPath $LogPath -Force -ErrorAction SilentlyContinue }
 $WebViewRuntimeGuid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+
+trap {
+    $record = $_
+    $lineNumber = 0
+    if ($record.InvocationInfo) { $lineNumber = $record.InvocationInfo.ScriptLineNumber }
+    $detail = "Setup failed: $($record.Exception.Message)" + [Environment]::NewLine +
+        "Script line: $lineNumber" + [Environment]::NewLine +
+        "Command: $($record.InvocationInfo.Line)"
+    try {
+        [IO.File]::WriteAllText($LogPath, $detail, [Text.UTF8Encoding]::new($false))
+    }
+    catch { }
+    Write-Host ''
+    Write-Host "Ошибка настройки Loca Loca: $($record.Exception.Message)" -ForegroundColor Red
+    Write-Host "Подробности записаны в: $LogPath" -ForegroundColor Yellow
+    exit 1
+}
 
 function Read-RequiredValue {
     param([Parameter(Mandatory = $true)][string]$Prompt, [string]$Default = '')
@@ -58,6 +77,23 @@ function Ensure-WebView2 {
     Remove-Item -LiteralPath $installerPath -Force -ErrorAction SilentlyContinue
     if (-not (Test-WebView2Installed)) { throw 'Установщик завершился, но WebView2 Runtime не обнаружен.' }
     Write-Host 'WebView2 Runtime установлен.' -ForegroundColor Green
+}
+
+function Get-ConfiguredCloudApiUrl {
+    foreach ($scope in @('Process', 'User', 'Machine')) {
+        $value = [Environment]::GetEnvironmentVariable('LOCA_API_BASE_URL', $scope)
+        if ([string]::IsNullOrWhiteSpace($value)) { continue }
+
+        $uri = $null
+        if (-not [Uri]::TryCreate($value.Trim(), [UriKind]::Absolute, [ref]$uri) -or
+            $uri.Scheme -ne [Uri]::UriSchemeHttps) {
+            throw "LOCA_API_BASE_URL задан некорректно. Укажи полный HTTPS-адрес Render, например https://localoca-api.onrender.com."
+        }
+
+        return $uri
+    }
+
+    return $null
 }
 
 function Test-LoopbackHost {
@@ -115,7 +151,14 @@ function Write-EncryptedConfig {
 Write-Host 'Настройка Loca Loca: Supabase PostgreSQL' -ForegroundColor Cyan
 Write-Host 'Локальная PostgreSQL больше не устанавливается. Все устройства подключаются к общей облачной базе.' -ForegroundColor Gray
 
+$cloudApiUri = Get-ConfiguredCloudApiUrl
 Ensure-WebView2
+
+if ($cloudApiUri) {
+    Write-Host "Обнаружен облачный API: $($cloudApiUri.GetLeftPart([UriPartial]::Authority))" -ForegroundColor Green
+    Write-Host 'Прямое подключение Windows-клиента к Supabase не требуется. Пропускаем настройку локальной БД.' -ForegroundColor Gray
+    exit 0
+}
 
 $configDirectory = Split-Path -Parent $UserConfigPath
 New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
