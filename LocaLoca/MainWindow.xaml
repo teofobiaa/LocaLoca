@@ -190,7 +190,7 @@
                     <Border Grid.Column="1" Background="#FFFFFF" CornerRadius="13" Padding="13,9" VerticalAlignment="Center" BorderBrush="#E7EBE5" BorderThickness="1">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Ellipse Width="8" Height="8" Fill="#70B779" />
-                            <TextBlock x:Name="ConnectionStatusText" Text="Локальная база подключена" FontSize="11" Foreground="#65756B" VerticalAlignment="Center" />
+                            <TextBlock x:Name="ConnectionStatusText" Text="Облачная база подключена" FontSize="11" Foreground="#65756B" VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
                 </Grid>
