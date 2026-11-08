@@ -161,7 +161,7 @@ $port = 0
 if (-not [int]::TryParse($portText, [ref]$port) -or $port -lt 1 -or $port -gt 65535) { throw 'Порт должен быть числом от 1 до 65535.' }
 
 $database = Read-RequiredValue 'Имя базы данных' 'postgres'
-$username = Read-RequiredValue 'Пользователь БД' 'postgres.kkpfmslpweyotusmthvo'
+$username = Read-RequiredValue 'Пользователь БД (для Session Pooler: localoca_app.<project-ref>)'
 if (Test-LoopbackHost $hostName) { throw 'Нужно указать удалённый адрес Supabase, а не localhost или 127.0.0.1.' }
 if ($hostName -notlike '*.supabase.com' -and $hostName -notlike '*.supabase.co') { throw 'Указанный адрес не похож на домен Supabase. Проверь значение в Supabase Dashboard -> Connect.' }
 
