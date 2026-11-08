@@ -10,8 +10,13 @@ infrastructure, not a declaration that the cloud migration is complete.
 3. Set the secret `LOCA_DB_CONNECTION` in the Render service environment. Use the
    Supabase PostgreSQL connection string for the dedicated least-privilege
    `localoca_app` role and require TLS. Never commit this value.
-4. Deploy and inspect the service logs.
-5. Check `https://<render-service>.onrender.com/health`.
+4. Set `LOCA_SESSION_SECRET` to a cryptographically random value of at least 32 characters. Generate one locally with PowerShell:
+   ```powershell
+   [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+   ```
+   Keep the value only in Render environment settings; do not commit it.
+5. Deploy and inspect the service logs.
+6. Check `https://<render-service>.onrender.com/health`.
 
 Render provides the `PORT` environment variable. The API binds to
 `0.0.0.0:$PORT` in the container; local development retains
@@ -27,10 +32,10 @@ until all items below are implemented and tested:
   place photos to a private Supabase Storage bucket, including upload, download,
   and delete paths. Preserve per-user authorization. Existing database
   `file_path` values need a migration/compatibility strategy.
-- **Sessions:** `SessionStore` currently keeps bearer tokens in process memory.
-  A Render restart or instance replacement invalidates all sessions. Persist
-  hashed session tokens with expiry in PostgreSQL (or replace them with a properly
-  signed, expiring token design) before relying on cloud sessions.
+- **Sessions:** bearer tokens are now signed, expiring tokens (30-day lifetime).
+  In Render, the signing key is read from `LOCA_SESSION_SECRET`; keep it stable
+  across deploys and rotations. Local development generates an ephemeral key,
+  so local sessions are intentionally invalidated when the API restarts.
 - **Desktop client:** `LocaLocaApiClient` still targets localhost and starts the
   packaged local API process. Add a configurable HTTPS API base URL and stop
   requiring the local server for cloud mode. Keep a developer-only local override.
