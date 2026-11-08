@@ -48,7 +48,7 @@ public sealed class LocaLocaApiClient : IDisposable
 
     public async Task<HealthDto> EnsureApiAndDatabaseAsync(CancellationToken cancellationToken = default)
     {
-        HealthDto? firstHealth = await TryHealthAsync(cancellationToken);
+        HealthDto? firstHealth = await TryReadinessAsync(cancellationToken);
         if (firstHealth is { ApiConfigured: true, DatabaseConnected: true })
             return firstHealth;
 
@@ -64,7 +64,7 @@ public sealed class LocaLocaApiClient : IDisposable
             for (var i = 0; i < 12; i++)
             {
                 await Task.Delay(500, cancellationToken);
-                var current = await TryHealthAsync(cancellationToken);
+                var current = await TryReadinessAsync(cancellationToken);
                 if (current is { ApiConfigured: true, DatabaseConnected: true }) return current;
                 if (current is not null) firstHealth = current;
             }
@@ -99,7 +99,7 @@ public sealed class LocaLocaApiClient : IDisposable
             if (_apiProcess.HasExited)
                 throw new InvalidOperationException($"Локальный API завершился с кодом {_apiProcess.ExitCode}. Проверь облачную конфигурацию Supabase в %LOCALAPPDATA%\\LocaLoca\\server-config.json.");
 
-            var health = await TryHealthAsync(cancellationToken);
+            var health = await TryReadinessAsync(cancellationToken);
             if (health is { ApiConfigured: true, DatabaseConnected: true }) return health;
             if (health is not null) lastMessage = health.Message;
         }
@@ -290,13 +290,13 @@ public sealed class LocaLocaApiClient : IDisposable
 
     public void Logout() => _token = null;
 
-    private async Task<HealthDto?> TryHealthAsync(CancellationToken cancellationToken)
+    private async Task<HealthDto?> TryReadinessAsync(CancellationToken cancellationToken)
     {
         try
         {
             using var shortTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            shortTimeout.CancelAfter(TimeSpan.FromSeconds(1.5));
-            using var response = await _http.GetAsync("health", shortTimeout.Token);
+            shortTimeout.CancelAfter(_useRemoteApi ? TimeSpan.FromSeconds(90) : TimeSpan.FromSeconds(10));
+            using var response = await _http.GetAsync("ready", shortTimeout.Token);
             return await response.Content.ReadFromJsonAsync<HealthDto>(JsonOptions, shortTimeout.Token)
                    ?? new HealthDto(false, false, "API вернул пустой ответ.");
         }
