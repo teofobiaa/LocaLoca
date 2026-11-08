@@ -340,11 +340,22 @@ public sealed partial class MainWindow : Window
         try
         {
             var visit = _visits.FirstOrDefault(item => item.Id == visitId);
-            PhotosList.ItemsSource = visit?.UserMapPlaceId is int placeId
+            if (visit is null || _selectedVisit?.Id != visitId) return;
+
+            var photos = visit.UserMapPlaceId is int placeId
                 ? await _api.GetMapPlacePhotosAsync(placeId)
                 : await _api.GetPhotosAsync(visitId);
+
+            // A slower response for the previous selection must not replace
+            // the photos belonging to the visit currently shown in the UI.
+            if (_selectedVisit?.Id == visitId)
+                PhotosList.ItemsSource = photos;
         }
-        catch (Exception ex) { await ShowMessageAsync("Не удалось загрузить фотографии", ex.Message); }
+        catch (Exception ex)
+        {
+            if (_selectedVisit?.Id == visitId)
+                await ShowMessageAsync("Не удалось загрузить фотографии", ex.Message);
+        }
     }
 
     private async void EditVisit_Click(object sender, RoutedEventArgs e)

@@ -4,17 +4,15 @@ on:
   push:
     branches:
       - main
-      - feature/one-click-windows-installer
-      - feature/dark-theme
-      - feature/change-username
-      - feature/supabase-cloud-postgres
+      - 'feature/**'
+      - 'refactor/**'
   pull_request:
     branches:
       - main
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: windows-installer-${{ github.ref }}
@@ -42,7 +40,9 @@ jobs:
           $files = @(
             'tools/Install-CloudDependencies.ps1',
             'tools/Export-AttractionsSeed.ps1',
-            'tools/Build-Installer.ps1'
+            'tools/Build-Windows.ps1',
+            'tools/Build-Installer.ps1',
+            'tools/Publish-LocalApi.ps1'
           )
           foreach ($file in $files) {
             Write-Host "Checking PowerShell syntax: $file"
@@ -68,8 +68,20 @@ jobs:
           path: Builds/Installer/LocaLoca-Setup.exe
           if-no-files-found: error
 
+  publish-release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: LocaLoca-Setup
+          path: Builds/Installer
+
       - name: Publish latest public installer
-        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest

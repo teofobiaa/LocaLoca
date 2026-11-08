@@ -47,7 +47,12 @@ if (-not (Test-Path -LiteralPath (Join-Path $WindowsOutput 'Assets/loca-loca.ico
 	throw 'Не найдена иконка приложения в Builds/Windows/Assets.'
 }
 
+# Clear the old installer only after the new application build has passed validation.
+if (Test-Path -LiteralPath $InstallerOutput) {
+    Remove-Item -LiteralPath $InstallerOutput -Recurse -Force
+}
 New-Item -ItemType Directory -Path $InstallerOutput -Force | Out-Null
+
 & $isccPath $InstallerScript
 if ($LASTEXITCODE -ne 0) { throw 'Компиляция установщика завершилась ошибкой.' }
 

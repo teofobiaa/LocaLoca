@@ -40,7 +40,7 @@ app.Use(async (context, next) =>
         if (!context.Response.HasStarted)
         {
             context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new { error = "Для новых точек карты требуется миграция базы. Выполните database/04_migrate_user_map_places.sql от имени администратора PostgreSQL." });
+            await context.Response.WriteAsJsonAsync(new { error = "Для новых точек карты требуется миграция базы. Выполните database/migrations/04_migrate_user_map_places.sql от имени администратора PostgreSQL." });
         }
     }
     catch (Exception ex) when (ex is NpgsqlException || ex is InvalidOperationException)
@@ -138,7 +138,7 @@ SELECT
             var photoSchemaReady = Equals(await schemaCommand.ExecuteScalarAsync(cancellationToken), true);
             if (!photoSchemaReady)
                 return Results.Json(new HealthDto(true, false,
-                    "Не настроено хранение фотографий в PostgreSQL. Выполните database/07_migrate_photo_storage.sql в Supabase SQL Editor."),
+                    "Не настроено хранение фотографий в PostgreSQL. Выполните database/migrations/07_migrate_photo_storage.sql в Supabase SQL Editor."),
                     statusCode: 503);
         }
 
@@ -185,7 +185,7 @@ SELECT
         var hasPermissions = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
         if (!hasPermissions)
             return Results.Json(new HealthDto(true, false,
-                "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Выполни database/05_create_app_role.sql и проверь имя роли."),
+                "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграции 04 и database/migrations/07_migrate_photo_storage.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql."),
                 statusCode: 503);
         return Results.Ok(new HealthDto(true, true, "Supabase PostgreSQL подключена; права роли LocaLoca проверены."));
     }

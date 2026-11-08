@@ -39,12 +39,12 @@ API читает строку подключения в следующем по�
 
 1. переменная окружения `LOCA_DB_CONNECTION`;
 2. переменная окружения `ConnectionStrings__LocaLoca`;
-3. `%LOCALAPPDATA%\LocaLoca\server-config.json`;
-4. `ConnectionStrings:LocaLoca` из appsettings.
+3. `ConnectionStrings:LocaLoca` из appsettings;
+4. `%LOCALAPPDATA%\LocaLoca\server-config.json` (локальная разработка).
 
 В репозитории нет пароля базы данных. Не добавляй connection string, пароль PostgreSQL, Supabase service-role key или другие секреты в `appsettings.json`, исходный код, issues или коммиты. Файл `server-config.json` находится в профиле Windows и исключён из Git. Пароль хранится в нём как DPAPI ciphertext (`CurrentUser`); локальный API расшифровывает его при запуске под той же учётной записью Windows. Старые конфигурации с `connectionString` поддерживаются для совместимости, а установщик мигрирует их в новый формат.
 
-**Важно для учебного проекта:** настольный API подключается к PostgreSQL напрямую, поэтому пароль из локальной конфигурации доступен пользователю этого компьютера. Используй отдельную роль PostgreSQL с минимальными правами и передавай установщик только доверенным участникам. Для публичного продукта нужно разместить ASP.NET Core API на сервере и хранить DB-секрет только на сервере; клиенты должны обращаться к API по HTTPS, а не напрямую к PostgreSQL.
+**Модель безопасности:** обычная установленная версия Windows-клиента обращается к Render API по HTTPS. Строка подключения PostgreSQL и секрет подписи сессий хранятся на стороне Render и не передаются клиенту. Только в режиме локальной разработки API запускается на компьютере разработчика и может подключаться к PostgreSQL напрямую; его пароль хранится в DPAPI-конфигурации профиля Windows. Не распространяй локальную конфигурацию и не встраивай DB-секрет в клиент.
 
 ## Облачный сервер Render
 
@@ -113,19 +113,11 @@ PNG, WEBP, BMP и GIF. Это удобно для текущего учебно�
 
 ## Схема базы данных
 
-SQL-схема и миграции расположены в `database/`. Для нового Supabase-проекта администратор один раз выполняет SQL-файлы в Supabase SQL Editor в указанном порядке:
+SQL-файлы одной PostgreSQL-базы разложены по назначению в `database/schema/`, `database/seed/`, `database/migrations/` и `database/security/`. Порядок применения и различия между новой и уже существующей базой описаны в [database/README.md](database/README.md). Скрипты не запускаются автоматически приложением: их применяет администратор базы в Supabase SQL Editor.
 
-1. `database/01_schema.sql`
-2. `database/02_seed.sql`
-3. `database/03_migrate_wishlist.sql`
-4. `database/04_migrate_user_map_places.sql`
-5. `database/05_create_app_role.sql` — создать отдельную роль приложения после замены пароля-заглушки на длинный случайный пароль.
-6. `database/06_grant_display_name_update.sql` — разрешить роли приложения менять только отображаемое имя профиля.
-7. `database/07_migrate_photo_storage.sql` — добавить хранение содержимого фотографий в PostgreSQL. Для существующей базы выполнить до обновления API.
+Для новой базы достаточно актуальной схемы, стартового каталога и создания runtime-роли. Файлы миграций нужны прежде всего для обновления ранее созданной базы; не следует запускать скрипт создания роли повторно, если роль уже существует.
 
-Для уже работающей базы не нужно повторно загружать схему и seed: проверь/примени миграцию `04` при отсутствии личных точек, затем выполни `05` (если роль ещё не создана), `06` и `07` от имени администратора. Миграция `07` добавляет `bytea`-столбцы в обе таблицы фотографий и повторно выдаёт роли `localoca_app` права чтения/добавления/удаления фото. Выполни её в Supabase SQL Editor до обновления облачного API. Скрипт `05` создаёт `localoca_app` с LOGIN, без SUPERUSER/CREATEDB/CREATEROLE/BYPASSRLS и выдаёт только необходимые права на таблицы/identity sequences. Миграция `06` добавляет только колонное право UPDATE для `users.display_name`; права на логин, хэш пароля и другие поля пользователей не выдаются. Для Supabase Session Pooler имя пользователя подключения должно быть `localoca_app.<project-ref>`, а не просто `localoca_app`.
-
-`tools/Export-AttractionsSeed.ps1` экспортирует справочный каталог из базы, указанной в `server-config.json` или `LOCA_DB_CONNECTION`; для этого на компьютере разработчика нужен PostgreSQL Command Line Tools (`psql`).
+`tools/Export-AttractionsSeed.ps1` экспортирует справочный каталог из `LOCA_DB_CONNECTION` или локального `server-config.json` (поддерживаются старый формат и DPAPI). Для этого на компьютере разработчика нужны PostgreSQL Command Line Tools (`psql`).
 
 ## Возможности
 
@@ -166,6 +158,6 @@ SQL-схема и миграции расположены в `database/`. Для
 - `LocaLoca/` — WinUI-клиент.
 - `LocaLoca/Assets/` — иконка и изображения маскота.
 - `Server/LocaLoca.Api/` — локальный ASP.NET Core API с подключением к Supabase PostgreSQL.
-- `database/` — схема, стартовые данные и миграции общей PostgreSQL.
+- `database/` — схема, стартовые данные, миграции и права runtime-роли; см. [database/README.md](database/README.md).
 - `installer/` — сценарий Inno Setup.
 - `tools/` — настройка облачного подключения, публикация API и сборка приложения/установщика.

@@ -33,9 +33,6 @@
 
 	<ItemGroup>
 		<PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
-		<PackageReference Include="Supabase" Version="8.9.0" />
-		<PackageReference Include="Supabase.Core" Version="8.9.0" />
-		<PackageReference Include="Supabase.Postgrest" Version="8.9.0" />
 	</ItemGroup>
 
 	<ItemGroup>

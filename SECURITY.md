@@ -28,7 +28,7 @@ When reporting, include as much of the following information as possible:
 
 For Loca Loca, reports may concern the Windows desktop client, the per-device local ASP.NET Core API, Supabase PostgreSQL access, data or photo handling, installer scripts, and the project's GitHub Actions workflows. Please also indicate whether the issue requires local access or can be triggered remotely.
 
-The Supabase PostgreSQL connection string is a secret. It must never be committed to the repository or embedded in the installer. Store it in the per-user `%LOCALAPPDATA%\LocaLoca\server-config.json` file or provide it through a protected environment variable. Rotate any database password that has appeared in a commit, even if the current file no longer contains it. The desktop build currently connects directly to PostgreSQL for this educational project; this is not a production-safe secret distribution model.
+The Supabase PostgreSQL connection string and the session-signing secret are server-side secrets. For the deployed application, store them only in protected Render environment variables (`LOCA_DB_CONNECTION` and `LOCA_SESSION_SECRET`); never commit them or embed them in the installer or Windows client. The standard desktop client communicates with the hosted API over HTTPS and does not receive database credentials. In optional local-development mode, the local API can read a per-user `%LOCALAPPDATA%\LocaLoca\server-config.json` file whose password is protected with Windows DPAPI (`CurrentUser`). That file must not be shared or committed. Rotate any database password that has appeared in a commit, even if the current file no longer contains it.
 
 ### Response and Disclosure
 
