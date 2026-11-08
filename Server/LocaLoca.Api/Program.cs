@@ -103,9 +103,31 @@ app.MapGet("/health", async Task<IResult> () =>
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
-        await using var command = new NpgsqlCommand("SELECT 1", connection);
-        await command.ExecuteScalarAsync();
-        return Results.Ok(new HealthDto(true, true, "Локальный API подключён к облачной PostgreSQL Supabase."));
+        const string permissionCheck = @"
+SELECT
+    has_table_privilege(current_user, 'public.users', 'SELECT')
+    AND has_table_privilege(current_user, 'public.users', 'INSERT')
+    AND has_table_privilege(current_user, 'public.categories', 'SELECT')
+    AND has_table_privilege(current_user, 'public.countries', 'SELECT')
+    AND has_table_privilege(current_user, 'public.cities', 'SELECT')
+    AND has_table_privilege(current_user, 'public.attractions', 'SELECT')
+    AND has_table_privilege(current_user, 'public.visits', 'SELECT,INSERT,UPDATE,DELETE')
+    AND has_table_privilege(current_user, 'public.photos', 'SELECT,INSERT,DELETE')
+    AND has_table_privilege(current_user, 'public.wishlist', 'SELECT,INSERT,DELETE')
+    AND has_table_privilege(current_user, 'public.user_map_places', 'SELECT,INSERT,UPDATE,DELETE')
+    AND has_table_privilege(current_user, 'public.user_map_place_photos', 'SELECT,INSERT,DELETE')
+    AND has_sequence_privilege(current_user, 'public.users_user_id_seq', 'USAGE')
+    AND has_sequence_privilege(current_user, 'public.visits_visit_id_seq', 'USAGE')
+    AND has_sequence_privilege(current_user, 'public.photos_photo_id_seq', 'USAGE')
+    AND has_sequence_privilege(current_user, 'public.user_map_places_user_map_place_id_seq', 'USAGE')
+    AND has_sequence_privilege(current_user, 'public.user_map_place_photos_photo_id_seq', 'USAGE')";
+        await using var command = new NpgsqlCommand(permissionCheck, connection);
+        var hasPermissions = Equals(await command.ExecuteScalarAsync(), true);
+        if (!hasPermissions)
+            return Results.Json(new HealthDto(true, false,
+                "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Выполни database/05_create_app_role.sql и проверь имя роли."),
+                statusCode: 503);
+        return Results.Ok(new HealthDto(true, true, "Supabase PostgreSQL подключена; права роли LocaLoca проверены."));
     }
     catch (Exception ex)
     {
