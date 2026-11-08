@@ -158,6 +158,6 @@ SQL-файлы одной PostgreSQL-базы разложены по назна
 - `LocaLoca/` — WinUI-клиент.
 - `LocaLoca/Assets/` — иконка и изображения маскота.
 - `Server/LocaLoca.Api/` — локальный ASP.NET Core API с подключением к Supabase PostgreSQL.
- - `database/` — схема, стартовые данные, миграции и права runtime-роли; см. [database/README.md](database/README.md).
+- `database/` — схема, стартовые данные, миграции и права runtime-роли; см. [database/README.md](database/README.md).
 - `installer/` — сценарий Inno Setup.
 - `tools/` — настройка облачного подключения, публикация API и сборка приложения/установщика.
