@@ -116,6 +116,7 @@
                     <SolidColorBrush x:Key="SidebarBrush" Color="#182E2A" />
                     <SolidColorBrush x:Key="SidebarHoverBrush" Color="#29443D" />
                     <SolidColorBrush x:Key="AccentBrush" Color="#C9F27A" />
+                    <SolidColorBrush x:Key="AccentForegroundBrush" Color="#172521" />
                     <SolidColorBrush x:Key="AccentDarkBrush" Color="#8EBB48" />
                     <SolidColorBrush x:Key="CoralBrush" Color="#F2B4A5" />
                     <SolidColorBrush x:Key="LineBrush" Color="#E1E7DF" />
@@ -266,7 +267,7 @@
 
             <Style x:Key="DialogPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
                 <Setter Property="Background" Value="{ThemeResource Palette_C9F27A}" />
-                <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
+                <Setter Property="Foreground" Value="{ThemeResource AccentForegroundBrush}" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="CornerRadius" Value="10" />
