@@ -33,27 +33,6 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<AttractionDto> Attractions => _attractions;
     public ObservableCollection<VisitDto> Visits => _visits;
     public ObservableCollection<AttractionDto> WishlistAttractions => _wishlistAttractions;
-    private async void ConnectButton_Click(
-    object sender,
-    Microsoft.UI.Xaml.RoutedEventArgs e)
-    {
-        try
-        {
-            var url = "https://kkpfmslpweyotusmthvo.supabase.co";
-            var key = "sb_publishable_ih5NE942Xx1hl5JmTfJIJA_mYVzAPCW";
-
-            var options = new Supabase.SupabaseOptions();
-            var client = new Supabase.Client(url, key, options);
-
-            await client.InitializeAsync();
-
-            StatusText.Text = "Клиент Supabase инициализирован.";
-        }
-        catch (Exception ex)
-        {
-            StatusText.Text = $"Ошибка подключения: {ex.Message}";
-        }
-    }
     public MainWindow()
     {
         InitializeComponent();

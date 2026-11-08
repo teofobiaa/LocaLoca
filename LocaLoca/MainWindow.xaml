@@ -67,18 +67,6 @@
             </DataTemplate>
         </Grid.Resources>
         <!-- Authentication -->
-        <Button
-    Content="Проверить подключение"
-    Click="ConnectButton_Click"
-    HorizontalAlignment="Right"
-    VerticalAlignment="Top"
-    Margin="12" />
-
-        <TextBlock
-    x:Name="StatusText"
-    HorizontalAlignment="Right"
-    VerticalAlignment="Top"
-    Margin="12,55,12,0" />
         <Grid x:Name="AuthPage" Visibility="Visible" ColumnDefinitions="1.15*,0.85*">
             <Border Grid.Column="0" Background="#182E2A" Padding="54,42">
                 <Grid>
@@ -134,8 +122,8 @@
                     <Button x:Name="AuthSubmitButton" Content="Войти в аккаунт" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="AuthSubmit_Click" Margin="0,12,0,0" />
                     <Button x:Name="AuthModeButton" Content="Создать новый аккаунт" Background="Transparent" BorderThickness="0" Foreground="#52665A" HorizontalAlignment="Center" Click="AuthModeButton_Click" />
                     <TextBlock x:Name="AuthStatusText" Text="Проверяем локальное подключение…" TextWrapping="Wrap" Foreground="#86948B" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center" />
-                    <Button x:Name="RetryConnectionButton" Content="Повторить подключение" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Center" Visibility="Collapsed" Click="RetryConnection_Click" />
-                </StackPanel>
+                        <Button x:Name="RetryConnectionButton" Content="Повторить подключение" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Center" Visibility="Collapsed" Click="RetryConnection_Click" />
+                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>
