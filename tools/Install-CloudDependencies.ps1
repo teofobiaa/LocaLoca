@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$UserConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json'),
-    [string]$LogPath = (Join-Path $env:TEMP 'LocaLoca-CloudSetup.log')
+    [string]$LogPath = (Join-Path $env:TEMP 'LocaLoca-CloudSetup.log'),
+    [string]$CloudApiUrl = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -80,6 +81,16 @@ function Ensure-WebView2 {
 }
 
 function Get-ConfiguredCloudApiUrl {
+    if (-not [string]::IsNullOrWhiteSpace($CloudApiUrl)) {
+        $value = $CloudApiUrl.Trim()
+        $uri = $null
+        if (-not [Uri]::TryCreate($value, [UriKind]::Absolute, [ref]$uri) -or
+            $uri.Scheme -ne [Uri]::UriSchemeHttps) {
+            throw 'Параметр CloudApiUrl должен содержать корректный HTTPS-адрес Render.'
+        }
+        return $uri
+    }
+
     foreach ($scope in @('Process', 'User', 'Machine')) {
         $value = [Environment]::GetEnvironmentVariable('LOCA_API_BASE_URL', $scope)
         if ([string]::IsNullOrWhiteSpace($value)) { continue }
@@ -155,8 +166,31 @@ $cloudApiUri = Get-ConfiguredCloudApiUrl
 Ensure-WebView2
 
 if ($cloudApiUri) {
-    Write-Host "Обнаружен облачный API: $($cloudApiUri.GetLeftPart([UriPartial]::Authority))" -ForegroundColor Green
-    Write-Host 'Прямое подключение Windows-клиента к Supabase не требуется. Пропускаем настройку локальной БД.' -ForegroundColor Gray
+    $apiBaseUrl = $cloudApiUri.GetLeftPart([UriPartial]::Authority).TrimEnd('/')
+    $clientConfigDirectory = Split-Path -Parent $UserConfigPath
+    New-Item -ItemType Directory -Path $clientConfigDirectory -Force | Out-Null
+
+    $clientConfigPath = Join-Path $clientConfigDirectory 'client-config.json'
+    $clientConfigTemporaryPath = "$clientConfigPath.tmp"
+    $clientConfig = [ordered]@{
+        version = 1
+        apiBaseUrl = $apiBaseUrl
+    } | ConvertTo-Json -Compress
+
+    [IO.File]::WriteAllText(
+        $clientConfigTemporaryPath,
+        $clientConfig,
+        [Text.UTF8Encoding]::new($false)
+    )
+    Move-Item -LiteralPath $clientConfigTemporaryPath -Destination $clientConfigPath -Force
+
+    # Keep the environment variable as an explicit override for developers.
+    [Environment]::SetEnvironmentVariable('LOCA_API_BASE_URL', $apiBaseUrl, 'User')
+    $env:LOCA_API_BASE_URL = $apiBaseUrl
+
+    Write-Host "Облачный API настроен: $apiBaseUrl" -ForegroundColor Green
+    Write-Host "Конфигурация сохранена: $clientConfigPath"
+    Write-Host 'Прямое подключение Windows-клиента к Supabase не требуется.' -ForegroundColor Gray
     exit 0
 }
 
