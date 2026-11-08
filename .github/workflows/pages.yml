@@ -4,8 +4,8 @@ on:
   push:
     branches: [main]
     paths:
-      - 'index.html'
-      - 'styles.css'
+      - 'site/**'
+      - 'site/**'
       - '.github/workflows/pages.yml'
       - 'LocaLoca/Assets/**'
   workflow_dispatch:
@@ -33,7 +33,7 @@ jobs:
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: ./site
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
