@@ -551,7 +551,7 @@ public sealed partial class MainWindow : Window
     private async void DeletePhoto_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || button.DataContext is not PhotoDto photo || _selectedVisit is null) return;
-        var result = await ConfirmAsync("Удалить фотографию?", "Файл будет удалён из локального хранилища.");
+        var result = await ConfirmAsync("Удалить фотографию?", "Фотография будет удалена из облачной базы данных.");
         if (result != ContentDialogResult.Primary) return;
         try
         {
