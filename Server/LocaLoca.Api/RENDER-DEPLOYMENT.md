@@ -26,8 +26,9 @@ and deploys new commits from the branch selected when the Blueprint is created.
 6. Save the environment variables and let Render deploy the service. Open the
    service's Events and Logs tabs and wait for a successful deploy.
 7. Copy the service's `onrender.com` URL from its Overview page and check
-   `https://<render-service>.onrender.com/health`. A healthy response must report
-   both API configuration and database connectivity.
+   `https://<render-service>.onrender.com/health` for API availability, then
+   `https://<render-service>.onrender.com/ready` to verify database connectivity
+   and application-role permissions.
 
 Render provides the `PORT` environment variable. The API binds to
 `0.0.0.0:$PORT` in the container; local development retains
@@ -51,7 +52,7 @@ local sessions are invalidated when the API restarts.
 
 ## Connect the Windows desktop client
 
-After `/health` reports a healthy API and database, run this in PowerShell on
+After `/health` reports API availability and `/ready` confirms the database, run this in PowerShell on
 the Windows PC that will use LocaLoca (replace the URL with the actual Render URL):
 
 ```powershell
@@ -79,7 +80,8 @@ docker run --rm -p 10000:10000 \
   localoca-api
 ```
 
-Then request `http://localhost:10000/health`.
+Then request `http://localhost:10000/health` for API liveness and
+`http://localhost:10000/ready` for the database and permission check.
 
 A successful image build does not prove database permissions, session signing,
 photo durability, or desktop-client connectivity. The free service may sleep
