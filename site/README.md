@@ -1,11 +1,18 @@
-# Loca Loca website
+# Сайт Loca Loca
 
-This directory is reserved for the project's future static website.
+Статический сайт проекта публикуется через GitHub Pages из каталога \`site/\`.
 
-Planned content may include:
-- a short overview of Loca Loca and its features;
-- screenshots and installation instructions;
-- links to releases and documentation;
-- privacy and support information.
+## Содержимое
 
-The directory is not published through GitHub Pages yet. When the site is ready, configure the Pages workflow to publish only this directory rather than the repository root.
+- \`index.html\` — главная страница на русском языке: назначение, возможности, пример состава записи, порядок хранения данных, установка и FAQ.
+- \`styles.css\` — адаптивная визуальная система без CSS-фреймворков и JavaScript-зависимостей.
+
+## Публикация
+
+Workflow \`.github/workflows/pages.yml\` публикует содержимое \`site/\` в GitHub Pages после изменений в \`main\`. Для ручного запуска доступен \`workflow_dispatch\`.
+
+## Актуальность информации
+
+Перед изменением описания возможностей сверяйся с корневым \`README.md\`. Сейчас структурированные записи пользователя хранятся в общей Supabase PostgreSQL через облачный API. Файлы фотографий остаются локально в профиле Windows и не синхронизируются между компьютерами. При деинсталляции локальные файлы приложения, включая фотографии, удаляются; облачные записи аккаунта сохраняются.
+
+Изображение маскота загружается из каталога \`LocaLoca/Assets/Mascot/\` основной ветки репозитория. При переименовании или переносе изображения нужно обновить URL в \`index.html\`.
