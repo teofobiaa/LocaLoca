@@ -123,17 +123,20 @@ New-Item -ItemType Directory -Path $configDirectory -Force | Out-Null
 $existing = Read-ExistingConfig -Path $UserConfigPath
 $legacyConnection = $null
 $existingHost = ''
+$existingUsername = ''
 if ($existing -and -not [string]::IsNullOrWhiteSpace([string]$existing.connectionString)) {
     $legacyConnection = [System.Data.Common.DbConnectionStringBuilder]::new()
     $legacyConnection.ConnectionString = [string]$existing.connectionString
     if ($legacyConnection.ContainsKey('Host')) { $existingHost = [string]$legacyConnection['Host'] }
+    if ($legacyConnection.ContainsKey('Username')) { $existingUsername = [string]$legacyConnection['Username'] }
 }
 elseif ($existing -and -not [string]::IsNullOrWhiteSpace([string]$existing.host)) {
     $existingHost = [string]$existing.host
+    $existingUsername = [string]$existing.username
 }
 
 $existingIsSupabase = $existingHost -like '*.supabase.com' -or $existingHost -like '*.supabase.co'
-if ($existing -and $existingIsSupabase -and -not (Test-LoopbackHost $existingHost)) {
+if ($existing -and $existingIsSupabase -and -not (Test-LoopbackHost $existingHost) -and $existingUsername -like 'localoca_app.*') {
     if ($legacyConnection -and $legacyConnection.ContainsKey('Password')) {
         Write-EncryptedConfig -Path $UserConfigPath -Connection $legacyConnection
         Write-Host 'Существующий пароль Supabase зашифрован средствами Windows DPAPI.' -ForegroundColor Green
@@ -150,6 +153,9 @@ if ($existing -and $existingIsSupabase -and -not (Test-LoopbackHost $existingHos
 
 if ($existingHost -and (Test-LoopbackHost $existingHost)) {
     Write-Host 'Обнаружена старая локальная PostgreSQL. Её настройки будут заменены подключением Supabase.' -ForegroundColor Yellow
+}
+elseif ($existingIsSupabase -and $existingUsername -and $existingUsername -notlike 'localoca_app.*') {
+    Write-Host 'Обнаружено подключение Supabase под старой/административной ролью. Введи параметры роли localoca_app с минимальными правами.' -ForegroundColor Yellow
 }
 
 Write-Host ''
