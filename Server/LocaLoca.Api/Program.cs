@@ -30,7 +30,7 @@ app.Use(async (context, next) =>
         if (!context.Response.HasStarted)
         {
             context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new { error = "Не удалось обратиться к PostgreSQL. Проверьте, запущена ли служба и верны ли настройки подключения." });
+            await context.Response.WriteAsJsonAsync(new { error = "Не удалось обратиться к Supabase PostgreSQL. Проверь интернет и параметры подключения." });
         }
     }
     catch (Exception ex)
