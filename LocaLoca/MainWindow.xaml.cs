@@ -410,7 +410,7 @@ public sealed partial class MainWindow : Window
             var files = await picker.PickMultipleFilesAsync();
             if (files.Count == 0) return;
             pickedPhotos.AddRange(files);
-            photoLabel.Text = $"Выбрано новых фотографий: {pickedPhotos.Count}. Общий лимит — 20 МБ.";
+            photoLabel.Text = $"Выбрано новых фотографий: {pickedPhotos.Count}. За одну операцию — до 10 файлов и 20 МиБ суммарно.";
         };
 
         var content = new StackPanel { Spacing = 10 };
