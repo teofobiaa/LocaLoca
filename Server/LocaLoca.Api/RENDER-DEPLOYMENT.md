@@ -1,22 +1,28 @@
 # Render deployment: LocaLoca API
 
-This repository includes a Docker build and a Render Blueprint. They are deployment
-infrastructure, not a declaration that the cloud migration is complete.
+This repository includes a Docker build and a Render Blueprint. The Blueprint creates a free Docker-based Web Service, checks `/health`, and enables automatic deploys from the branch used to create the Blueprint.
 
 ## Deploy
 
-1. Push this branch to GitHub.
-2. In Render, create a new Blueprint and select this repository and branch.
-3. Set the secret `LOCA_DB_CONNECTION` in the Render service environment. Use the
-   Supabase PostgreSQL connection string for the dedicated least-privilege
-   `localoca_app` role and require TLS. Never commit this value.
-4. Set `LOCA_SESSION_SECRET` to a cryptographically random value of at least 32 characters. Generate one locally with PowerShell:
+1. Push `feature/render-cloud-server` to GitHub.
+2. Sign in to Render and open [New + → Blueprint](https://dashboard.render.com/blueprints).
+3. Connect GitHub if prompted, select `teofobiaa/LocaLoca`, and choose branch
+   `feature/render-cloud-server` (the branch containing this `render.yaml`).
+4. Review the Blueprint. It should show one Web Service named `localoca-api`,
+   runtime Docker, Free plan, and health check `/health`. Apply it.
+5. When Render prompts for `LOCA_DB_CONNECTION`, enter the Supabase PostgreSQL
+   connection string. Use a dedicated least-privilege application role and require
+   TLS. Never commit this value.
+6. Set `LOCA_SESSION_SECRET` to a cryptographically random value of at least 32 characters. Generate one locally with PowerShell:
    ```powershell
    [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
    ```
    Keep the value only in Render environment settings; do not commit it.
-5. Deploy and inspect the service logs.
-6. Check `https://<render-service>.onrender.com/health`.
+7. Save the environment variables and let Render deploy the service. Open the
+   service's Events and Logs tabs and wait for a successful deploy.
+8. Copy the service's `onrender.com` URL from its Overview page and check
+   `https://<render-service>.onrender.com/health`. A healthy response must report
+   both API configuration and database connectivity.
 
 Render provides the `PORT` environment variable. The API binds to
 `0.0.0.0:$PORT` in the container; local development retains
@@ -44,12 +50,29 @@ until all items below are implemented and tested:
   ```
   Restart the desktop application after changing the variable. Without it, local
   development continues to use `127.0.0.1:5181`.
-- **Map authentication:** the map currently places the bearer token in the query
-  string. Replace this with a short-lived one-time exchange or another mechanism
-  that does not expose the bearer token in URLs, browser history, or logs.
+- **Map authentication:** the desktop client now places the bearer token in the URL
+  fragment. The map reads it, stores it in session storage, and removes it from the
+  visible URL. Fragments are not sent in the HTTP request or ordinary server access logs.
 - **Linux validation:** verify every startup path is Linux-compatible. The
   Windows DPAPI configuration is for local desktop installations only and must
   never be required in the container.
+
+## Connect the Windows desktop client
+
+After `/health` reports a healthy API and database, run this in PowerShell on the
+Windows PC that will use LocaLoca (replace the URL with the actual Render URL):
+
+```powershell
+[Environment]::SetEnvironmentVariable("LOCA_API_BASE_URL", "https://<service>.onrender.com", "User")
+```
+
+Close and reopen LocaLoca. The client uses the cloud endpoint whenever this
+variable is set; if the remote endpoint is unavailable, it does not silently start
+a local API. Remove the variable to return to local development:
+
+```powershell
+[Environment]::SetEnvironmentVariable("LOCA_API_BASE_URL", $null, "User")
+```
 
 ## Local Docker smoke test
 
@@ -65,5 +88,7 @@ docker run --rm -p 10000:10000 \
 
 Then request `http://localhost:10000/health`.
 
-A successful image build alone does not prove database permissions, Storage access,
-session persistence, photo durability, or desktop-client connectivity.
+A successful image build alone does not prove database permissions, session signing,
+photo durability, or desktop-client connectivity. This project intentionally keeps
+photo storage on the API filesystem for this deployment iteration; Render Free does
+not provide durable local storage, so uploaded photos can disappear after restarts.
