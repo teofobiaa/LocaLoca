@@ -320,11 +320,12 @@ public sealed class LocaLocaApiClient : IDisposable
     public async Task DeleteMapPlacePhotoAsync(int photoId, CancellationToken cancellationToken = default) =>
         await SendForMessageAsync(HttpMethod.Delete, $"api/me/map-place-photos/{photoId}", null, cancellationToken);
 
-    public Uri GetMapUri(bool startNewVisit = false)
+    public Uri GetMapUri(bool startNewVisit = false, bool isDarkTheme = false)
     {
         if (string.IsNullOrWhiteSpace(_token)) throw new InvalidOperationException("Сначала выполни вход в аккаунт.");
+        var theme = isDarkTheme ? "dark" : "light";
         var mode = startNewVisit ? "&mode=visit" : string.Empty;
-        return new Uri(_http.BaseAddress!, $"map#token={Uri.EscapeDataString(_token)}{mode}");
+        return new Uri(_http.BaseAddress!, $"map?theme={theme}#token={Uri.EscapeDataString(_token)}{mode}");
     }
 
     public void Logout() => _token = null;

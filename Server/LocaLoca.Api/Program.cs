@@ -849,7 +849,6 @@ static string? ReadUserConnectionString(string configPath)
                 Username = root.GetProperty("username").GetString() ?? throw new InvalidDataException("Missing database username."),
                 Password = password,
                 SslMode = SslMode.Require,
-                TrustServerCertificate = true,
                 Pooling = true,
                 Timeout = 15,
                 CommandTimeout = 30,

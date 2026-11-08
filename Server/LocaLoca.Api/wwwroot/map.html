@@ -6,12 +6,51 @@
   <title>Loca Loca — карта</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
   <style>
-    html,body,#map{height:100%;margin:0;font-family:Arial,sans-serif;background:#eef1f5}
-    .top{position:absolute;z-index:1000;top:14px;left:50px;background:#fff;padding:10px 15px;border-radius:12px;box-shadow:0 2px 14px #17233a22;color:#18243a}
-    .top strong{font-size:15px}.top small{display:block;color:#667085;margin-top:3px}
+    :root {
+      color-scheme: light;
+      --page-bg: #eef1f5;
+      --surface: #ffffff;
+      --text: #18243a;
+      --muted: #667085;
+      --border: #d5ddd7;
+      --soft: #f0f3ed;
+      --accent: #d9ecb2;
+      --accent-text: #253524;
+      --danger-bg: #f8e2de;
+      --danger-text: #8f382e;
+      --field-text: #58685d;
+    }
+    :root[data-theme="dark"] {
+      color-scheme: dark;
+      --page-bg: #151d19;
+      --surface: #202b26;
+      --text: #e7efe9;
+      --muted: #a3b0a8;
+      --border: #46554d;
+      --soft: #2a352f;
+      --accent: #415a2c;
+      --accent-text: #e4eee6;
+      --danger-bg: #4b302d;
+      --danger-text: #e9a095;
+      --field-text: #bac7be;
+    }
+    html,body,#map{height:100%;margin:0;font-family:Arial,sans-serif;background:var(--page-bg)}
+    .top{position:absolute;z-index:1000;top:14px;left:50px;background:var(--surface);padding:10px 15px;border-radius:12px;box-shadow:0 2px 14px #17233a22;color:var(--text);border:1px solid var(--border)}
+    .top strong{font-size:15px}.top small{display:block;color:var(--muted);margin-top:3px}
     .pin{width:18px;height:18px;border:3px solid white;border-radius:50%;box-shadow:0 1px 7px #18243a77}
     .leaflet-popup-content{max-height:70vh;overflow-y:auto}
-    .place-form{display:grid;gap:7px;min-width:230px}.place-form input,.place-form select,.place-form textarea{box-sizing:border-box;width:100%;padding:7px;border:1px solid #d5ddd7;border-radius:6px;font:inherit}.place-form textarea{resize:vertical;min-height:48px}.place-form button{padding:7px 10px;border:0;border-radius:7px;background:#d9ecb2;color:#253524;cursor:pointer}.place-form .danger{background:#f8e2de;color:#8f382e}.place-form label{font-size:12px;color:#58685d}.place-photos{display:grid;gap:5px}.status-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px}.status-switch label{display:flex;align-items:center;gap:6px;padding:8px;background:#f0f3ed;border-radius:8px;font-size:12px;cursor:pointer}.status-switch input{width:auto;margin:0}.field-label{font-size:11px;color:#58685d}
+    .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--text)}
+    .leaflet-control-zoom a,.leaflet-control-attribution{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important}
+    .place-form{display:grid;gap:7px;min-width:230px;color:var(--text)}
+    .place-form input,.place-form select,.place-form textarea{box-sizing:border-box;width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font:inherit;background:var(--surface);color:var(--text)}
+    .place-form textarea{resize:vertical;min-height:48px}
+    .place-form button{padding:7px 10px;border:0;border-radius:7px;background:var(--accent);color:var(--accent-text);cursor:pointer}
+    .place-form .danger{background:var(--danger-bg);color:var(--danger-text)}
+    .place-form label{font-size:12px;color:var(--field-text)}
+    .place-photos{display:grid;gap:5px}.status-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .status-switch label{display:flex;align-items:center;gap:6px;padding:8px;background:var(--soft);border-radius:8px;font-size:12px;cursor:pointer}
+    .status-switch input{width:auto;margin:0}.field-label{font-size:11px;color:var(--field-text)}
+    :root[data-theme="dark"] .leaflet-tile-pane{filter:brightness(.78) invert(1) hue-rotate(180deg) saturate(.8) contrast(.9)}
   </style>
 </head>
 <body>
@@ -21,6 +60,7 @@
   <script>
     const params = new URLSearchParams(location.search);
     const hashParams = new URLSearchParams(location.hash.slice(1));
+    document.documentElement.dataset.theme = params.get('theme') === 'dark' ? 'dark' : 'light';
     const token = hashParams.get('token') || params.get('token') || sessionStorage.getItem('ll_token') || '';
     const startNewVisit = hashParams.get('mode') === 'visit' || params.get('mode') === 'visit';
     const now = new Date();

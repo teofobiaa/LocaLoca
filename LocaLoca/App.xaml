@@ -10,90 +10,265 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- Make text inputs readable in every visual state. -->
+            <!-- Palette and control resources are resolved again when Root.RequestedTheme changes. -->
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="TextControlBackground" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FBFCF8" />
                     <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#F0F2EE" />
-
                     <SolidColorBrush x:Key="TextControlForeground" Color="#172521" />
                     <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#172521" />
                     <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#172521" />
                     <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#87938B" />
-
                     <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#78877F" />
                     <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#66766D" />
                     <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#66766D" />
                     <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#A4AEA7" />
-
                     <SolidColorBrush x:Key="TextControlBorderBrush" Color="#D5DED6" />
                     <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#A8BB9C" />
                     <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#86A958" />
                     <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#E3E8E2" />
                     <Color x:Key="TextControlSelectionHighlightColor">#BFE879</Color>
+                    <SolidColorBrush x:Key="Palette_172521" Color="#172521" />
+                    <SolidColorBrush x:Key="Palette_182E2A" Color="#182E2A" />
+                    <SolidColorBrush x:Key="Palette_192B25" Color="#192B25" />
+                    <SolidColorBrush x:Key="Palette_1A2C26" Color="#1A2C26" />
+                    <SolidColorBrush x:Key="Palette_1A2D25" Color="#1A2D25" />
+                    <SolidColorBrush x:Key="Palette_1B2A25" Color="#1B2A25" />
+                    <SolidColorBrush x:Key="Palette_1C3028" Color="#1C3028" />
+                    <SolidColorBrush x:Key="Palette_20352A" Color="#20352A" />
+                    <SolidColorBrush x:Key="Palette_263A31" Color="#263A31" />
+                    <SolidColorBrush x:Key="Palette_263A33" Color="#263A33" />
+                    <SolidColorBrush x:Key="Palette_29443D" Color="#29443D" />
+                    <SolidColorBrush x:Key="Palette_314C43" Color="#314C43" />
+                    <SolidColorBrush x:Key="Palette_4F8758" Color="#4F8758" />
+                    <SolidColorBrush x:Key="Palette_52665A" Color="#52665A" />
+                    <SolidColorBrush x:Key="Palette_53645B" Color="#53645B" />
+                    <SolidColorBrush x:Key="Palette_596960" Color="#596960" />
+                    <SolidColorBrush x:Key="Palette_5D715F" Color="#5D715F" />
+                    <SolidColorBrush x:Key="Palette_5F7844" Color="#5F7844" />
+                    <SolidColorBrush x:Key="Palette_617F3E" Color="#617F3E" />
+                    <SolidColorBrush x:Key="Palette_65756B" Color="#65756B" />
+                    <SolidColorBrush x:Key="Palette_66766D" Color="#66766D" />
+                    <SolidColorBrush x:Key="Palette_68776E" Color="#68776E" />
+                    <SolidColorBrush x:Key="Palette_688A43" Color="#688A43" />
+                    <SolidColorBrush x:Key="Palette_6F7D74" Color="#6F7D74" />
+                    <SolidColorBrush x:Key="Palette_70B779" Color="#70B779" />
+                    <SolidColorBrush x:Key="Palette_718078" Color="#718078" />
+                    <SolidColorBrush x:Key="Palette_74837A" Color="#74837A" />
+                    <SolidColorBrush x:Key="Palette_78877F" Color="#78877F" />
+                    <SolidColorBrush x:Key="Palette_789451" Color="#789451" />
+                    <SolidColorBrush x:Key="Palette_7A8880" Color="#7A8880" />
+                    <SolidColorBrush x:Key="Palette_7A8980" Color="#7A8980" />
+                    <SolidColorBrush x:Key="Palette_7E9C54" Color="#7E9C54" />
+                    <SolidColorBrush x:Key="Palette_809087" Color="#809087" />
+                    <SolidColorBrush x:Key="Palette_819087" Color="#819087" />
+                    <SolidColorBrush x:Key="Palette_829087" Color="#829087" />
+                    <SolidColorBrush x:Key="Palette_839188" Color="#839188" />
+                    <SolidColorBrush x:Key="Palette_85928A" Color="#85928A" />
+                    <SolidColorBrush x:Key="Palette_86948B" Color="#86948B" />
+                    <SolidColorBrush x:Key="Palette_86A05F" Color="#86A05F" />
+                    <SolidColorBrush x:Key="Palette_86A958" Color="#86A958" />
+                    <SolidColorBrush x:Key="Palette_87938B" Color="#87938B" />
+                    <SolidColorBrush x:Key="Palette_87948C" Color="#87948C" />
+                    <SolidColorBrush x:Key="Palette_8B9990" Color="#8B9990" />
+                    <SolidColorBrush x:Key="Palette_8CA398" Color="#8CA398" />
+                    <SolidColorBrush x:Key="Palette_8EA06E" Color="#8EA06E" />
+                    <SolidColorBrush x:Key="Palette_8EBB48" Color="#8EBB48" />
+                    <SolidColorBrush x:Key="Palette_8FA79A" Color="#8FA79A" />
+                    <SolidColorBrush x:Key="Palette_91A097" Color="#91A097" />
+                    <SolidColorBrush x:Key="Palette_9BB1A3" Color="#9BB1A3" />
+                    <SolidColorBrush x:Key="Palette_A0AAA3" Color="#A0AAA3" />
+                    <SolidColorBrush x:Key="Palette_A4AEA7" Color="#A4AEA7" />
+                    <SolidColorBrush x:Key="Palette_A65345" Color="#A65345" />
+                    <SolidColorBrush x:Key="Palette_A6BAAD" Color="#A6BAAD" />
+                    <SolidColorBrush x:Key="Palette_A8BB9C" Color="#A8BB9C" />
+                    <SolidColorBrush x:Key="Palette_B85D4D" Color="#B85D4D" />
+                    <SolidColorBrush x:Key="Palette_BFE879" Color="#BFE879" />
+                    <SolidColorBrush x:Key="Palette_C4D2C8" Color="#C4D2C8" />
+                    <SolidColorBrush x:Key="Palette_C4D3C8" Color="#C4D3C8" />
+                    <SolidColorBrush x:Key="Palette_C9F27A" Color="#C9F27A" />
+                    <SolidColorBrush x:Key="Palette_D5DED6" Color="#D5DED6" />
+                    <SolidColorBrush x:Key="Palette_D6E0D8" Color="#D6E0D8" />
+                    <SolidColorBrush x:Key="Palette_D8E7CD" Color="#D8E7CD" />
+                    <SolidColorBrush x:Key="Palette_DDEBCB" Color="#DDEBCB" />
+                    <SolidColorBrush x:Key="Palette_E1E7DF" Color="#E1E7DF" />
+                    <SolidColorBrush x:Key="Palette_E3E8E2" Color="#E3E8E2" />
+                    <SolidColorBrush x:Key="Palette_E3EBD8" Color="#E3EBD8" />
+                    <SolidColorBrush x:Key="Palette_E7EBE5" Color="#E7EBE5" />
+                    <SolidColorBrush x:Key="Palette_E9ECE6" Color="#E9ECE6" />
+                    <SolidColorBrush x:Key="Palette_E9F0E3" Color="#E9F0E3" />
+                    <SolidColorBrush x:Key="Palette_EAF0E2" Color="#EAF0E2" />
+                    <SolidColorBrush x:Key="Palette_EEF1EB" Color="#EEF1EB" />
+                    <SolidColorBrush x:Key="Palette_F0F2EE" Color="#F0F2EE" />
+                    <SolidColorBrush x:Key="Palette_F0F4E9" Color="#F0F4E9" />
+                    <SolidColorBrush x:Key="Palette_F2B4A5" Color="#F2B4A5" />
+                    <SolidColorBrush x:Key="Palette_F4F5F1" Color="#F4F5F1" />
+                    <SolidColorBrush x:Key="Palette_F9E9E5" Color="#F9E9E5" />
+                    <SolidColorBrush x:Key="Palette_FBFCF8" Color="#FBFCF8" />
+                    <SolidColorBrush x:Key="Palette_FBFCF9" Color="#FBFCF9" />
+                    <SolidColorBrush x:Key="Palette_FFFFFF" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="CanvasBrush" Color="#F4F5F1" />
+                    <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="InkBrush" Color="#172521" />
+                    <SolidColorBrush x:Key="MutedBrush" Color="#68776E" />
+                    <SolidColorBrush x:Key="SidebarBrush" Color="#182E2A" />
+                    <SolidColorBrush x:Key="SidebarHoverBrush" Color="#29443D" />
+                    <SolidColorBrush x:Key="AccentBrush" Color="#C9F27A" />
+                    <SolidColorBrush x:Key="AccentForegroundBrush" Color="#172521" />
+                    <SolidColorBrush x:Key="AccentDarkBrush" Color="#8EBB48" />
+                    <SolidColorBrush x:Key="CoralBrush" Color="#F2B4A5" />
+                    <SolidColorBrush x:Key="LineBrush" Color="#E1E7DF" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="TextControlBackground" Color="#202B26" />
+                    <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#202B26" />
+                    <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#202B26" />
+                    <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="#293630" />
+                    <SolidColorBrush x:Key="TextControlForeground" Color="#E7EFE9" />
+                    <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="#E7EFE9" />
+                    <SolidColorBrush x:Key="TextControlForegroundFocused" Color="#E7EFE9" />
+                    <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="#7D8B82" />
+                    <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="#A3B0A8" />
+                    <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="#B2BDB5" />
+                    <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="#B2BDB5" />
+                    <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="#7A8981" />
+                    <SolidColorBrush x:Key="TextControlBorderBrush" Color="#46554D" />
+                    <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#728F67" />
+                    <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="#A8CB6E" />
+                    <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="#344139" />
+                    <Color x:Key="TextControlSelectionHighlightColor">#527D2D</Color>
+                    <SolidColorBrush x:Key="Palette_172521" Color="#E7EFE9" />
+                    <SolidColorBrush x:Key="Palette_182E2A" Color="#111F1B" />
+                    <SolidColorBrush x:Key="Palette_192B25" Color="#E7F0E8" />
+                    <SolidColorBrush x:Key="Palette_1A2C26" Color="#E4EEE6" />
+                    <SolidColorBrush x:Key="Palette_1A2D25" Color="#E4EEE6" />
+                    <SolidColorBrush x:Key="Palette_1B2A25" Color="#E6EFE8" />
+                    <SolidColorBrush x:Key="Palette_1C3028" Color="#E7F0E8" />
+                    <SolidColorBrush x:Key="Palette_20352A" Color="#E0EBE3" />
+                    <SolidColorBrush x:Key="Palette_263A31" Color="#DDE8E0" />
+                    <SolidColorBrush x:Key="Palette_263A33" Color="#DDE8E0" />
+                    <SolidColorBrush x:Key="Palette_29443D" Color="#2B4438" />
+                    <SolidColorBrush x:Key="Palette_314C43" Color="#263D34" />
+                    <SolidColorBrush x:Key="Palette_4F8758" Color="#7ECF8A" />
+                    <SolidColorBrush x:Key="Palette_52665A" Color="#BDCCC2" />
+                    <SolidColorBrush x:Key="Palette_53645B" Color="#BAC7BE" />
+                    <SolidColorBrush x:Key="Palette_596960" Color="#CAD5CE" />
+                    <SolidColorBrush x:Key="Palette_5D715F" Color="#A6B5A9" />
+                    <SolidColorBrush x:Key="Palette_5F7844" Color="#A7C777" />
+                    <SolidColorBrush x:Key="Palette_617F3E" Color="#B0CC82" />
+                    <SolidColorBrush x:Key="Palette_65756B" Color="#A8B6AC" />
+                    <SolidColorBrush x:Key="Palette_66766D" Color="#B2BDB5" />
+                    <SolidColorBrush x:Key="Palette_68776E" Color="#A0AEA5" />
+                    <SolidColorBrush x:Key="Palette_688A43" Color="#A5CB70" />
+                    <SolidColorBrush x:Key="Palette_6F7D74" Color="#A8B6AC" />
+                    <SolidColorBrush x:Key="Palette_70B779" Color="#7ECF8A" />
+                    <SolidColorBrush x:Key="Palette_718078" Color="#A8B5AB" />
+                    <SolidColorBrush x:Key="Palette_74837A" Color="#A7B4AA" />
+                    <SolidColorBrush x:Key="Palette_78877F" Color="#A3B0A8" />
+                    <SolidColorBrush x:Key="Palette_789451" Color="#AACD75" />
+                    <SolidColorBrush x:Key="Palette_7A8880" Color="#A5B2A9" />
+                    <SolidColorBrush x:Key="Palette_7A8980" Color="#A5B2A9" />
+                    <SolidColorBrush x:Key="Palette_7E9C54" Color="#A7C87E" />
+                    <SolidColorBrush x:Key="Palette_809087" Color="#A4B1A8" />
+                    <SolidColorBrush x:Key="Palette_819087" Color="#A1AEA5" />
+                    <SolidColorBrush x:Key="Palette_829087" Color="#A3B0A7" />
+                    <SolidColorBrush x:Key="Palette_839188" Color="#A4B1A7" />
+                    <SolidColorBrush x:Key="Palette_85928A" Color="#A0AFA5" />
+                    <SolidColorBrush x:Key="Palette_86948B" Color="#A3B2A8" />
+                    <SolidColorBrush x:Key="Palette_86A05F" Color="#A8C777" />
+                    <SolidColorBrush x:Key="Palette_86A958" Color="#A8CB6E" />
+                    <SolidColorBrush x:Key="Palette_87938B" Color="#7D8B82" />
+                    <SolidColorBrush x:Key="Palette_87948C" Color="#A3B0A7" />
+                    <SolidColorBrush x:Key="Palette_8B9990" Color="#A3B0A7" />
+                    <SolidColorBrush x:Key="Palette_8CA398" Color="#A4B9AC" />
+                    <SolidColorBrush x:Key="Palette_8EA06E" Color="#AFC28C" />
+                    <SolidColorBrush x:Key="Palette_8EBB48" Color="#A5CF65" />
+                    <SolidColorBrush x:Key="Palette_8FA79A" Color="#9DB1A4" />
+                    <SolidColorBrush x:Key="Palette_91A097" Color="#A6B1AA" />
+                    <SolidColorBrush x:Key="Palette_9BB1A3" Color="#A5B7AA" />
+                    <SolidColorBrush x:Key="Palette_A0AAA3" Color="#9BA89F" />
+                    <SolidColorBrush x:Key="Palette_A4AEA7" Color="#7A8981" />
+                    <SolidColorBrush x:Key="Palette_A65345" Color="#E9A095" />
+                    <SolidColorBrush x:Key="Palette_A6BAAD" Color="#9AB0A2" />
+                    <SolidColorBrush x:Key="Palette_A8BB9C" Color="#728F67" />
+                    <SolidColorBrush x:Key="Palette_B85D4D" Color="#E9A095" />
+                    <SolidColorBrush x:Key="Palette_BFE879" Color="#527D2D" />
+                    <SolidColorBrush x:Key="Palette_C4D2C8" Color="#D2DED5" />
+                    <SolidColorBrush x:Key="Palette_C4D3C8" Color="#D2DED5" />
+                    <SolidColorBrush x:Key="Palette_C9F27A" Color="#C9F27A" />
+                    <SolidColorBrush x:Key="Palette_D5DED6" Color="#46554D" />
+                    <SolidColorBrush x:Key="Palette_D6E0D8" Color="#BFCFC4" />
+                    <SolidColorBrush x:Key="Palette_D8E7CD" Color="#34452D" />
+                    <SolidColorBrush x:Key="Palette_DDEBCB" Color="#34452D" />
+                    <SolidColorBrush x:Key="Palette_E1E7DF" Color="#35433B" />
+                    <SolidColorBrush x:Key="Palette_E3E8E2" Color="#344139" />
+                    <SolidColorBrush x:Key="Palette_E3EBD8" Color="#2C3A2D" />
+                    <SolidColorBrush x:Key="Palette_E7EBE5" Color="#36443C" />
+                    <SolidColorBrush x:Key="Palette_E9ECE6" Color="#3A4840" />
+                    <SolidColorBrush x:Key="Palette_E9F0E3" Color="#2C3A30" />
+                    <SolidColorBrush x:Key="Palette_EAF0E2" Color="#334330" />
+                    <SolidColorBrush x:Key="Palette_EEF1EB" Color="#2A352F" />
+                    <SolidColorBrush x:Key="Palette_F0F2EE" Color="#293630" />
+                    <SolidColorBrush x:Key="Palette_F0F4E9" Color="#2B392C" />
+                    <SolidColorBrush x:Key="Palette_F2B4A5" Color="#D98D7D" />
+                    <SolidColorBrush x:Key="Palette_F4F5F1" Color="#151D19" />
+                    <SolidColorBrush x:Key="Palette_F9E9E5" Color="#4B302D" />
+                    <SolidColorBrush x:Key="Palette_FBFCF8" Color="#202B26" />
+                    <SolidColorBrush x:Key="Palette_FBFCF9" Color="#202B26" />
+                    <SolidColorBrush x:Key="Palette_FFFFFF" Color="#202B26" />
+                    <SolidColorBrush x:Key="CanvasBrush" Color="#151D19" />
+                    <SolidColorBrush x:Key="SurfaceBrush" Color="#202B26" />
+                    <SolidColorBrush x:Key="InkBrush" Color="#E7EFE9" />
+                    <SolidColorBrush x:Key="MutedBrush" Color="#A0AEA5" />
+                    <SolidColorBrush x:Key="SidebarBrush" Color="#111F1B" />
+                    <SolidColorBrush x:Key="SidebarHoverBrush" Color="#2B4438" />
+                    <SolidColorBrush x:Key="AccentBrush" Color="#C9F27A" />
+                    <SolidColorBrush x:Key="AccentForegroundBrush" Color="#172521" />
+                    <SolidColorBrush x:Key="AccentDarkBrush" Color="#A5CF65" />
+                    <SolidColorBrush x:Key="CoralBrush" Color="#D98D7D" />
+                    <SolidColorBrush x:Key="LineBrush" Color="#35433B" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
-            <!-- Цвет подсказок для полей ввода -->
-            <SolidColorBrush
-            x:Key="TextControlPlaceholderForeground"
-            Color="#78877F" />
-
-            <!-- Обычные поля -->
-            <Style TargetType="TextBox"
-               BasedOn="{StaticResource DefaultTextBoxStyle}">
-                <Setter Property="Background" Value="#FFFFFF" />
-                <Setter Property="Foreground" Value="#172521" />
-                <Setter Property="BorderBrush" Value="#D5DED6" />
+            <Style TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
+                <Setter Property="Background" Value="{ThemeResource Palette_FFFFFF}" />
+                <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource Palette_D5DED6}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Padding" Value="13,9" />
                 <Setter Property="FontSize" Value="14" />
             </Style>
 
-            <!-- Поля пароля -->
-            <Style TargetType="PasswordBox"
-               BasedOn="{StaticResource DefaultPasswordBoxStyle}">
-                <Setter Property="Background" Value="#FFFFFF" />
-                <Setter Property="Foreground" Value="#172521" />
-                <Setter Property="BorderBrush" Value="#D5DED6" />
+            <Style TargetType="PasswordBox" BasedOn="{StaticResource DefaultPasswordBoxStyle}">
+                <Setter Property="Background" Value="{ThemeResource Palette_FFFFFF}" />
+                <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource Palette_D5DED6}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Padding" Value="13,9" />
                 <Setter Property="FontSize" Value="14" />
             </Style>
-
-            <!-- Brand palette -->
-            <SolidColorBrush x:Key="CanvasBrush" Color="#F4F5F1" />
-            <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
-            <SolidColorBrush x:Key="InkBrush" Color="#172521" />
-            <SolidColorBrush x:Key="MutedBrush" Color="#68776E" />
-            <SolidColorBrush x:Key="SidebarBrush" Color="#182E2A" />
-            <SolidColorBrush x:Key="SidebarHoverBrush" Color="#29443D" />
-            <SolidColorBrush x:Key="AccentBrush" Color="#C9F27A" />
-            <SolidColorBrush x:Key="AccentDarkBrush" Color="#8EBB48" />
-            <SolidColorBrush x:Key="CoralBrush" Color="#F2B4A5" />
-            <SolidColorBrush x:Key="LineBrush" Color="#E1E7DF" />
 
             <Style TargetType="ComboBox" BasedOn="{StaticResource DefaultComboBoxStyle}">
-                <Setter Property="Background" Value="#FFFFFF" />
-                <Setter Property="Foreground" Value="#172521" />
-                <Setter Property="PlaceholderForeground" Value="#78877F" />
-                <Setter Property="BorderBrush" Value="#D5DED6" />
+                <Setter Property="Background" Value="{ThemeResource Palette_FFFFFF}" />
+                <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
+                <Setter Property="PlaceholderForeground" Value="{ThemeResource Palette_78877F}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource Palette_D5DED6}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="FontSize" Value="14" />
             </Style>
 
             <Style TargetType="DatePicker" BasedOn="{StaticResource DefaultDatePickerStyle}">
-                <Setter Property="Background" Value="#FFFFFF" />
-                <Setter Property="Foreground" Value="#172521" />
-                <Setter Property="BorderBrush" Value="#D5DED6" />
+                <Setter Property="Background" Value="{ThemeResource Palette_FFFFFF}" />
+                <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource Palette_D5DED6}" />
                 <Setter Property="BorderThickness" Value="1" />
             </Style>
 
             <Style x:Key="DialogPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
-                <Setter Property="Background" Value="#C9F27A" />
-                <Setter Property="Foreground" Value="#172521" />
+                <Setter Property="Background" Value="{ThemeResource Palette_C9F27A}" />
+                <Setter Property="Foreground" Value="{ThemeResource AccentForegroundBrush}" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="FontWeight" Value="SemiBold" />
                 <Setter Property="CornerRadius" Value="10" />
@@ -101,16 +276,16 @@
             </Style>
 
             <Style x:Key="DialogCloseButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
-                <Setter Property="Background" Value="#EEF1EB" />
-                <Setter Property="Foreground" Value="#263A33" />
+                <Setter Property="Background" Value="{ThemeResource Palette_EEF1EB}" />
+                <Setter Property="Foreground" Value="{ThemeResource Palette_263A33}" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="CornerRadius" Value="10" />
                 <Setter Property="Padding" Value="18,9" />
             </Style>
 
             <Style TargetType="ContentDialog" BasedOn="{StaticResource DefaultContentDialogStyle}">
-                <Setter Property="Background" Value="#FBFCF9" />
-                <Setter Property="Foreground" Value="#172521" />
+                <Setter Property="Background" Value="{ThemeResource Palette_FBFCF9}" />
+                <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
                 <Setter Property="MaxWidth" Value="560" />
                 <Setter Property="PrimaryButtonStyle" Value="{StaticResource DialogPrimaryButtonStyle}" />
                 <Setter Property="CloseButtonStyle" Value="{StaticResource DialogCloseButtonStyle}" />

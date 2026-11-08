@@ -30,6 +30,8 @@ public sealed partial class MainWindow : Window
     private bool _isRegisterMode;
     private bool _initialized;
     private bool _mapInitialized;
+    private bool _isDarkTheme;
+    private ContentDialog? _activeProfileDialog;
 
     public ObservableCollection<AttractionDto> Attractions => _attractions;
     public ObservableCollection<VisitDto> Visits => _visits;
@@ -37,6 +39,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        LoadThemePreference();
         Title = "Loca Loca";
         var hwnd = WindowNative.GetWindowHandle(this);
         var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
@@ -434,6 +437,7 @@ public sealed partial class MainWindow : Window
             PrimaryButtonText = "Сохранить",
             CloseButtonText = "Отмена",
             DefaultButton = ContentDialogButton.Primary,
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
@@ -509,6 +513,7 @@ public sealed partial class MainWindow : Window
             PrimaryButtonText = "Сохранить",
             CloseButtonText = "Отмена",
             DefaultButton = ContentDialogButton.Primary,
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
@@ -600,7 +605,7 @@ public sealed partial class MainWindow : Window
                 _mapInitialized = true;
             }
 
-            MapWebView.Source = _api.GetMapUri(startNewVisit);
+            MapWebView.Source = _api.GetMapUri(startNewVisit, _isDarkTheme);
         }
         catch (Exception ex)
         {
@@ -627,45 +632,81 @@ public sealed partial class MainWindow : Window
         HomeNavButton.Background = page == "home" ? Brush("#29443D") : Brush("Transparent");
     }
 
-    private async void ChangeDisplayName_Click(object sender, RoutedEventArgs e)
+    private async void Profile_Click(object sender, RoutedEventArgs e)
+    {
+        await ShowProfileDialogAsync();
+    }
+
+    private async Task ShowProfileDialogAsync()
     {
         if (_currentUser is null) return;
 
         var nameBox = new TextBox
         {
             Text = _currentUser.DisplayName,
-            PlaceholderText = "Как к тебе обращаться",
+            PlaceholderText = "Имя, которое будет отображаться в приложении",
             MaxLength = 40,
-            MinWidth = 300
+            MinWidth = 320
         };
-        var content = new StackPanel { Spacing = 8 };
+        var themeToggle = new ToggleSwitch
+        {
+            Header = "Тёмная тема",
+            OnContent = "Включена",
+            OffContent = "Выключена",
+            IsOn = _isDarkTheme
+        };
+        themeToggle.Toggled += ProfileTheme_Toggled;
+
+        var content = new StackPanel { Spacing = 9, MinWidth = 340 };
+        content.Children.Add(new TextBlock { Text = "Имя профиля", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
+        content.Children.Add(nameBox);
+        content.Children.Add(new TextBlock { Text = "Логин", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 5, 0, 0) });
+        content.Children.Add(new TextBlock { Text = _currentUser.Login, TextWrapping = TextWrapping.Wrap });
+        content.Children.Add(new TextBlock { Text = "Оформление", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) });
+        content.Children.Add(themeToggle);
         content.Children.Add(new TextBlock
         {
-            Text = "Это имя будет отображаться в приветствии и профиле. Логин для входа не изменится.",
+            Text = "Электронная почта и смена пароля пока не поддерживаются. Эти настройки можно будет добавить в следующих версиях.",
             TextWrapping = TextWrapping.Wrap,
-            Foreground = Brush("#718078")
+            Margin = new Thickness(0, 8, 0, 0)
         });
-        content.Children.Add(nameBox);
 
         var dialog = new ContentDialog
         {
-            Title = "Изменить имя пользователя",
+            Title = "Профиль и настройки",
             Content = content,
-            PrimaryButtonText = "Сохранить",
-            CloseButtonText = "Отмена",
+            PrimaryButtonText = "Сохранить имя",
+            SecondaryButtonText = "Выйти из аккаунта",
+            CloseButtonText = "Закрыть",
             DefaultButton = ContentDialogButton.Primary,
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
-        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-
-        var newName = nameBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(newName))
+        _activeProfileDialog = dialog;
+        ContentDialogResult result;
+        try
         {
-            await ShowMessageAsync("Имя не указано", "Введи имя длиной от 1 до 40 символов.");
+            result = await dialog.ShowAsync();
+        }
+        finally
+        {
+            _activeProfileDialog = null;
+        }
+
+        if (result == ContentDialogResult.Secondary)
+        {
+            Logout();
             return;
         }
-        if (string.Equals(newName, _currentUser.DisplayName, StringComparison.Ordinal))
+        if (result != ContentDialogResult.Primary) return;
+
+        var newName = nameBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(newName) || newName.Length > 40)
+        {
+            await ShowMessageAsync("Проверь имя", "Имя должно содержать от 1 до 40 символов.");
             return;
+        }
+        if (string.Equals(newName, _currentUser.DisplayName, StringComparison.Ordinal)) return;
 
         try
         {
@@ -682,7 +723,73 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void Logout_Click(object sender, RoutedEventArgs e)
+    private async void ProfileTheme_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleSwitch themeToggle) return;
+
+        _isDarkTheme = themeToggle.IsOn;
+        Root.RequestedTheme = _isDarkTheme ? ElementTheme.Dark : ElementTheme.Light;
+        if (_activeProfileDialog is not null)
+            _activeProfileDialog.RequestedTheme = Root.RequestedTheme;
+        SaveThemePreference();
+        await UpdateMapThemeAsync();
+    }
+
+    private async Task UpdateMapThemeAsync()
+    {
+        if (!_mapInitialized || MapWebView.CoreWebView2 is null) return;
+        var theme = _isDarkTheme ? "dark" : "light";
+        try
+        {
+            await MapWebView.CoreWebView2.ExecuteScriptAsync($"document.documentElement.dataset.theme = '{theme}';");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Не удалось обновить тему карты: {ex.Message}");
+        }
+    }
+
+    private static string ThemePreferencePath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "LocaLoca",
+        "theme-preference.txt");
+
+    private void LoadThemePreference()
+    {
+        try
+        {
+            _isDarkTheme = File.Exists(ThemePreferencePath) &&
+                string.Equals(File.ReadAllText(ThemePreferencePath).Trim(), "dark", StringComparison.OrdinalIgnoreCase);
+        }
+        catch (IOException)
+        {
+            _isDarkTheme = false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            _isDarkTheme = false;
+        }
+
+        Root.RequestedTheme = _isDarkTheme ? ElementTheme.Dark : ElementTheme.Light;
+    }
+
+    private void SaveThemePreference()
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(ThemePreferencePath)!;
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(ThemePreferencePath, _isDarkTheme ? "dark" : "light");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Debug.WriteLine($"Не удалось сохранить настройку темы: {ex.Message}");
+        }
+    }
+
+    private void Logout_Click(object sender, RoutedEventArgs e) => Logout();
+
+    private void Logout()
     {
         _api.Logout();
         _currentUser = null;
@@ -703,6 +810,7 @@ public sealed partial class MainWindow : Window
             PrimaryButtonText = "Удалить",
             CloseButtonText = "Отмена",
             DefaultButton = ContentDialogButton.Close,
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
         return await dialog.ShowAsync();
@@ -715,15 +823,33 @@ public sealed partial class MainWindow : Window
             Title = title,
             Content = message,
             CloseButtonText = "Понятно",
+            RequestedTheme = Root.RequestedTheme,
             XamlRoot = Root.XamlRoot
         };
         await dialog.ShowAsync();
     }
 
-    private static SolidColorBrush Brush(string color)
+    private SolidColorBrush Brush(string color)
     {
         if (string.Equals(color, "Transparent", StringComparison.OrdinalIgnoreCase))
             return new SolidColorBrush(Microsoft.UI.Colors.Transparent);
+
+        if (_isDarkTheme)
+        {
+            color = color.ToUpperInvariant() switch
+            {
+                "#7A8980" => "#A5B2A9",
+                "#4F8758" => "#7ECF8A",
+                "#B85D4D" => "#E9A095",
+                "#829087" => "#A3B0A7",
+                "#6F7D74" => "#A8B6AC",
+                "#263A31" => "#DDE8E0",
+                "#29443D" => "#2B4438",
+                "#718078" => "#A8B5AB",
+                _ => color
+            };
+        }
+
         var hex = color.TrimStart('#');
         if (hex.Length != 6) throw new ArgumentException("Цвет должен иметь формат #RRGGBB.", nameof(color));
         return new SolidColorBrush(Windows.UI.Color.FromArgb(

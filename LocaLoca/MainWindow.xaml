@@ -5,11 +5,11 @@
     xmlns:controls="using:Microsoft.UI.Xaml.Controls"
     xmlns:models="using:LocaLoca.Models">
 
-    <Grid x:Name="Root" Background="{StaticResource CanvasBrush}" Loaded="Root_Loaded">
+    <Grid x:Name="Root" Background="{ThemeResource CanvasBrush}" Loaded="Root_Loaded">
         <Grid.Resources>
             <Style x:Key="PrimaryButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="{StaticResource AccentBrush}" />
-                <Setter Property="Foreground" Value="#172521" />
+                <Setter Property="Background" Value="{ThemeResource AccentBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource AccentForegroundBrush}" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Padding" Value="18,11" />
                 <Setter Property="FontSize" Value="14" />
@@ -17,8 +17,8 @@
                 <Setter Property="CornerRadius" Value="12" />
             </Style>
             <Style x:Key="QuietButtonStyle" TargetType="Button">
-                <Setter Property="Background" Value="#EEF1EB" />
-                <Setter Property="Foreground" Value="#263A33" />
+                <Setter Property="Background" Value="{ThemeResource Palette_EEF1EB}" />
+                <Setter Property="Foreground" Value="{ThemeResource Palette_263A33}" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="Padding" Value="15,10" />
                 <Setter Property="FontSize" Value="13" />
@@ -26,7 +26,7 @@
             </Style>
             <Style x:Key="NavButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="Transparent" />
-                <Setter Property="Foreground" Value="#D6E0D8" />
+                <Setter Property="Foreground" Value="{ThemeResource Palette_D6E0D8}" />
                 <Setter Property="BorderThickness" Value="0" />
                 <Setter Property="HorizontalContentAlignment" Value="Left" />
                 <Setter Property="Padding" Value="14,12" />
@@ -34,33 +34,33 @@
                 <Setter Property="CornerRadius" Value="12" />
             </Style>
             <DataTemplate x:Key="AttractionTemplate" x:DataType="models:AttractionDto">
-                <Border Background="#FFFFFF" CornerRadius="16" Padding="15" Margin="0,0,0,10" BorderBrush="#E9ECE6" BorderThickness="1">
+                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="16" Padding="15" Margin="0,0,0,10" BorderBrush="{ThemeResource Palette_E9ECE6}" BorderThickness="1">
                     <Grid ColumnDefinitions="48,*" ColumnSpacing="13">
-                        <Border Width="48" Height="48" CornerRadius="14" Background="#EAF0E2" VerticalAlignment="Top">
-                            <FontIcon Glyph="&#xE734;" FontSize="20" Foreground="#688A43" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border Width="48" Height="48" CornerRadius="14" Background="{ThemeResource Palette_EAF0E2}" VerticalAlignment="Top">
+                            <FontIcon Glyph="&#xE734;" FontSize="20" Foreground="{ThemeResource Palette_688A43}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <StackPanel Grid.Column="1" Spacing="4">
-                            <TextBlock Text="{x:Bind Name}" FontSize="15" FontWeight="SemiBold" Foreground="#1B2A25" TextWrapping="Wrap" />
-                            <TextBlock FontSize="12" Foreground="#819087">
+                            <TextBlock Text="{x:Bind Name}" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1B2A25}" TextWrapping="Wrap" />
+                            <TextBlock FontSize="12" Foreground="{ThemeResource Palette_819087}">
                                 <Run Text="{x:Bind City}" />
                                 <Run Text=" · " />
                                 <Run Text="{x:Bind Country}" />
                             </TextBlock>
-                            <TextBlock Text="{x:Bind Category}" FontSize="11" Foreground="#7E9C54" />
+                            <TextBlock Text="{x:Bind Category}" FontSize="11" Foreground="{ThemeResource Palette_7E9C54}" />
                         </StackPanel>
                     </Grid>
                 </Border>
             </DataTemplate>
             <DataTemplate x:Key="VisitTemplate" x:DataType="models:VisitDto">
-                <Border Background="#FFFFFF" CornerRadius="16" Padding="15" Margin="0,0,0,10" BorderBrush="#E9ECE6" BorderThickness="1">
+                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="16" Padding="15" Margin="0,0,0,10" BorderBrush="{ThemeResource Palette_E9ECE6}" BorderThickness="1">
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                         <StackPanel Spacing="5">
-                            <TextBlock Text="{x:Bind AttractionName}" FontSize="15" FontWeight="SemiBold" Foreground="#1B2A25" TextWrapping="Wrap" />
-                            <TextBlock Text="{x:Bind LocationText}" FontSize="12" Foreground="#819087" />
-                            <TextBlock Text="{x:Bind VisitDate}" FontSize="11" Foreground="#8EA06E" />
+                            <TextBlock Text="{x:Bind AttractionName}" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1B2A25}" TextWrapping="Wrap" />
+                            <TextBlock Text="{x:Bind LocationText}" FontSize="12" Foreground="{ThemeResource Palette_819087}" />
+                            <TextBlock Text="{x:Bind VisitDate}" FontSize="11" Foreground="{ThemeResource Palette_8EA06E}" />
                         </StackPanel>
-                        <Border Grid.Column="1" Background="#F0F4E9" CornerRadius="10" Padding="10,6" VerticalAlignment="Center">
-                            <TextBlock Text="{x:Bind RatingText}" Foreground="#617F3E" FontWeight="SemiBold" />
+                        <Border Grid.Column="1" Background="{ThemeResource Palette_F0F4E9}" CornerRadius="10" Padding="10,6" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind RatingText}" Foreground="{ThemeResource Palette_617F3E}" FontWeight="SemiBold" />
                         </Border>
                     </Grid>
                 </Border>
@@ -68,7 +68,7 @@
         </Grid.Resources>
         <!-- Authentication -->
         <Grid x:Name="AuthPage" Visibility="Visible" ColumnDefinitions="1.15*,0.85*">
-            <Border Grid.Column="0" Background="#182E2A" Padding="54,42">
+            <Border Grid.Column="0" Background="{ThemeResource Palette_182E2A}" Padding="54,42">
                 <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -81,47 +81,47 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="10">
                     <Image Source="Assets/loca-loca-icon.png" Width="36" Height="36" Stretch="Uniform" />
-                    <TextBlock Text="loca loca" FontSize="24" FontWeight="Bold" Foreground="#FFFFFF" VerticalAlignment="Center" />
+                    <TextBlock Text="loca loca" FontSize="24" FontWeight="Bold" Foreground="{ThemeResource Palette_FFFFFF}" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" MaxWidth="600" Spacing="20">
-                    <Border Background="#29443D" CornerRadius="20" Padding="14,8" HorizontalAlignment="Left">
-                        <TextBlock Text="ДНЕВНИК ПУТЕШЕСТВИЙ" FontSize="10" FontWeight="Bold" Foreground="#D8E7CD" />
+                    <Border Background="{ThemeResource Palette_29443D}" CornerRadius="20" Padding="14,8" HorizontalAlignment="Left">
+                        <TextBlock Text="ДНЕВНИК ПУТЕШЕСТВИЙ" FontSize="10" FontWeight="Bold" Foreground="{ThemeResource Palette_D8E7CD}" />
                     </Border>
-                    <TextBlock Text="Мир большой.&#x0a;Сохрани своё." FontSize="54" FontWeight="SemiBold" Foreground="#FFFFFF" TextWrapping="WrapWholeWords" LineHeight="58" />
-                    <TextBlock Text="Места, которые стали частью твоей истории. Фотографии, впечатления и маленькие открытия — в одном пространстве." FontSize="17" Foreground="#C4D2C8" TextWrapping="Wrap" MaxWidth="480" LineHeight="25" />
+                    <TextBlock Text="Мир большой.&#x0a;Сохрани своё." FontSize="54" FontWeight="SemiBold" Foreground="{ThemeResource Palette_FFFFFF}" TextWrapping="WrapWholeWords" LineHeight="58" />
+                    <TextBlock Text="Места, которые стали частью твоей истории. Фотографии, впечатления и маленькие открытия — в одном пространстве." FontSize="17" Foreground="{ThemeResource Palette_C4D2C8}" TextWrapping="Wrap" MaxWidth="480" LineHeight="25" />
                     <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,10,0,0">
-                        <Border Background="#314C43" CornerRadius="14" Padding="14,10"><TextBlock Text="✦  Впечатления" Foreground="#E3EBD8" /></Border>
-                        <Border Background="#314C43" CornerRadius="14" Padding="14,10"><TextBlock Text="⌖  Карта" Foreground="#E3EBD8" /></Border>
-                        <Border Background="#314C43" CornerRadius="14" Padding="14,10"><TextBlock Text="♡  Избранное" Foreground="#E3EBD8" /></Border>
+                        <Border Background="{ThemeResource Palette_314C43}" CornerRadius="14" Padding="14,10"><TextBlock Text="✦  Впечатления" Foreground="{ThemeResource Palette_E3EBD8}" /></Border>
+                        <Border Background="{ThemeResource Palette_314C43}" CornerRadius="14" Padding="14,10"><TextBlock Text="⌖  Карта" Foreground="{ThemeResource Palette_E3EBD8}" /></Border>
+                        <Border Background="{ThemeResource Palette_314C43}" CornerRadius="14" Padding="14,10"><TextBlock Text="♡  Избранное" Foreground="{ThemeResource Palette_E3EBD8}" /></Border>
                     </StackPanel>
-                    <TextBlock Text="Путешественник уже собирает маршрут вместе с тобой." FontSize="12" Foreground="#C4D2C8" TextWrapping="Wrap" MaxWidth="420" />
+                    <TextBlock Text="Путешественник уже собирает маршрут вместе с тобой." FontSize="12" Foreground="{ThemeResource Palette_C4D2C8}" TextWrapping="Wrap" MaxWidth="420" />
                 </StackPanel>
                 <Image Grid.Row="1" Grid.Column="1" Source="Assets/Mascot/mascot-map.png" Width="156" Height="156" Stretch="Uniform" VerticalAlignment="Center" Margin="4,0,0,0" />
-                <TextBlock Grid.Row="2" Text="Твоя история путешествий начинается здесь" FontSize="11" Foreground="#8FA79A" />
+                <TextBlock Grid.Row="2" Text="Твоя история путешествий начинается здесь" FontSize="11" Foreground="{ThemeResource Palette_8FA79A}" />
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" Padding="52,40" Background="#F4F5F1">
+            <Border Grid.Column="1" Padding="52,40" Background="{ThemeResource Palette_F4F5F1}">
                 <Grid>
                 <StackPanel VerticalAlignment="Center" MaxWidth="420" HorizontalAlignment="Center" Spacing="16">
-                    <TextBlock x:Name="AuthEyebrow" Text="С возвращением" FontSize="12" FontWeight="SemiBold" Foreground="#809087" />
-                    <TextBlock x:Name="AuthTitle" Text="С возвращением" FontSize="34" FontWeight="SemiBold" Foreground="#1A2C26" />
-                    <TextBlock x:Name="AuthSubtitle" Text="Войди, чтобы продолжить свою историю." FontSize="14" Foreground="#7A8880" TextWrapping="Wrap" />
+                    <TextBlock x:Name="AuthEyebrow" Text="С возвращением" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource Palette_809087}" />
+                    <TextBlock x:Name="AuthTitle" Text="С возвращением" FontSize="34" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1A2C26}" />
+                    <TextBlock x:Name="AuthSubtitle" Text="Войди, чтобы продолжить свою историю." FontSize="14" Foreground="{ThemeResource Palette_7A8880}" TextWrapping="Wrap" />
                     <StackPanel x:Name="DisplayNamePanel" Spacing="6" Visibility="Collapsed" Margin="0,8,0,0">
-                        <TextBlock Text="Как к тебе обращаться" FontSize="12" FontWeight="SemiBold" Foreground="#53645B" />
+                        <TextBlock Text="Как к тебе обращаться" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource Palette_53645B}" />
                         <TextBox x:Name="DisplayNameBox" PlaceholderText="Твоё имя" Height="46" />
                     </StackPanel>
                     <StackPanel Spacing="6" Margin="0,8,0,0">
-                        <TextBlock Text="Логин" FontSize="12" FontWeight="SemiBold" Foreground="#53645B" />
+                        <TextBlock Text="Логин" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource Palette_53645B}" />
                         <TextBox x:Name="LoginBox" PlaceholderText="Введите логин" Height="46" />
                     </StackPanel>
                     <StackPanel Spacing="6">
-                        <TextBlock Text="Пароль" FontSize="12" FontWeight="SemiBold" Foreground="#53645B" />
+                        <TextBlock Text="Пароль" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource Palette_53645B}" />
                         <PasswordBox x:Name="PasswordBox" PlaceholderText="Не менее 6 символов" Height="46" />
                     </StackPanel>
                     <Button x:Name="AuthSubmitButton" Content="Войти в аккаунт" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="AuthSubmit_Click" Margin="0,12,0,0" />
-                    <Button x:Name="AuthModeButton" Content="Создать новый аккаунт" Background="Transparent" BorderThickness="0" Foreground="#52665A" HorizontalAlignment="Center" Click="AuthModeButton_Click" />
-                    <TextBlock x:Name="AuthStatusText" Text="Проверяем локальное подключение…" TextWrapping="Wrap" Foreground="#86948B" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center" />
+                    <Button x:Name="AuthModeButton" Content="Создать новый аккаунт" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource Palette_52665A}" HorizontalAlignment="Center" Click="AuthModeButton_Click" />
+                    <TextBlock x:Name="AuthStatusText" Text="Проверяем локальное подключение…" TextWrapping="Wrap" Foreground="{ThemeResource Palette_86948B}" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center" />
                         <Button x:Name="RetryConnectionButton" Content="Повторить подключение" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Center" Visibility="Collapsed" Click="RetryConnection_Click" />
                     </StackPanel>
                 </Grid>
@@ -130,7 +130,7 @@
 
         <!-- Main application -->
         <Grid x:Name="MainShell" Visibility="Collapsed" ColumnDefinitions="250,*">
-            <Border Grid.Column="0" Background="{StaticResource SidebarBrush}" Padding="22,28,18,22">
+            <Border Grid.Column="0" Background="{ThemeResource SidebarBrush}" Padding="22,28,18,22">
                 <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -141,13 +141,13 @@
                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="4,0,0,34">
                     <Image Source="Assets/loca-loca-icon.png" Width="36" Height="36" Stretch="Uniform" />
                     <StackPanel VerticalAlignment="Center" Spacing="0">
-                        <TextBlock Text="loca loca" FontSize="22" FontWeight="Bold" Foreground="#FFFFFF" />
-                        <TextBlock Text="ДНЕВНИК ПУТЕШЕСТВИЙ" FontSize="9" Foreground="#9BB1A3" />
+                        <TextBlock Text="loca loca" FontSize="22" FontWeight="Bold" Foreground="{ThemeResource Palette_FFFFFF}" />
+                        <TextBlock Text="ДНЕВНИК ПУТЕШЕСТВИЙ" FontSize="9" Foreground="{ThemeResource Palette_9BB1A3}" />
                     </StackPanel>
                 </StackPanel>
-                <TextBlock Grid.Row="1" Text="Моё пространство" FontSize="11" Foreground="#8CA398" Margin="5,0,0,12" />
+                <TextBlock Grid.Row="1" Text="Моё пространство" FontSize="11" Foreground="{ThemeResource Palette_8CA398}" Margin="5,0,0,12" />
                 <StackPanel Grid.Row="2" Spacing="7">
-                    <Button x:Name="HomeNavButton" Style="{StaticResource NavButtonStyle}" Click="HomeNav_Click" Background="#29443D">
+                    <Button x:Name="HomeNavButton" Style="{StaticResource NavButtonStyle}" Click="HomeNav_Click" Background="{ThemeResource Palette_29443D}">
                         <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE80F;" FontSize="17" /><TextBlock Text="Обзор" VerticalAlignment="Center" /></StackPanel>
                     </Button>
                     <Button Style="{StaticResource NavButtonStyle}" Click="CatalogNav_Click">
@@ -163,18 +163,20 @@
                         <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE81D;" FontSize="17" /><TextBlock Text="Карта" VerticalAlignment="Center" /></StackPanel>
                     </Button>
                 </StackPanel>
-                <Border Grid.Row="3" Background="#29443D" CornerRadius="16" Padding="14" Margin="0,20,0,0">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Мой профиль" FontSize="11" Foreground="#A6BAAD" />
-                        <TextBlock x:Name="ProfileNameText" Text="Путешественник" FontSize="15" FontWeight="SemiBold" Foreground="#FFFFFF" />
-                        <Button Content="Изменить имя" Background="Transparent" BorderThickness="0" Foreground="#C4D3C8" HorizontalAlignment="Left" Padding="0,6" Click="ChangeDisplayName_Click" />
-                        <Button Content="Выйти из аккаунта" Background="Transparent" BorderThickness="0" Foreground="#C4D3C8" HorizontalAlignment="Left" Padding="0,6" Click="Logout_Click" />
+                <Button Grid.Row="3" x:Name="ProfileButton" Background="{ThemeResource Palette_29443D}" Foreground="{ThemeResource Palette_FFFFFF}" BorderThickness="0" CornerRadius="16" Padding="14" Margin="0,20,0,0" HorizontalContentAlignment="Stretch" Click="Profile_Click">
+                    <StackPanel Spacing="7">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Text="МОЙ ПРОФИЛЬ" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource Palette_A6BAAD}" VerticalAlignment="Center" />
+                            <FontIcon Grid.Column="1" Glyph="&#xE76C;" FontSize="13" Foreground="{ThemeResource Palette_C4D3C8}" />
+                        </Grid>
+                        <TextBlock x:Name="ProfileNameText" Text="Путешественник" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource Palette_FFFFFF}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="Настройки аккаунта и оформления" FontSize="11" Foreground="{ThemeResource Palette_C4D3C8}" TextWrapping="Wrap" />
                     </StackPanel>
-                </Border>
+                </Button>
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" Background="{StaticResource CanvasBrush}" Padding="34,26,34,28">
+            <Border Grid.Column="1" Background="{ThemeResource CanvasBrush}" Padding="34,26,34,28">
                 <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -183,13 +185,13 @@
                 </Grid.RowDefinitions>
                 <Grid Grid.Row="0" Margin="0,0,0,22" ColumnDefinitions="*,Auto">
                     <StackPanel Spacing="3">
-                        <TextBlock x:Name="PageEyebrow" Text="Личная карта воспоминаний" FontSize="11" Foreground="#87948C" FontWeight="SemiBold" />
-                        <TextBlock x:Name="PageTitle" Text="Привет, путешественник" FontSize="30" FontWeight="SemiBold" Foreground="#192B25" TextWrapping="WrapWholeWords" />
+                        <TextBlock x:Name="PageEyebrow" Text="Личная карта воспоминаний" FontSize="11" Foreground="{ThemeResource Palette_87948C}" FontWeight="SemiBold" />
+                        <TextBlock x:Name="PageTitle" Text="Привет, путешественник" FontSize="30" FontWeight="SemiBold" Foreground="{ThemeResource Palette_192B25}" TextWrapping="WrapWholeWords" />
                     </StackPanel>
-                    <Border Grid.Column="1" Background="#FFFFFF" CornerRadius="13" Padding="13,9" VerticalAlignment="Center" BorderBrush="#E7EBE5" BorderThickness="1">
+                    <Border Grid.Column="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="13" Padding="13,9" VerticalAlignment="Center" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Ellipse Width="8" Height="8" Fill="#70B779" />
-                            <TextBlock x:Name="ConnectionStatusText" Text="Облачная база подключена" FontSize="11" Foreground="#65756B" VerticalAlignment="Center" />
+                            <Ellipse Width="8" Height="8" Fill="{ThemeResource Palette_70B779}" />
+                            <TextBlock x:Name="ConnectionStatusText" Text="Облачная база подключена" FontSize="11" Foreground="{ThemeResource Palette_65756B}" VerticalAlignment="Center" />
                         </StackPanel>
                     </Border>
                 </Grid>
@@ -198,32 +200,32 @@
                     <!-- Dashboard -->
                     <ScrollViewer x:Name="DashboardPage" VerticalScrollBarVisibility="Auto" Visibility="Visible">
                         <StackPanel Spacing="22" Margin="0,0,0,18">
-                            <Border Background="#DDEBCB" CornerRadius="22" Padding="26" MinHeight="170">
+                            <Border Background="{ThemeResource Palette_DDEBCB}" CornerRadius="22" Padding="26" MinHeight="170">
                                 <Grid ColumnDefinitions="*,Auto">
                                     <StackPanel VerticalAlignment="Center" Spacing="10" MaxWidth="560">
-                                        <TextBlock Text="Твоя история — твои правила" FontSize="11" FontWeight="SemiBold" Foreground="#5F7844" />
-                                        <TextBlock Text="Собирай впечатления,&#x0a;а не вкладки." FontSize="32" FontWeight="SemiBold" Foreground="#20352A" LineHeight="36" />
-                                        <TextBlock Text="Сохраняй любимые места, фотографии и истории каждого путешествия." FontSize="13" Foreground="#5D715F" TextWrapping="Wrap" />
+                                        <TextBlock Text="Твоя история — твои правила" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource Palette_5F7844}" />
+                                        <TextBlock Text="Собирай впечатления,&#x0a;а не вкладки." FontSize="32" FontWeight="SemiBold" Foreground="{ThemeResource Palette_20352A}" LineHeight="36" />
+                                        <TextBlock Text="Сохраняй любимые места, фотографии и истории каждого путешествия." FontSize="13" Foreground="{ThemeResource Palette_5D715F}" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <Image Grid.Column="1" Source="Assets/Mascot/mascot-celebrate.png" Width="176" Height="176" Stretch="Uniform" VerticalAlignment="Center" Margin="12,0,4,0" />
                                 </Grid>
                             </Border>
                             <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="13">
-                                <Border Background="#FFFFFF" CornerRadius="17" Padding="17" BorderBrush="#E7EBE5" BorderThickness="1">
-                                    <StackPanel Spacing="5"><TextBlock Text="Посещений" FontSize="11" Foreground="#819087" /><TextBlock x:Name="VisitsCountText" Text="0" FontSize="29" FontWeight="SemiBold" Foreground="#1C3028" /><TextBlock Text="в твоём дневнике" FontSize="10" Foreground="#91A097" /></StackPanel>
+                                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="17" Padding="17" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                    <StackPanel Spacing="5"><TextBlock Text="Посещений" FontSize="11" Foreground="{ThemeResource Palette_819087}" /><TextBlock x:Name="VisitsCountText" Text="0" FontSize="29" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1C3028}" /><TextBlock Text="в твоём дневнике" FontSize="10" Foreground="{ThemeResource Palette_91A097}" /></StackPanel>
                                 </Border>
-                                <Border Grid.Column="1" Background="#FFFFFF" CornerRadius="17" Padding="17" BorderBrush="#E7EBE5" BorderThickness="1">
-                                    <StackPanel Spacing="5"><TextBlock Text="Мест" FontSize="11" Foreground="#819087" /><TextBlock x:Name="PlacesCountText" Text="0" FontSize="29" FontWeight="SemiBold" Foreground="#1C3028" /><TextBlock Text="открыто для себя" FontSize="10" Foreground="#91A097" /></StackPanel>
+                                <Border Grid.Column="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="17" Padding="17" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                    <StackPanel Spacing="5"><TextBlock Text="Мест" FontSize="11" Foreground="{ThemeResource Palette_819087}" /><TextBlock x:Name="PlacesCountText" Text="0" FontSize="29" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1C3028}" /><TextBlock Text="открыто для себя" FontSize="10" Foreground="{ThemeResource Palette_91A097}" /></StackPanel>
                                 </Border>
-                                <Border Grid.Column="2" Background="#FFFFFF" CornerRadius="17" Padding="17" BorderBrush="#E7EBE5" BorderThickness="1">
-                                    <StackPanel Spacing="5"><TextBlock Text="Городов" FontSize="11" Foreground="#819087" /><TextBlock x:Name="CitiesCountText" Text="0" FontSize="29" FontWeight="SemiBold" Foreground="#1C3028" /><TextBlock Text="на твоей карте" FontSize="10" Foreground="#91A097" /></StackPanel>
+                                <Border Grid.Column="2" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="17" Padding="17" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                    <StackPanel Spacing="5"><TextBlock Text="Городов" FontSize="11" Foreground="{ThemeResource Palette_819087}" /><TextBlock x:Name="CitiesCountText" Text="0" FontSize="29" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1C3028}" /><TextBlock Text="на твоей карте" FontSize="10" Foreground="{ThemeResource Palette_91A097}" /></StackPanel>
                                 </Border>
-                                <Border Grid.Column="3" Background="#FFFFFF" CornerRadius="17" Padding="17" BorderBrush="#E7EBE5" BorderThickness="1">
-                                    <StackPanel Spacing="5"><TextBlock Text="Стран" FontSize="11" Foreground="#819087" /><TextBlock x:Name="CountriesCountText" Text="0" FontSize="29" FontWeight="SemiBold" Foreground="#1C3028" /><TextBlock Text="в коллекции" FontSize="10" Foreground="#91A097" /></StackPanel>
+                                <Border Grid.Column="3" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="17" Padding="17" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                    <StackPanel Spacing="5"><TextBlock Text="Стран" FontSize="11" Foreground="{ThemeResource Palette_819087}" /><TextBlock x:Name="CountriesCountText" Text="0" FontSize="29" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1C3028}" /><TextBlock Text="в коллекции" FontSize="10" Foreground="{ThemeResource Palette_91A097}" /></StackPanel>
                                 </Border>
                             </Grid>
                             <Grid ColumnDefinitions="*,Auto">
-                                <StackPanel Spacing="3"><TextBlock Text="Продолжай исследовать" FontSize="20" FontWeight="SemiBold" Foreground="#1C3028" /><TextBlock Text="Места, с которых можно начать следующую историю" FontSize="12" Foreground="#87948C" /></StackPanel>
+                                <StackPanel Spacing="3"><TextBlock Text="Продолжай исследовать" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1C3028}" /><TextBlock Text="Места, с которых можно начать следующую историю" FontSize="12" Foreground="{ThemeResource Palette_87948C}" /></StackPanel>
                                 <Button Grid.Column="1" Content="Весь каталог  →" Style="{StaticResource QuietButtonStyle}" Click="CatalogNav_Click" VerticalAlignment="Center" />
                             </Grid>
                             <ListView x:Name="DashboardAttractionsList" IsItemClickEnabled="True" ItemClick="DashboardAttraction_ItemClick" ItemTemplate="{StaticResource AttractionTemplate}" SelectionMode="None" Background="Transparent" BorderThickness="0" MaxHeight="360" />
@@ -240,19 +242,19 @@
                             </Grid>
                             <ListView x:Name="CatalogList" Grid.Row="1" ItemsSource="{x:Bind Attractions, Mode=OneWay}" ItemTemplate="{StaticResource AttractionTemplate}" SelectionChanged="CatalogList_SelectionChanged" Background="Transparent" BorderThickness="0" />
                         </Grid>
-                        <Border Grid.Column="1" Background="#FFFFFF" CornerRadius="20" Padding="22" BorderBrush="#E7EBE5" BorderThickness="1">
+                        <Border Grid.Column="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="20" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <StackPanel Spacing="13">
-                                    <Border Height="120" CornerRadius="16" Background="#E9F0E3">
-                                        <FontIcon Glyph="&#xE734;" FontSize="54" Foreground="#789451" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <Border Height="120" CornerRadius="16" Background="{ThemeResource Palette_E9F0E3}">
+                                        <FontIcon Glyph="&#xE734;" FontSize="54" Foreground="{ThemeResource Palette_789451}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                     </Border>
-                                    <TextBlock x:Name="SelectedAttractionCategory" Text="Выбери место в каталоге" FontSize="11" FontWeight="SemiBold" Foreground="#86A05F" />
-                                    <TextBlock x:Name="SelectedAttractionName" Text="Твоя следующая история" FontSize="25" FontWeight="SemiBold" Foreground="#1A2D25" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="SelectedAttractionLocation" Text="Город · Страна" FontSize="12" Foreground="#85928A" />
-                                    <TextBlock x:Name="SelectedAttractionDescription" Text="Выбери достопримечательность слева, чтобы посмотреть описание и историческую справку." TextWrapping="Wrap" FontSize="13" Foreground="#596960" LineHeight="20" />
-                                    <Border Height="1" Background="#E9ECE6" Margin="0,5" />
-                                    <TextBlock Text="История места" FontSize="11" FontWeight="SemiBold" Foreground="#8B9990" />
-                                    <TextBlock x:Name="SelectedAttractionHistory" Text="" TextWrapping="Wrap" FontSize="12" Foreground="#74837A" LineHeight="19" />
+                                    <TextBlock x:Name="SelectedAttractionCategory" Text="Выбери место в каталоге" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource Palette_86A05F}" />
+                                    <TextBlock x:Name="SelectedAttractionName" Text="Твоя следующая история" FontSize="25" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1A2D25}" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="SelectedAttractionLocation" Text="Город · Страна" FontSize="12" Foreground="{ThemeResource Palette_85928A}" />
+                                    <TextBlock x:Name="SelectedAttractionDescription" Text="Выбери достопримечательность слева, чтобы посмотреть описание и историческую справку." TextWrapping="Wrap" FontSize="13" Foreground="{ThemeResource Palette_596960}" LineHeight="20" />
+                                    <Border Height="1" Background="{ThemeResource Palette_E9ECE6}" Margin="0,5" />
+                                    <TextBlock Text="История места" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource Palette_8B9990}" />
+                                    <TextBlock x:Name="SelectedAttractionHistory" Text="" TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource Palette_74837A}" LineHeight="19" />
                                     <Button x:Name="AddVisitButton" Content="＋  Добавить посещение" Style="{StaticResource PrimaryButtonStyle}" Click="AddVisit_Click" IsEnabled="False" />
                                     <Button x:Name="WishlistButton" Content="♡  Хочу посетить" Style="{StaticResource QuietButtonStyle}" Click="Wishlist_Click" IsEnabled="False" />
                                 </StackPanel>
@@ -264,35 +266,35 @@
                     <Grid x:Name="VisitsPage" Visibility="Collapsed" ColumnDefinitions="1.1*,0.9*" ColumnSpacing="20">
                         <Grid RowDefinitions="Auto,*">
                             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,14">
-                                <TextBlock Text="Все твои открытия в одном месте" FontSize="13" Foreground="#839188" VerticalAlignment="Center" />
+                                <TextBlock Text="Все твои открытия в одном месте" FontSize="13" Foreground="{ThemeResource Palette_839188}" VerticalAlignment="Center" />
                                 <Button Grid.Column="1" Content="Из каталога" Style="{StaticResource QuietButtonStyle}" Click="NewVisitFromCatalog_Click" />
                                 <Button Grid.Column="2" Content="＋  Своё место" Style="{StaticResource PrimaryButtonStyle}" Click="NewMapVisit_Click" />
                             </Grid>
                             <ListView x:Name="VisitsList" Grid.Row="1" ItemsSource="{x:Bind Visits, Mode=OneWay}" ItemTemplate="{StaticResource VisitTemplate}" SelectionChanged="VisitsList_SelectionChanged" Background="Transparent" BorderThickness="0" />
                         </Grid>
-                        <Border Grid.Column="1" Background="#FFFFFF" CornerRadius="20" Padding="22" BorderBrush="#E7EBE5" BorderThickness="1">
+                        <Border Grid.Column="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="20" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <StackPanel Spacing="12">
-                                    <TextBlock Text="Запись из дневника" FontSize="11" FontWeight="SemiBold" Foreground="#86A05F" />
-                                    <TextBlock x:Name="SelectedVisitName" Text="Выбери посещение" FontSize="23" FontWeight="SemiBold" Foreground="#1A2D25" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="SelectedVisitMeta" Text="Дата · Город · Страна" FontSize="12" Foreground="#85928A" />
-                                    <TextBlock x:Name="SelectedVisitRating" Text="Оценка: —" FontSize="12" Foreground="#789451" />
-                                    <TextBlock x:Name="SelectedVisitImpressions" Text="Впечатления появятся здесь." TextWrapping="Wrap" FontSize="13" Foreground="#596960" LineHeight="20" />
-                                    <TextBlock x:Name="SelectedVisitNotes" Text="" TextWrapping="Wrap" FontSize="12" Foreground="#85928A" />
+                                    <TextBlock Text="Запись из дневника" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource Palette_86A05F}" />
+                                    <TextBlock x:Name="SelectedVisitName" Text="Выбери посещение" FontSize="23" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1A2D25}" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="SelectedVisitMeta" Text="Дата · Город · Страна" FontSize="12" Foreground="{ThemeResource Palette_85928A}" />
+                                    <TextBlock x:Name="SelectedVisitRating" Text="Оценка: —" FontSize="12" Foreground="{ThemeResource Palette_789451}" />
+                                    <TextBlock x:Name="SelectedVisitImpressions" Text="Впечатления появятся здесь." TextWrapping="Wrap" FontSize="13" Foreground="{ThemeResource Palette_596960}" LineHeight="20" />
+                                    <TextBlock x:Name="SelectedVisitNotes" Text="" TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource Palette_85928A}" />
                                     <StackPanel Orientation="Horizontal" Spacing="9">
                                         <Button x:Name="EditVisitButton" Content="Редактировать" Style="{StaticResource QuietButtonStyle}" Click="EditVisit_Click" IsEnabled="False" />
-                                        <Button x:Name="DeleteVisitButton" Content="Удалить" Background="#F9E9E5" Foreground="#A65345" BorderThickness="0" Padding="14,10" CornerRadius="11" Click="DeleteVisit_Click" IsEnabled="False" />
+                                        <Button x:Name="DeleteVisitButton" Content="Удалить" Background="{ThemeResource Palette_F9E9E5}" Foreground="{ThemeResource Palette_A65345}" BorderThickness="0" Padding="14,10" CornerRadius="11" Click="DeleteVisit_Click" IsEnabled="False" />
                                     </StackPanel>
-                                    <Border Height="1" Background="#E9ECE6" Margin="0,4" />
-                                    <TextBlock Text="Фотографии" FontSize="11" FontWeight="SemiBold" Foreground="#8B9990" />
+                                    <Border Height="1" Background="{ThemeResource Palette_E9ECE6}" Margin="0,4" />
+                                    <TextBlock Text="Фотографии" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource Palette_8B9990}" />
                                     <ListView x:Name="PhotosList" SelectionMode="None" IsItemClickEnabled="False" Background="Transparent" BorderThickness="0">
                                         <ListView.ItemTemplate>
                                             <DataTemplate x:DataType="models:PhotoDto">
                                                 <Grid ColumnDefinitions="*,Auto" Margin="0,5">
-                                                    <TextBlock Text="{x:Bind Caption}" FontSize="12" Foreground="#53645B" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{x:Bind Caption}" FontSize="12" Foreground="{ThemeResource Palette_53645B}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="5">
                                                         <Button Content="Открыть" Click="OpenPhoto_Click" Style="{StaticResource QuietButtonStyle}" Padding="10,6" />
-                                                        <Button Content="×" Click="DeletePhoto_Click" Background="#F9E9E5" Foreground="#A65345" BorderThickness="0" Padding="10,6" />
+                                                        <Button Content="×" Click="DeletePhoto_Click" Background="{ThemeResource Palette_F9E9E5}" Foreground="{ThemeResource Palette_A65345}" BorderThickness="0" Padding="10,6" />
                                                     </StackPanel>
                                                 </Grid>
                                             </DataTemplate>
@@ -306,7 +308,7 @@
                     <!-- Wishlist -->
                     <Grid x:Name="WishlistPage" Visibility="Collapsed" RowDefinitions="Auto,*">
                         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,15">
-                            <TextBlock Text="Сохрани идеи для будущих поездок" FontSize="13" Foreground="#839188" VerticalAlignment="Center" />
+                            <TextBlock Text="Сохрани идеи для будущих поездок" FontSize="13" Foreground="{ThemeResource Palette_839188}" VerticalAlignment="Center" />
                             <Button Grid.Column="1" Content="Убрать из списка" Style="{StaticResource QuietButtonStyle}" Click="RemoveWishlist_Click" IsEnabled="False" x:Name="RemoveWishlistButton" />
                         </Grid>
                         <ListView x:Name="WishlistList" Grid.Row="1" ItemsSource="{x:Bind WishlistAttractions, Mode=OneWay}" ItemTemplate="{StaticResource AttractionTemplate}" SelectionChanged="WishlistList_SelectionChanged" Background="Transparent" BorderThickness="0" />
@@ -314,16 +316,16 @@
 
                     <!-- Map -->
                     <Grid x:Name="MapPage" Visibility="Collapsed" RowDefinitions="Auto,*">
-                        <Border Background="#FFFFFF" CornerRadius="12" Padding="13" Margin="0,0,0,12" BorderBrush="#E7EBE5" BorderThickness="1">
-                            <TextBlock Text="Щёлкни по карте, чтобы добавить своё место. Для каждой точки можно указать статус, дату посещения, оценку, впечатления, заметки и фотографии. Для загрузки карты требуется интернет." FontSize="12" Foreground="#74837A" TextWrapping="Wrap" />
+                        <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="12" Padding="13" Margin="0,0,0,12" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                            <TextBlock Text="Щёлкни по карте, чтобы добавить своё место. Для каждой точки можно указать статус, дату посещения, оценку, впечатления, заметки и фотографии. Для загрузки карты требуется интернет." FontSize="12" Foreground="{ThemeResource Palette_74837A}" TextWrapping="Wrap" />
                         </Border>
-                        <Border Grid.Row="1" Background="#FFFFFF" CornerRadius="18" BorderBrush="#E7EBE5" BorderThickness="1">
+                        <Border Grid.Row="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                             <controls:WebView2 x:Name="MapWebView" />
                         </Border>
                     </Grid>
                 </Grid>
 
-                <TextBlock Grid.Row="2" Text="Loca Loca · Твоя карта воспоминаний" FontSize="10" Foreground="#A0AAA3" Margin="0,14,0,0" />
+                <TextBlock Grid.Row="2" Text="Loca Loca · Твоя карта воспоминаний" FontSize="10" Foreground="{ThemeResource Palette_A0AAA3}" Margin="0,14,0,0" />
                 </Grid>
             </Border>
         </Grid>
