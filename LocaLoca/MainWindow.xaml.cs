@@ -592,8 +592,9 @@ public sealed partial class MainWindow : Window
                     "WebView2");
                 Directory.CreateDirectory(webViewDataPath);
                 var webViewEnvironment = await CoreWebView2Environment.CreateAsync(
-                    browserExecutableFolder: null,
-                    userDataFolder: webViewDataPath);
+                    null,
+                    webViewDataPath,
+                    null);
                 await MapWebView.EnsureCoreWebView2Async(webViewEnvironment);
                 MapWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
                 _mapInitialized = true;
