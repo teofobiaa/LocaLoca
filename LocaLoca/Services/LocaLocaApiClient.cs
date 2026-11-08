@@ -99,6 +99,19 @@ public sealed class LocaLocaApiClient : IDisposable
         return result;
     }
 
+    public async Task<UserDto> UpdateDisplayNameAsync(string displayName, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, "api/me/profile/display-name")
+        {
+            Content = JsonContent.Create(new UpdateDisplayNameRequest(displayName), options: JsonOptions)
+        };
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<UserDto>(JsonOptions, cancellationToken))
+            ?? throw new InvalidOperationException("Сервер вернул пустой профиль.");
+    }
+
     public async Task<List<CategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
         var result = await GetJsonAsync<ItemsResponse<CategoryDto>>("api/catalog/categories", cancellationToken);
