@@ -52,13 +52,20 @@ CREATE TABLE visits (
     created_at     timestamptz NOT NULL DEFAULT now()
 );
 
--- В базе хранится только путь к файлу; сами изображения лежат в папке на диске.
+-- Метаданные и бинарные данные фотографий хранятся вместе в PostgreSQL (bytea).
 CREATE TABLE photos (
     photo_id       integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     visit_id       integer      NOT NULL REFERENCES visits (visit_id) ON DELETE CASCADE,
     file_path      varchar(500) NOT NULL,
     caption        varchar(200) NOT NULL DEFAULT '',
-    added_at       timestamptz  NOT NULL DEFAULT now()
+    image_data     bytea,
+    content_type   varchar(100),
+    added_at       timestamptz  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_photos_image_payload CHECK (
+        (image_data IS NULL AND content_type IS NULL) OR
+        (image_data IS NOT NULL AND octet_length(image_data) BETWEEN 1 AND 20971520
+            AND content_type IS NOT NULL AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
+    )
 );
 
 -- Список мест, которые пользователь хочет посетить.
@@ -93,7 +100,14 @@ CREATE TABLE user_map_place_photos (
     user_map_place_id integer      NOT NULL REFERENCES user_map_places (user_map_place_id) ON DELETE CASCADE,
     file_path         varchar(500) NOT NULL,
     caption           varchar(200) NOT NULL DEFAULT '',
-    added_at          timestamptz  NOT NULL DEFAULT now()
+    image_data        bytea,
+    content_type      varchar(100),
+    added_at          timestamptz  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_user_map_place_photos_image_payload CHECK (
+        (image_data IS NULL AND content_type IS NULL) OR
+        (image_data IS NOT NULL AND octet_length(image_data) BETWEEN 1 AND 20971520
+            AND content_type IS NOT NULL AND content_type IN ('image/jpeg', 'image/png', 'image/webp', 'image/bmp', 'image/gif'))
+    )
 );
 
 CREATE INDEX ix_attractions_city      ON attractions (city_id);

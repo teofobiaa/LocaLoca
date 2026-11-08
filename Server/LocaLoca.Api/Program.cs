@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Npgsql;
 using NpgsqlTypes;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
 // Local development keeps the loopback endpoint. Render supplies PORT; in the
@@ -20,6 +21,11 @@ else
 {
     builder.WebHost.UseUrls("http://127.0.0.1:5181");
 }
+builder.Services.Configure<FormOptions>(options =>
+{
+    // 20 MiB is the application photo limit; leave room for multipart headers and fields.
+    options.MultipartBodyLengthLimit = 22 * 1024 * 1024;
+});
 builder.Services.AddSingleton<SessionStore>();
 var app = builder.Build();
 
@@ -121,6 +127,21 @@ app.MapGet("/ready", async Task<IResult> (CancellationToken cancellationToken) =
     {
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
+        const string photoSchemaCheck = @"
+SELECT
+    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='photos' AND column_name='image_data')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='photos' AND column_name='content_type')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='user_map_place_photos' AND column_name='image_data')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='user_map_place_photos' AND column_name='content_type')";
+        await using (var schemaCommand = new NpgsqlCommand(photoSchemaCheck, connection))
+        {
+            var photoSchemaReady = Equals(await schemaCommand.ExecuteScalarAsync(cancellationToken), true);
+            if (!photoSchemaReady)
+                return Results.Json(new HealthDto(true, false,
+                    "Не настроено хранение фотографий в PostgreSQL. Выполните database/07_migrate_photo_storage.sql в Supabase SQL Editor."),
+                    statusCode: 503);
+        }
+
         const string permissionCheck = @"
 SELECT
     has_table_privilege(current_user, 'public.users', 'SELECT')
@@ -137,6 +158,10 @@ SELECT
     AND has_table_privilege(current_user, 'public.photos', 'SELECT')
     AND has_table_privilege(current_user, 'public.photos', 'INSERT')
     AND has_table_privilege(current_user, 'public.photos', 'DELETE')
+    AND has_column_privilege(current_user, 'public.photos', 'image_data', 'SELECT')
+    AND has_column_privilege(current_user, 'public.photos', 'image_data', 'INSERT')
+    AND has_column_privilege(current_user, 'public.photos', 'content_type', 'SELECT')
+    AND has_column_privilege(current_user, 'public.photos', 'content_type', 'INSERT')
     AND has_table_privilege(current_user, 'public.wishlist', 'SELECT')
     AND has_table_privilege(current_user, 'public.wishlist', 'INSERT')
     AND has_table_privilege(current_user, 'public.wishlist', 'DELETE')
@@ -147,6 +172,10 @@ SELECT
     AND has_table_privilege(current_user, 'public.user_map_place_photos', 'SELECT')
     AND has_table_privilege(current_user, 'public.user_map_place_photos', 'INSERT')
     AND has_table_privilege(current_user, 'public.user_map_place_photos', 'DELETE')
+    AND has_column_privilege(current_user, 'public.user_map_place_photos', 'image_data', 'SELECT')
+    AND has_column_privilege(current_user, 'public.user_map_place_photos', 'image_data', 'INSERT')
+    AND has_column_privilege(current_user, 'public.user_map_place_photos', 'content_type', 'SELECT')
+    AND has_column_privilege(current_user, 'public.user_map_place_photos', 'content_type', 'INSERT')
     AND has_sequence_privilege(current_user, 'public.users_user_id_seq', 'USAGE')
     AND has_sequence_privilege(current_user, 'public.visits_visit_id_seq', 'USAGE')
     AND has_sequence_privilege(current_user, 'public.photos_photo_id_seq', 'USAGE')
@@ -356,57 +385,59 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
     if (files.Any(f => !allowedExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant())))
         return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
 
-    var writtenFiles = new List<string>();
-    try
+    // Read and validate every image before opening the transaction. A bad file
+    // cannot leave a partially saved visit or a partial photo collection.
+    var uploads = new List<(string RelativePath, string Caption, byte[] Data, string ContentType)>();
+    foreach (var file in files)
     {
-        await using var connection = await OpenAsync(connectionString);
-        await using var transaction = await connection.BeginTransactionAsync();
-        int savedVisitId;
-        if (visitId is null)
-        {
-            await using var insert = new NpgsqlCommand(@"INSERT INTO visits(user_id, attraction_id, visit_date, rating, impressions, notes)
-                VALUES (@u, @a, @d, @r, @i, @n) RETURNING visit_id", connection, transaction);
-            AddVisitParameters(insert, userId, new VisitWriteRequest(attractionId, visitDate.ToString("yyyy-MM-dd"), rating,
-                form["impressions"].ToString(), form["notes"].ToString()), visitDate);
-            savedVisitId = Convert.ToInt32(await insert.ExecuteScalarAsync());
-        }
-        else
-        {
-            await using var update = new NpgsqlCommand(@"UPDATE visits SET attraction_id=@a, visit_date=@d, rating=@r,
-                impressions=@i, notes=@n WHERE visit_id=@v AND user_id=@u", connection, transaction);
-            AddVisitParameters(update, userId, new VisitWriteRequest(attractionId, visitDate.ToString("yyyy-MM-dd"), rating,
-                form["impressions"].ToString(), form["notes"].ToString()), visitDate);
-            update.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId.Value);
-            if (await update.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ErrorDto("Посещение не найдено."));
-            savedVisitId = visitId.Value;
-        }
-
-        foreach (var file in files)
-        {
-            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            var fileName = $"{Guid.NewGuid():N}{extension}";
-            var relativePath = $"Photos/{fileName}";
-            var fullPath = Path.Combine(photosRoot, fileName);
-            writtenFiles.Add(relativePath); // Удалится даже частично записанный файл при откате.
-            await using (var stream = File.Create(fullPath)) await file.CopyToAsync(stream);
-            var caption = Path.GetFileNameWithoutExtension(file.FileName);
-            if (caption.Length > 200) caption = caption[..200];
-            await using var photoInsert = new NpgsqlCommand(
-                "INSERT INTO photos(visit_id, file_path, caption) VALUES (@v, @p, @c)", connection, transaction);
-            photoInsert.Parameters.AddWithValue("v", NpgsqlDbType.Integer, savedVisitId);
-            photoInsert.Parameters.AddWithValue("p", NpgsqlDbType.Varchar, relativePath);
-            photoInsert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, caption);
-            await photoInsert.ExecuteNonQueryAsync();
-        }
-
-        await transaction.CommitAsync();
-        return Results.Ok(new VisitSavedDto(savedVisitId, "Посещение и фотографии сохранены."));
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var data = await ReadPhotoDataAsync(file);
+        if (!HasValidImageSignature(data, extension))
+            return Results.BadRequest(new ErrorDto($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
+        var fileName = $"{Guid.NewGuid():N}{extension}";
+        var relativePath = $"Photos/{fileName}";
+        var caption = Path.GetFileNameWithoutExtension(file.FileName);
+        if (caption.Length > 200) caption = caption[..200];
+        uploads.Add((relativePath, caption, data, ContentTypeFor(relativePath)));
     }
-    catch
+
+    await using var connection = await OpenAsync(connectionString);
+    await using var transaction = await connection.BeginTransactionAsync();
+    int savedVisitId;
+    if (visitId is null)
     {
-        foreach (var relativePath in writtenFiles) TryDeletePhoto(dataRoot, relativePath);
-        throw;
+        await using var insert = new NpgsqlCommand(@"INSERT INTO visits(user_id, attraction_id, visit_date, rating, impressions, notes)
+            VALUES (@u, @a, @d, @r, @i, @n) RETURNING visit_id", connection, transaction);
+        AddVisitParameters(insert, userId, new VisitWriteRequest(attractionId, visitDate.ToString("yyyy-MM-dd"), rating,
+            form["impressions"].ToString(), form["notes"].ToString()), visitDate);
+        savedVisitId = Convert.ToInt32(await insert.ExecuteScalarAsync());
     }
+    else
+    {
+        await using var update = new NpgsqlCommand(@"UPDATE visits SET attraction_id=@a, visit_date=@d, rating=@r,
+            impressions=@i, notes=@n WHERE visit_id=@v AND user_id=@u", connection, transaction);
+        AddVisitParameters(update, userId, new VisitWriteRequest(attractionId, visitDate.ToString("yyyy-MM-dd"), rating,
+            form["impressions"].ToString(), form["notes"].ToString()), visitDate);
+        update.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId.Value);
+        if (await update.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ErrorDto("Посещение не найдено."));
+        savedVisitId = visitId.Value;
+    }
+
+    foreach (var upload in uploads)
+    {
+        await using var photoInsert = new NpgsqlCommand(
+            @"INSERT INTO photos(visit_id, file_path, caption, image_data, content_type)
+              VALUES (@v, @p, @c, @data, @type)", connection, transaction);
+        photoInsert.Parameters.AddWithValue("v", NpgsqlDbType.Integer, savedVisitId);
+        photoInsert.Parameters.AddWithValue("p", NpgsqlDbType.Varchar, upload.RelativePath);
+        photoInsert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, upload.Caption);
+        photoInsert.Parameters.AddWithValue("data", NpgsqlDbType.Bytea, upload.Data);
+        photoInsert.Parameters.AddWithValue("type", NpgsqlDbType.Varchar, upload.ContentType);
+        await photoInsert.ExecuteNonQueryAsync();
+    }
+
+    await transaction.CommitAsync();
+    return Results.Ok(new VisitSavedDto(savedVisitId, "Посещение и фотографии сохранены в PostgreSQL."));
 });
 
 app.MapPost("/api/me/visits", async Task<IResult> (VisitWriteRequest request, HttpContext context, SessionStore sessions) =>
@@ -454,6 +485,9 @@ app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visi
     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
     var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
     if (!allowed.Contains(extension)) return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
+    var data = await ReadPhotoDataAsync(file);
+    if (!HasValidImageSignature(data, extension))
+        return Results.BadRequest(new ErrorDto("Содержимое файла не соответствует формату изображения."));
 
     await using var connection = await OpenAsync(connectionString);
     await using var ownership = new NpgsqlCommand("SELECT 1 FROM visits WHERE visit_id = @v AND user_id = @u", connection);
@@ -461,20 +495,19 @@ app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visi
     ownership.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
     if (await ownership.ExecuteScalarAsync() is null) return Results.NotFound(new ErrorDto("Посещение не найдено."));
 
-    var fileName = $"{Guid.NewGuid():N}{extension}";
-    var fullPath = Path.Combine(photosRoot, fileName);
-    await using (var stream = File.Create(fullPath)) await file.CopyToAsync(stream);
-    var relativePath = $"Photos/{fileName}";
-    try
-    {
-        await using var insert = new NpgsqlCommand("INSERT INTO photos(visit_id, file_path, caption) VALUES (@v, @p, @c) RETURNING photo_id", connection);
-        insert.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId);
-        insert.Parameters.AddWithValue("p", NpgsqlDbType.Varchar, relativePath);
-        insert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, (form["caption"].ToString() ?? string.Empty)[..Math.Min(200, form["caption"].ToString().Length)]);
-        var id = Convert.ToInt32(await insert.ExecuteScalarAsync());
-        return Results.Ok(new PhotoDto(id, relativePath, form["caption"].ToString()));
-    }
-    catch { TryDeletePhoto(dataRoot, relativePath); throw; }
+    var relativePath = $"Photos/{Guid.NewGuid():N}{extension}";
+    var caption = Path.GetFileNameWithoutExtension(file.FileName);
+    if (caption.Length > 200) caption = caption[..200];
+    await using var insert = new NpgsqlCommand(
+        @"INSERT INTO photos(visit_id, file_path, caption, image_data, content_type)
+          VALUES (@v, @p, @c, @data, @type) RETURNING photo_id", connection);
+    insert.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId);
+    insert.Parameters.AddWithValue("p", NpgsqlDbType.Varchar, relativePath);
+    insert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, caption);
+    insert.Parameters.AddWithValue("data", NpgsqlDbType.Bytea, data);
+    insert.Parameters.AddWithValue("type", NpgsqlDbType.Varchar, ContentTypeFor(relativePath));
+    var id = Convert.ToInt32(await insert.ExecuteScalarAsync());
+    return Results.Ok(new PhotoDto(id, relativePath, caption));
 });
 
 app.MapGet("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visitId, HttpContext context, SessionStore sessions) =>
@@ -494,13 +527,24 @@ app.MapGet("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visit
 app.MapGet("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    await using var connection = await OpenAsync(connectionString);
-    await using var command = new NpgsqlCommand(@"SELECT p.file_path FROM photos p
-        JOIN visits v ON v.visit_id = p.visit_id WHERE p.photo_id = @p AND v.user_id = @u", connection);
-    command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
-    command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    var relativePath = await command.ExecuteScalarAsync() as string;
-    if (relativePath is null) return Results.NotFound();
+    string relativePath;
+    byte[]? imageData;
+    string contentType;
+    await using (var connection = await OpenAsync(connectionString))
+    await using (var command = new NpgsqlCommand(@"SELECT p.file_path, p.image_data, p.content_type FROM photos p
+        JOIN visits v ON v.visit_id = p.visit_id WHERE p.photo_id = @p AND v.user_id = @u", connection))
+    {
+        command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
+        command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync()) return Results.NotFound();
+        relativePath = reader.GetString(0);
+        imageData = reader.IsDBNull(1) ? null : reader.GetFieldValue<byte[]>(1);
+        contentType = reader.IsDBNull(2) ? ContentTypeFor(relativePath) : reader.GetString(2);
+    }
+    if (imageData is not null) return Results.File(imageData, contentType);
+
+    // Backward compatibility for records created before the database migration.
     var fullPath = SafePhotoPath(dataRoot, relativePath);
     if (fullPath is null || !File.Exists(fullPath)) return Results.NotFound();
     return Results.File(fullPath, ContentTypeFor(fullPath));
@@ -705,70 +749,67 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
     if (files.Any(f => !allowed.Contains(Path.GetExtension(f.FileName).ToLowerInvariant())))
         return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
 
-    var writtenPaths = new List<string>();
-    try
+    var uploads = new List<(string RelativePath, string Caption, byte[] Data, string ContentType)>();
+    foreach (var file in files)
     {
-        await using var connection = await OpenAsync(connectionString);
-        await using var transaction = await connection.BeginTransactionAsync();
-        await using var ownership = new NpgsqlCommand("SELECT 1 FROM user_map_places WHERE user_map_place_id=@p AND user_id=@u", connection, transaction);
-        ownership.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
-        ownership.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        if (await ownership.ExecuteScalarAsync() is null) return Results.NotFound(new ErrorDto("Место не найдено."));
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+        var data = await ReadPhotoDataAsync(file);
+        if (!HasValidImageSignature(data, extension))
+            return Results.BadRequest(new ErrorDto($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
+        var relativePath = $"Photos/{Guid.NewGuid():N}{extension}";
+        var caption = Path.GetFileNameWithoutExtension(file.FileName);
+        if (caption.Length > 200) caption = caption[..200];
+        uploads.Add((relativePath, caption, data, ContentTypeFor(relativePath)));
+    }
 
-        foreach (var file in files)
-        {
-            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            var fileName = $"{Guid.NewGuid():N}{extension}";
-            var relativePath = $"Photos/{fileName}";
-            writtenPaths.Add(relativePath);
-            await using (var stream = File.Create(Path.Combine(photosRoot, fileName))) await file.CopyToAsync(stream);
-            var caption = Path.GetFileNameWithoutExtension(file.FileName);
-            if (caption.Length > 200) caption = caption[..200];
-            await using var insert = new NpgsqlCommand(@"INSERT INTO user_map_place_photos(user_map_place_id, file_path, caption)
-                VALUES (@p, @f, @c)", connection, transaction);
-            insert.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
-            insert.Parameters.AddWithValue("f", NpgsqlDbType.Varchar, relativePath);
-            insert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, caption);
-            await insert.ExecuteNonQueryAsync();
-        }
-        await transaction.CommitAsync();
-        return Results.Ok(new MessageDto("Фотографии сохранены."));
-    }
-    catch
+    await using var connection = await OpenAsync(connectionString);
+    await using var transaction = await connection.BeginTransactionAsync();
+    await using var ownership = new NpgsqlCommand("SELECT 1 FROM user_map_places WHERE user_map_place_id=@p AND user_id=@u", connection, transaction);
+    ownership.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
+    ownership.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
+    if (await ownership.ExecuteScalarAsync() is null) return Results.NotFound(new ErrorDto("Место не найдено."));
+
+    foreach (var upload in uploads)
     {
-        foreach (var path in writtenPaths) TryDeletePhoto(dataRoot, path);
-        throw;
+        await using var insert = new NpgsqlCommand(
+            @"INSERT INTO user_map_place_photos(user_map_place_id, file_path, caption, image_data, content_type)
+              VALUES (@p, @f, @c, @data, @type)", connection, transaction);
+        insert.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
+        insert.Parameters.AddWithValue("f", NpgsqlDbType.Varchar, upload.RelativePath);
+        insert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, upload.Caption);
+        insert.Parameters.AddWithValue("data", NpgsqlDbType.Bytea, upload.Data);
+        insert.Parameters.AddWithValue("type", NpgsqlDbType.Varchar, upload.ContentType);
+        await insert.ExecuteNonQueryAsync();
     }
+    await transaction.CommitAsync();
+    return Results.Ok(new MessageDto("Фотографии сохранены в PostgreSQL."));
 });
 
 app.MapGet("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    await using var connection = await OpenAsync(connectionString);
-    await using var command = new NpgsqlCommand(@"SELECT p.file_path FROM user_map_place_photos p
+    string relativePath;
+    byte[]? imageData;
+    string contentType;
+    await using (var connection = await OpenAsync(connectionString))
+    await using (var command = new NpgsqlCommand(@"SELECT p.file_path, p.image_data, p.content_type FROM user_map_place_photos p
         JOIN user_map_places m ON m.user_map_place_id=p.user_map_place_id
-        WHERE p.photo_id=@p AND m.user_id=@u", connection);
-    command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
-    command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    var relativePath = await command.ExecuteScalarAsync() as string;
-    if (relativePath is null) return Results.NotFound();
+        WHERE p.photo_id=@p AND m.user_id=@u", connection))
+    {
+        command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
+        command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync()) return Results.NotFound();
+        relativePath = reader.GetString(0);
+        imageData = reader.IsDBNull(1) ? null : reader.GetFieldValue<byte[]>(1);
+        contentType = reader.IsDBNull(2) ? ContentTypeFor(relativePath) : reader.GetString(2);
+    }
+    if (imageData is not null) return Results.File(imageData, contentType);
+
+    // Backward compatibility for records created before the database migration.
     var fullPath = SafePhotoPath(dataRoot, relativePath);
     if (fullPath is null || !File.Exists(fullPath)) return Results.NotFound();
     return Results.File(fullPath, ContentTypeFor(fullPath));
-});
-
-app.MapDelete("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
-{
-    if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    await using var connection = await OpenAsync(connectionString);
-    await using var command = new NpgsqlCommand(@"DELETE FROM user_map_place_photos p USING user_map_places m
-        WHERE p.user_map_place_id=m.user_map_place_id AND p.photo_id=@p AND m.user_id=@u RETURNING p.file_path", connection);
-    command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
-    command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    var path = await command.ExecuteScalarAsync() as string;
-    if (path is null) return Results.NotFound();
-    TryDeletePhoto(dataRoot, path);
-    return Results.Ok(new MessageDto("Фотография удалена."));
 });
 
 app.MapGet("/map", IResult () =>
@@ -912,6 +953,27 @@ static bool VerifyPassword(string password, string stored)
     catch (FormatException) { return false; }
     catch (ArgumentException) { return false; }
 }
+
+static async Task<byte[]> ReadPhotoDataAsync(IFormFile file)
+{
+    await using var source = file.OpenReadStream();
+    using var buffer = new MemoryStream(checked((int)file.Length));
+    await source.CopyToAsync(buffer);
+    return buffer.ToArray();
+}
+
+static bool HasValidImageSignature(byte[] bytes, string extension) => extension switch
+{
+    ".jpg" or ".jpeg" => bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF,
+    ".png" => bytes.Length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 &&
+              bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A,
+    ".webp" => bytes.Length >= 12 && Encoding.ASCII.GetString(bytes, 0, 4) == "RIFF" &&
+               Encoding.ASCII.GetString(bytes, 8, 4) == "WEBP",
+    ".gif" => bytes.Length >= 6 && Encoding.ASCII.GetString(bytes, 0, 3) == "GIF" &&
+              Encoding.ASCII.GetString(bytes, 3, 3) is "87a" or "89a",
+    ".bmp" => bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D,
+    _ => false
+};
 
 static string? SafePhotoPath(string dataRoot, string relativePath)
 {

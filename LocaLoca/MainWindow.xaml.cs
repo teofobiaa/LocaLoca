@@ -410,7 +410,7 @@ public sealed partial class MainWindow : Window
             var files = await picker.PickMultipleFilesAsync();
             if (files.Count == 0) return;
             pickedPhotos.AddRange(files);
-            photoLabel.Text = $"Выбрано новых фотографий: {pickedPhotos.Count}. Общий лимит — 20 МБ.";
+            photoLabel.Text = $"Выбрано новых фотографий: {pickedPhotos.Count}. За одну операцию — до 10 файлов и 20 МиБ суммарно.";
         };
 
         var content = new StackPanel { Spacing = 10 };
@@ -551,7 +551,7 @@ public sealed partial class MainWindow : Window
     private async void DeletePhoto_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button button || button.DataContext is not PhotoDto photo || _selectedVisit is null) return;
-        var result = await ConfirmAsync("Удалить фотографию?", "Файл будет удалён из локального хранилища.");
+        var result = await ConfirmAsync("Удалить фотографию?", "Фотография будет удалена из облачной базы данных.");
         if (result != ContentDialogResult.Primary) return;
         try
         {

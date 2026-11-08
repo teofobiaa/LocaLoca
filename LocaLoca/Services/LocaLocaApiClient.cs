@@ -224,6 +224,7 @@ public sealed class LocaLocaApiClient : IDisposable
         IReadOnlyList<StorageFile> photos,
         CancellationToken cancellationToken = default)
     {
+        await ValidatePhotoFilesAsync(photos, cancellationToken);
         using var form = new MultipartFormDataContent();
         form.Add(new StringContent(attractionId.ToString(CultureInfo.InvariantCulture)), "attractionId");
         form.Add(new StringContent(visitDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), "visitDate");
@@ -271,6 +272,7 @@ public sealed class LocaLocaApiClient : IDisposable
     public async Task UploadMapPlacePhotosAsync(int placeId, IReadOnlyList<StorageFile> photos,
         CancellationToken cancellationToken = default)
     {
+        await ValidatePhotoFilesAsync(photos, cancellationToken);
         if (photos.Count == 0) return;
         using var form = new MultipartFormDataContent();
         foreach (var file in photos)
@@ -404,6 +406,37 @@ public sealed class LocaLocaApiClient : IDisposable
             throw new InvalidOperationException("Неверный логин или пароль либо истекла сессия.");
         if (string.IsNullOrWhiteSpace(message)) message = $"Ошибка API: {(int)response.StatusCode} {response.ReasonPhrase}";
         throw new InvalidOperationException(message);
+    }
+
+    private static async Task ValidatePhotoFilesAsync(
+        IReadOnlyList<StorageFile> photos,
+        CancellationToken cancellationToken)
+    {
+        const ulong maxTotalBytes = 20UL * 1024 * 1024;
+        var allowedExtensions = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"
+        };
+
+        if (photos.Count > 10)
+            throw new InvalidOperationException("За одну операцию можно добавить не более 10 фотографий.");
+
+        ulong totalBytes = 0;
+        foreach (var photo in photos)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var extension = Path.GetExtension(photo.Name);
+            if (!allowedExtensions.Contains(extension))
+                throw new InvalidOperationException($"Формат файла «{photo.Name}» не поддерживается. Выбери JPG, PNG, WEBP, BMP или GIF.");
+
+            var properties = await photo.GetBasicPropertiesAsync();
+            if (properties.Size == 0 || properties.Size > maxTotalBytes)
+                throw new InvalidOperationException($"Размер файла «{photo.Name}» некорректен или превышает 20 МиБ.");
+
+            totalBytes += properties.Size;
+            if (totalBytes > maxTotalBytes)
+                throw new InvalidOperationException("Общий размер фотографий за одну операцию не должен превышать 20 МиБ.");
+        }
     }
 
     private static string GetContentType(string extension) => extension.ToLowerInvariant() switch
