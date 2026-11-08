@@ -36,9 +36,14 @@ until all items below are implemented and tested:
   In Render, the signing key is read from `LOCA_SESSION_SECRET`; keep it stable
   across deploys and rotations. Local development generates an ephemeral key,
   so local sessions are intentionally invalidated when the API restarts.
-- **Desktop client:** `LocaLocaApiClient` still targets localhost and starts the
-  packaged local API process. Add a configurable HTTPS API base URL and stop
-  requiring the local server for cloud mode. Keep a developer-only local override.
+- **Desktop client:** the client now accepts `LOCA_API_BASE_URL` as an HTTPS
+  endpoint. When configured, it uses the remote API and does not start the local
+  API as a fallback. Set it on a Windows client after Render assigns the service URL:
+  ```powershell
+  [Environment]::SetEnvironmentVariable("LOCA_API_BASE_URL", "https://<service>.onrender.com", "User")
+  ```
+  Restart the desktop application after changing the variable. Without it, local
+  development continues to use `127.0.0.1:5181`.
 - **Map authentication:** the map currently places the bearer token in the query
   string. Replace this with a short-lived one-time exchange or another mechanism
   that does not expose the bearer token in URLs, browser history, or logs.
