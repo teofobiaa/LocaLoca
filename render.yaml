@@ -11,3 +11,5 @@ services:
         value: Production
       - key: LOCA_DB_CONNECTION
         sync: false
+      - key: LOCA_SESSION_SECRET
+        sync: false
