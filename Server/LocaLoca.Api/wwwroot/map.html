@@ -20,14 +20,20 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script>
     const params = new URLSearchParams(location.search);
-    const token = params.get('token') || sessionStorage.getItem('ll_token') || '';
-    const startNewVisit = params.get('mode') === 'visit';
+    const hashParams = new URLSearchParams(location.hash.slice(1));
+    const token = hashParams.get('token') || params.get('token') || sessionStorage.getItem('ll_token') || '';
+    const startNewVisit = hashParams.get('mode') === 'visit' || params.get('mode') === 'visit';
     const now = new Date();
     const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
     document.getElementById('map-hint').textContent = startNewVisit
       ? 'Выберите точку на карте, чтобы записать посещение'
       : 'Нажмите на карту, чтобы добавить своё место';
-    if (token) { sessionStorage.setItem('ll_token', token); history.replaceState({}, '', '/map'); }
+    if (token) {
+      sessionStorage.setItem('ll_token', token);
+      // Remove credentials from the visible URL immediately. The fragment is
+      // not sent to the server in the HTTP request or normal access logs.
+      history.replaceState({}, '', location.pathname);
+    }
     const map = L.map('map').setView([48, 16], 4);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
