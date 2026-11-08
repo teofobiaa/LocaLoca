@@ -52,7 +52,7 @@ begin
     PowerShellPath := ExpandConstant('{sysnative}\WindowsPowerShell\v1.0\powershell.exe');
     Parameters :=
       '-NoProfile -ExecutionPolicy Bypass -File "' +
-      ExpandConstant('{app}\\tools\\Install-CloudDependencies.ps1') + '"';
+      ExpandConstant('{app}\tools\Install-CloudDependencies.ps1') + '"';
 
     WizardForm.StatusLabel.Caption :=
       'Настраиваем подключение к Supabase и проверяем компоненты первого запуска.';
