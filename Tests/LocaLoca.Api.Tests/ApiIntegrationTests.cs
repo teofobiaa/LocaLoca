@@ -199,6 +199,11 @@ public sealed class ApiIntegrationTests
         Assert.Equal(jpegBytes, await ownerPhoto.Content.ReadAsByteArrayAsync());
         Assert.Equal(HttpStatusCode.NotFound, otherPhoto.StatusCode);
 
+        using var foreignDelete = await otherClient.DeleteAsync($"/api/me/photos/{photoId}");
+        using var stillAvailableToOwner = await ownerClient.GetAsync($"/api/me/photos/{photoId}");
+        Assert.Equal(HttpStatusCode.NotFound, foreignDelete.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, stillAvailableToOwner.StatusCode);
+
         using var delete = await ownerClient.DeleteAsync($"/api/me/photos/{photoId}");
         using var afterDelete = await ownerClient.GetAsync($"/api/me/photos/{photoId}");
 
@@ -256,6 +261,27 @@ public sealed class ApiIntegrationTests
             markerId.ValueKind == JsonValueKind.Number &&
             markerId.GetInt32() == placeId);
         Assert.DoesNotContain(otherMarkers, item =>
+            item.TryGetProperty("userPlaceId", out var markerId) &&
+            markerId.ValueKind == JsonValueKind.Number &&
+            markerId.GetInt32() == placeId);
+
+        using var ownerUpdate = await ownerClient.PutAsJsonAsync($"/api/me/map-places/{placeId}", new
+        {
+            name = "Owner updated test point",
+            status = "visited",
+            visitDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-1)).ToString("yyyy-MM-dd"),
+            rating = 5,
+            impressions = "Updated by owner",
+            notes = "Map point update test"
+        });
+        Assert.Equal(HttpStatusCode.OK, ownerUpdate.StatusCode);
+
+        using var ownerDelete = await ownerClient.DeleteAsync($"/api/me/map-places/{placeId}");
+        using var afterDeleteResponse = await ownerClient.GetAsync("/api/me/map-markers");
+        var afterDeleteMarkers = await ReadItemsAsync(afterDeleteResponse);
+
+        Assert.Equal(HttpStatusCode.OK, ownerDelete.StatusCode);
+        Assert.DoesNotContain(afterDeleteMarkers, item =>
             item.TryGetProperty("userPlaceId", out var markerId) &&
             markerId.ValueKind == JsonValueKind.Number &&
             markerId.GetInt32() == placeId);
