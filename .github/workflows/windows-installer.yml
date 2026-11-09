@@ -21,6 +21,8 @@ concurrency:
 jobs:
   build-installer:
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -67,21 +69,8 @@ jobs:
           name: LocaLoca-Setup
           path: Builds/Installer/LocaLoca-Setup.exe
           if-no-files-found: error
-
-  publish-release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build-installer
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download installer artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: LocaLoca-Setup
-          path: Builds/Installer
-
       - name: Publish latest public installer
+        if: ${{ github.ref == 'refs/heads/main' }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
