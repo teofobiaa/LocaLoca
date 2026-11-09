@@ -45,6 +45,20 @@ SQL-файлы не включаются в Windows-установщик и не
 
 Проверка `/ready` подтверждает доступность БД, нужных колонок фотографий и runtime-разрешений. Она не применяет миграции автоматически.
 
+## Проверка доступа через Supabase Data API
+
+Если в старых версиях приложения использовался Supabase publishable/anon key, проверь, что таблицы нельзя читать или изменять напрямую через Data API в обход облачного Loca Loca API.
+
+Для этого предназначен [audits/check_supabase_data_api_access.sql](audits/check_supabase_data_api_access.sql). Это **только диагностический запрос**: он показывает, включён ли RLS на таблицах схемы `public`, и перечисляет прямые права ролей `anon`, `authenticated` и `PUBLIC`, а также default privileges для будущих таблиц. Он ничего не изменяет.
+
+Запусти его в Supabase SQL Editor под ролью администратора и изучи результат:
+- если RLS выключен и `anon`, `authenticated` или `PUBLIC` имеют права на пользовательские таблицы, проверь потенциальную доступность данных;
+- если RLS включён, проверь существующие политики и то, какие операции они разрешают;
+- проверь default privileges отдельно: новые таблицы могут получать права автоматически;
+- не запускай массовый `REVOKE` или `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` без анализа. Приложение подключается к PostgreSQL через Npgsql под ролью `localoca_app`; сначала убедись, что изменения не сломают этот серверный доступ.
+
+Текущий Windows-клиент использует облачный API, а не Supabase Data API. Сам publishable/anon key не является паролем БД или service-role секретом, но его публичность не заменяет RLS и корректные grants.
+
 ## Экспорт стартового каталога
 
 Скрипт [tools/Export-AttractionsSeed.ps1](../tools/Export-AttractionsSeed.ps1) выгружает справочник из доступной разработчику базы в `seed/02_seed.sql`. Он принимает строку `LOCA_DB_CONNECTION` либо читает локальный `%LOCALAPPDATA%\LocaLoca\server-config.json`, включая новый DPAPI-формат. Расшифровка возможна только под той же учётной записью Windows, которая создала конфигурацию. Требуется PostgreSQL Command Line Tools (`psql`).
