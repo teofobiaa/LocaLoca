@@ -54,6 +54,34 @@ WHERE acl.grantee = 0
    )
 ORDER BY owner_role.rolname, schema_name.nspname, object_type, acl.grantee;
 
+-- Check EXECUTE access to application functions and procedures in public.
+-- Functions can expose data too, so review each grantee and overload.
+SELECT
+    n.nspname AS schema_name,
+    p.proname AS routine_name,
+    pg_get_function_identity_arguments(p.oid) AS arguments,
+    CASE
+        WHEN acl.grantee = 0 THEN 'PUBLIC'
+        ELSE grantee_role.rolname
+    END AS grantee,
+    acl.privilege_type,
+    acl.is_grantable
+FROM pg_proc AS p
+JOIN pg_namespace AS n
+    ON n.oid = p.pronamespace
+CROSS JOIN LATERAL aclexplode(
+    COALESCE(p.proacl, acldefault('f', p.proowner))
+) AS acl
+LEFT JOIN pg_roles AS grantee_role
+    ON grantee_role.oid = acl.grantee
+WHERE n.nspname = 'public'
+  AND p.prokind IN ('f', 'p')
+  AND (
+      acl.grantee = 0
+      OR grantee_role.rolname IN ('anon', 'authenticated')
+  )
+ORDER BY p.proname, arguments, grantee;
+
 -- Show row-level security policies. A policy is not required for a table
 -- without grants to anon/authenticated, but every exposed table with RLS
 -- enabled should have policies matching the intended user model.
