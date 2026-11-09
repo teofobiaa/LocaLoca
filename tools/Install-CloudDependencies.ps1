@@ -2,9 +2,10 @@
 param(
     [string]$UserConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json'),
     [string]$LogPath = (Join-Path $env:TEMP 'LocaLoca-CloudSetup.log'),
-    # Ordinary installations use the hosted API by default. Empty string is
-    # reserved for an explicit developer opt-in to legacy direct Supabase setup.
-    [string]$CloudApiUrl = 'https://localoca-api.onrender.com'
+    # Ordinary installations always use the hosted API. The legacy direct
+    # Supabase setup requires an explicit switch and is never selected implicitly.
+    [string]$CloudApiUrl = 'https://localoca-api.onrender.com',
+    [switch]$UseLegacySupabaseSetup
 )
 
 $ErrorActionPreference = 'Stop'
@@ -135,30 +136,37 @@ function Ensure-WebView2 {
 }
 
 function Get-ConfiguredCloudApiUrl {
-    if (-not [string]::IsNullOrWhiteSpace($CloudApiUrl)) {
-        $value = $CloudApiUrl.Trim()
-        $uri = $null
-        if (-not [Uri]::TryCreate($value, [UriKind]::Absolute, [ref]$uri) -or
-            $uri.Scheme -ne [Uri]::UriSchemeHttps) {
-            throw 'Параметр CloudApiUrl должен содержать корректный HTTPS-адрес Render.'
-        }
-        return $uri
+    if ($UseLegacySupabaseSetup) {
+        Write-SetupLog 'Явно включён режим прямой настройки Supabase.'
+        return $null
     }
 
-    foreach ($scope in @('Process', 'User', 'Machine')) {
-        $value = [Environment]::GetEnvironmentVariable('LOCA_API_BASE_URL', $scope)
-        if ([string]::IsNullOrWhiteSpace($value)) { continue }
-
-        $uri = $null
-        if (-not [Uri]::TryCreate($value.Trim(), [UriKind]::Absolute, [ref]$uri) -or
-            $uri.Scheme -ne [Uri]::UriSchemeHttps) {
-            throw "LOCA_API_BASE_URL задан некорректно. Укажи полный HTTPS-адрес Render, например https://localoca-api.onrender.com."
+    $value = $CloudApiUrl
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        foreach ($scope in @('Process', 'User', 'Machine')) {
+            $configuredValue = [Environment]::GetEnvironmentVariable('LOCA_API_BASE_URL', $scope)
+            if (-not [string]::IsNullOrWhiteSpace($configuredValue)) {
+                $value = $configuredValue
+                break
+            }
         }
-
-        return $uri
     }
 
-    return $null
+    # A missing/empty optional argument must not send an unattended installer
+    # into Read-Host prompts for Supabase credentials.
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        $value = 'https://localoca-api.onrender.com'
+    }
+
+    $value = $value.Trim()
+    $uri = $null
+    if (-not [Uri]::TryCreate($value, [UriKind]::Absolute, [ref]$uri) -or
+        $uri.Scheme -ne [Uri]::UriSchemeHttps) {
+        throw 'Параметр CloudApiUrl должен содержать корректный HTTPS-адрес Render.'
+    }
+
+    Write-SetupLog "Режим облачного API: $($uri.GetLeftPart([UriPartial]::Authority))."
+    return $uri
 }
 
 function Test-LoopbackHost {
