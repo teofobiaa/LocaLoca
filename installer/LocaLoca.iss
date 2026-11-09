@@ -49,14 +49,43 @@ Type: filesandordirs; Name: "{localappdata}\LocaLoca"
 Type: filesandordirs; Name: "{app}\LocaLoca.exe.WebView2"
 
 [Code]
+procedure AppendLogLines(const LogPath, Prefix: String; const Lines: TArrayOfString);
+var
+  TaggedLines: TArrayOfString;
+  I: Integer;
+begin
+  if GetArrayLength(Lines) = 0 then
+    Exit;
+
+  SetArrayLength(TaggedLines, GetArrayLength(Lines));
+  for I := 0 to GetArrayLength(Lines) - 1 do
+    TaggedLines[I] := Prefix + Lines[I];
+
+  if not SaveStringsToUTF8File(LogPath, TaggedLines, True) then
+    Log('Не удалось дописать вывод PowerShell в журнал: ' + LogPath);
+end;
+
+procedure AppendLogLine(const LogPath, Line: String);
+var
+  Lines: TArrayOfString;
+begin
+  SetArrayLength(Lines, 1);
+  Lines[0] := Line;
+  if not SaveStringsToUTF8File(LogPath, Lines, True) then
+    Log('Не удалось дописать строку в журнал: ' + LogPath);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;
   PowerShellPath: string;
   Parameters: string;
   SetupLogPath: string;
-  SetupLogContent: AnsiString;
+  SetupLogLines: TArrayOfString;
+  PowerShellOutput: TExecOutput;
   ErrorMessage: string;
+  I: Integer;
+  ExecSucceeded: Boolean;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -64,37 +93,63 @@ begin
     SetupLogPath := ExpandConstant('{localappdata}\LocaLoca\Logs\CloudSetup.log');
     if not ForceDirectories(ExtractFileDir(SetupLogPath)) then
       RaiseException('Не удалось создать каталог журнала: ' + ExtractFileDir(SetupLogPath));
+
     DeleteFile(SetupLogPath);
+    SetArrayLength(SetupLogLines, 1);
+    SetupLogLines[0] := 'Loca Loca installer: PowerShell setup started.';
+    if not SaveStringsToUTF8File(SetupLogPath, SetupLogLines, False) then
+      RaiseException('Не удалось создать диагностический журнал: ' + SetupLogPath +
+        #13#10 + 'Проверь права записи в каталог LocalAppData.');
+
     Parameters :=
       '-NoProfile -ExecutionPolicy Bypass -File "' +
       ExpandConstant('{app}\tools\Install-CloudDependencies.ps1') +
       '" -CloudApiUrl "https://localoca-api.onrender.com" -LogPath "' +
       SetupLogPath + '"';
 
+    AppendLogLine(SetupLogPath, 'PowerShell: ' + PowerShellPath);
+    AppendLogLine(SetupLogPath, 'Script: ' + ExpandConstant('{app}\tools\Install-CloudDependencies.ps1'));
+    AppendLogLine(SetupLogPath, 'Working directory: ' + ExpandConstant('{app}'));
+
     WizardForm.StatusLabel.Caption :=
       'Настраиваем облачное подключение Loca Loca и проверяем WebView2.';
     WizardForm.ProgressGauge.Style := npbstMarquee;
     WizardForm.Update;
 
-    if not Exec(PowerShellPath, Parameters, ExpandConstant('{app}'),
-      SW_SHOW, ewWaitUntilTerminated, ResultCode) then
+    ExecSucceeded := ExecAndCaptureOutput(
+      PowerShellPath, Parameters, ExpandConstant('{app}'),
+      SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, PowerShellOutput);
+
+    AppendLogLines(SetupLogPath, 'STDOUT: ', PowerShellOutput.StdOut);
+    AppendLogLines(SetupLogPath, 'STDERR: ', PowerShellOutput.StdErr);
+    if PowerShellOutput.Error then
+      AppendLogLine(SetupLogPath, 'WARNING: Ошибка при чтении вывода PowerShell.');
+
+    if not ExecSucceeded then
     begin
-      RaiseException('Не удалось запустить PowerShell для настройки Loca Loca. Проверь наличие Windows PowerShell в системе.');
+      ErrorMessage := 'Не удалось запустить PowerShell. Код Windows: ' +
+        IntToStr(ResultCode) + ' (' + SysErrorMessage(ResultCode) + ').';
+      AppendLogLine(SetupLogPath, ErrorMessage);
+      RaiseException(ErrorMessage + #13#10 + 'Журнал: ' + SetupLogPath);
     end;
+
+    AppendLogLine(SetupLogPath, 'PowerShell exit code: ' + IntToStr(ResultCode));
 
     if ResultCode <> 0 then
     begin
       ErrorMessage :=
         'Не удалось завершить настройку Loca Loca. Код ошибки PowerShell: ' +
-        IntToStr(ResultCode) + '.';
+        IntToStr(ResultCode) + '.' + #13#10#13#10;
 
-      if LoadStringFromFile(SetupLogPath, SetupLogContent) then
-        ErrorMessage := ErrorMessage + #13#10#13#10 + UTF8Decode(SetupLogContent)
+      if LoadStringsFromFile(SetupLogPath, SetupLogLines) then
+      begin
+        for I := 0 to GetArrayLength(SetupLogLines) - 1 do
+          ErrorMessage := ErrorMessage + SetupLogLines[I] + #13#10;
+      end
       else
-        ErrorMessage := ErrorMessage + #13#10 +
-          'Диагностический журнал не удалось создать или прочитать. Путь: ' + SetupLogPath + #13#10 +
-          'Проверь права доступа к каталогу LocalAppData.';
+        ErrorMessage := ErrorMessage + 'Не удалось прочитать журнал: ' + SetupLogPath;
 
+      ErrorMessage := ErrorMessage + #13#10 + 'Журнал: ' + SetupLogPath;
       RaiseException(ErrorMessage);
     end;
 
