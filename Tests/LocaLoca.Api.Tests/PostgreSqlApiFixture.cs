@@ -16,8 +16,7 @@ public sealed class PostgreSqlApiCollection : ICollectionFixture<PostgreSqlApiFi
 
 public sealed class PostgreSqlApiFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("localoca_api_tests")
         .WithUsername("localoca_test")
         .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
