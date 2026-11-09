@@ -9,10 +9,10 @@ using Microsoft.AspNetCore.Http.Features;
 var builder = WebApplication.CreateBuilder(args);
 // Local development keeps the loopback endpoint. Render supplies PORT; in the
 // container the API must listen on all interfaces so the platform can reach it.
-var renderPort = Environment.GetEnvironmentVariable("PORT");
+var renderPort = builder.Configuration["PORT"];
 if (!string.IsNullOrWhiteSpace(renderPort))
 {
-    var sessionSecret = Environment.GetEnvironmentVariable("LOCA_SESSION_SECRET");
+    var sessionSecret = builder.Configuration["LOCA_SESSION_SECRET"];
     if (string.IsNullOrWhiteSpace(sessionSecret) || sessionSecret.Length < 32)
         throw new InvalidOperationException("LOCA_SESSION_SECRET must contain at least 32 characters for cloud hosting.");
     builder.WebHost.UseUrls($"http://0.0.0.0:{renderPort}");
@@ -63,12 +63,12 @@ app.Use(async (context, next) =>
     }
 });
 
-var dataRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocaLoca");
+var dataRoot = builder.Configuration["LOCA_DATA_ROOT"]
+    ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocaLoca");
 var userConfigPath = Path.Combine(dataRoot, "server-config.json");
 // Prefer server environment variables. Do not attempt to decrypt a Windows
 // DPAPI config in Linux containers when the cloud connection string is set.
-var connectionString = Environment.GetEnvironmentVariable("LOCA_DB_CONNECTION")
-    ?? Environment.GetEnvironmentVariable("ConnectionStrings__LocaLoca")
+var connectionString = builder.Configuration["LOCA_DB_CONNECTION"]
     ?? builder.Configuration.GetConnectionString("LocaLoca")
     ?? ReadUserConnectionString(userConfigPath);
 string? connectionConfigurationError = null;
@@ -1050,9 +1050,9 @@ sealed class SessionStore
     private readonly byte[] _secret;
     private static readonly TimeSpan Lifetime = TimeSpan.FromDays(30);
 
-    public SessionStore()
+    public SessionStore(IConfiguration configuration)
     {
-        var configuredSecret = Environment.GetEnvironmentVariable("LOCA_SESSION_SECRET");
+        var configuredSecret = configuration["LOCA_SESSION_SECRET"];
         // Local development remains zero-configuration. In Render, startup
         // explicitly requires a persistent secret so tokens survive restarts.
         _secret = string.IsNullOrWhiteSpace(configuredSecret)
@@ -1132,3 +1132,6 @@ record MapPlaceUpdateRequest(string? Name, string? Status, string? VisitDate, in
 record MapPlaceSavedDto(int Id, string Message);
 record ItemsResponse<T>(IReadOnlyList<T> Items);
 record IntItemsResponse(IReadOnlyList<int> Items);
+
+// Exposed for HTTP integration tests through WebApplicationFactory.
+public partial class Program { }
