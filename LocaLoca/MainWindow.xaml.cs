@@ -31,7 +31,8 @@ public sealed partial class MainWindow : Window
     private bool _initialized;
     private bool _mapInitialized;
     private bool _isDarkTheme;
-    private ContentDialog? _activeProfileDialog;
+    private string _authStatusTone = "muted";
+    private string _profileStatusTone = "muted";
 
     public ObservableCollection<AttractionDto> Attractions => _attractions;
     public ObservableCollection<VisitDto> Visits => _visits;
@@ -69,20 +70,17 @@ public sealed partial class MainWindow : Window
 
     private async Task InitializeConnectionAsync()
     {
-        AuthStatusText.Text = "Подключаем локальный API и облачную PostgreSQL…";
-        AuthStatusText.Foreground = Brush("#7A8980");
+        SetAuthStatus("Подключаем локальный API и облачную PostgreSQL…", "muted");
         try
         {
             var health = await _api.EnsureApiAndDatabaseAsync();
-            AuthStatusText.Text = "Облачная база подключена. Можно войти или создать аккаунт.";
-            AuthStatusText.Foreground = Brush("#4F8758");
+            SetAuthStatus("Облачная база подключена. Можно войти или создать аккаунт.", "success");
             RetryConnectionButton.Visibility = Visibility.Collapsed;
             ConnectionStatusText.Text = "Облачная база подключена";
         }
         catch (Exception ex)
         {
-            AuthStatusText.Text = ex.Message;
-            AuthStatusText.Foreground = Brush("#B85D4D");
+            SetAuthStatus(ex.Message, "error");
             RetryConnectionButton.Visibility = Visibility.Visible;
             ConnectionStatusText.Text = "Нет подключения";
         }
@@ -98,7 +96,7 @@ public sealed partial class MainWindow : Window
     private async void AuthSubmit_Click(object sender, RoutedEventArgs e)
     {
         AuthSubmitButton.IsEnabled = false;
-        AuthStatusText.Text = _isRegisterMode ? "Создаём аккаунт…" : "Проверяем данные…";
+        SetAuthStatus(_isRegisterMode ? "Создаём аккаунт…" : "Проверяем данные…", "muted");
         try
         {
             var login = LoginBox.Text.Trim();
@@ -117,13 +115,12 @@ public sealed partial class MainWindow : Window
             ProfileNameText.Text = result.User.DisplayName;
             AuthPage.Visibility = Visibility.Collapsed;
             MainShell.Visibility = Visibility.Visible;
-            PageTitle.Text = $"Привет, {result.User.DisplayName}";
+            ShowPage("home");
             await LoadMainDataAsync();
         }
         catch (Exception ex)
         {
-            AuthStatusText.Text = ex.Message;
-            AuthStatusText.Foreground = Brush("#B85D4D");
+            SetAuthStatus(ex.Message, "error");
         }
         finally
         {
@@ -140,7 +137,7 @@ public sealed partial class MainWindow : Window
         AuthSubtitle.Text = _isRegisterMode ? "Сохраняй места, фотографии и впечатления." : "Войди, чтобы продолжить свою историю.";
         AuthSubmitButton.Content = _isRegisterMode ? "Создать аккаунт" : "Войти в аккаунт";
         AuthModeButton.Content = _isRegisterMode ? "У меня уже есть аккаунт" : "Создать новый аккаунт";
-        AuthStatusText.Text = "";
+        SetAuthStatus(string.Empty, "muted");
     }
 
     private async Task LoadMainDataAsync()
@@ -631,6 +628,8 @@ public sealed partial class MainWindow : Window
         VisitsPage.Visibility = page == "visits" ? Visibility.Visible : Visibility.Collapsed;
         WishlistPage.Visibility = page == "wishlist" ? Visibility.Visible : Visibility.Collapsed;
         MapPage.Visibility = page == "map" ? Visibility.Visible : Visibility.Collapsed;
+        ProfilePage.Visibility = page == "profile" ? Visibility.Visible : Visibility.Collapsed;
+        SupportPage.Visibility = page == "support" ? Visibility.Visible : Visibility.Collapsed;
 
         (PageEyebrow.Text, PageTitle.Text) = page switch
         {
@@ -638,100 +637,75 @@ public sealed partial class MainWindow : Window
             "catalog" => ("Места для новых историй", "Каталог мест"),
             "visits" => ("Сохранённые моменты", "Мои посещения"),
             "wishlist" => ("Идеи для следующей поездки", "Хочу посетить"),
+            "map" => ("Исследуй мир", "Карта открытий"),
+            "profile" => ("Личные данные и оформление", "Профиль и настройки"),
+            "support" => ("Контакты и полезные ссылки", "Поддержка"),
             _ => ("Исследуй мир", "Карта открытий")
         };
         HomeNavButton.Background = page == "home" ? Brush("#29443D") : Brush("Transparent");
+        SupportNavButton.Background = page == "support" ? Brush("#29443D") : Brush("Transparent");
     }
 
-    private async void Profile_Click(object sender, RoutedEventArgs e)
-    {
-        await ShowProfileDialogAsync();
-    }
+    private void SupportNav_Click(object sender, RoutedEventArgs e) => ShowPage("support");
 
-    private async Task ShowProfileDialogAsync()
+    private void Profile_Click(object sender, RoutedEventArgs e)
     {
         if (_currentUser is null) return;
 
-        var nameBox = new TextBox
-        {
-            Text = _currentUser.DisplayName,
-            PlaceholderText = "Имя, которое будет отображаться в приложении",
-            MaxLength = 40,
-            MinWidth = 320
-        };
-        var themeToggle = new ToggleSwitch
-        {
-            Header = "Тёмная тема",
-            OnContent = "Включена",
-            OffContent = "Выключена",
-            IsOn = _isDarkTheme
-        };
-        themeToggle.Toggled += ProfileTheme_Toggled;
+        ProfileDisplayNameBox.Text = _currentUser.DisplayName;
+        ProfileLoginText.Text = _currentUser.Login;
+        ProfileThemeToggle.IsOn = _isDarkTheme;
+        SetProfileStatus(string.Empty, "muted");
+        ShowPage("profile");
+    }
 
-        var content = new StackPanel { Spacing = 9, MinWidth = 340 };
-        content.Children.Add(new TextBlock { Text = "Имя профиля", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold });
-        content.Children.Add(nameBox);
-        content.Children.Add(new TextBlock { Text = "Логин", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 5, 0, 0) });
-        content.Children.Add(new TextBlock { Text = _currentUser.Login, TextWrapping = TextWrapping.Wrap });
-        content.Children.Add(new TextBlock { Text = "Оформление", FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) });
-        content.Children.Add(themeToggle);
-        content.Children.Add(new TextBlock
-        {
-            Text = "Электронная почта и смена пароля пока не поддерживаются. Эти настройки можно будет добавить в следующих версиях.",
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 8, 0, 0)
-        });
+    private async void SaveProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentUser is null) return;
 
-        var dialog = new ContentDialog
+        var newName = ProfileDisplayNameBox.Text.Trim();
+        if (newName.Length is < 1 or > 40)
         {
-            Title = "Профиль и настройки",
-            Content = content,
-            PrimaryButtonText = "Сохранить имя",
-            SecondaryButtonText = "Выйти из аккаунта",
-            CloseButtonText = "Закрыть",
-            DefaultButton = ContentDialogButton.Primary,
-            RequestedTheme = Root.RequestedTheme,
-            XamlRoot = Root.XamlRoot
-        };
-        _activeProfileDialog = dialog;
-        ContentDialogResult result;
-        try
-        {
-            result = await dialog.ShowAsync();
-        }
-        finally
-        {
-            _activeProfileDialog = null;
-        }
-
-        if (result == ContentDialogResult.Secondary)
-        {
-            Logout();
+            SetProfileStatus("Имя должно содержать от 1 до 40 символов.", "error");
             return;
         }
-        if (result != ContentDialogResult.Primary) return;
-
-        var newName = nameBox.Text.Trim();
-        if (string.IsNullOrWhiteSpace(newName) || newName.Length > 40)
+        if (string.Equals(newName, _currentUser.DisplayName, StringComparison.Ordinal))
         {
-            await ShowMessageAsync("Проверь имя", "Имя должно содержать от 1 до 40 символов.");
+            SetProfileStatus("Изменений нет.", "muted");
             return;
         }
-        if (string.Equals(newName, _currentUser.DisplayName, StringComparison.Ordinal)) return;
 
+        ProfileSaveButton.IsEnabled = false;
+        SetProfileStatus("Сохраняем изменения…", "muted");
         try
         {
             var updatedUser = await _api.UpdateDisplayNameAsync(newName);
             _currentUser = updatedUser;
             ProfileNameText.Text = updatedUser.DisplayName;
-            if (DashboardPage.Visibility == Visibility.Visible)
-                PageTitle.Text = $"Привет, {updatedUser.DisplayName}";
-            await ShowMessageAsync("Имя обновлено", "Новое имя сохранено в профиле.");
+            ProfileLoginText.Text = updatedUser.Login;
+            ProfileDisplayNameBox.Text = updatedUser.DisplayName;
+            SetProfileStatus("Имя профиля успешно обновлено.", "success");
         }
         catch (Exception ex)
         {
-            await ShowMessageAsync("Не удалось изменить имя", ex.Message);
+            SetProfileStatus(ex.Message, "error");
         }
+        finally
+        {
+            ProfileSaveButton.IsEnabled = true;
+        }
+    }
+
+    private void SetProfileStatus(string message, string tone)
+    {
+        _profileStatusTone = tone;
+        ProfileStatusText.Text = message;
+        ProfileStatusText.Foreground = Brush(tone switch
+        {
+            "success" => "#4F8758",
+            "error" => "#B85D4D",
+            _ => "#7A8980"
+        });
     }
 
     private async void ProfileTheme_Toggled(object sender, RoutedEventArgs e)
@@ -739,9 +713,9 @@ public sealed partial class MainWindow : Window
         if (sender is not ToggleSwitch themeToggle) return;
 
         _isDarkTheme = themeToggle.IsOn;
-        Root.RequestedTheme = _isDarkTheme ? ElementTheme.Dark : ElementTheme.Light;
-        if (_activeProfileDialog is not null)
-            _activeProfileDialog.RequestedTheme = Root.RequestedTheme;
+        ApplyRequestedTheme();
+        SetAuthStatus(AuthStatusText.Text, _authStatusTone);
+        SetProfileStatus(ProfileStatusText.Text, _profileStatusTone);
         SaveThemePreference();
         await UpdateMapThemeAsync();
     }
@@ -781,7 +755,15 @@ public sealed partial class MainWindow : Window
             _isDarkTheme = false;
         }
 
-        Root.RequestedTheme = _isDarkTheme ? ElementTheme.Dark : ElementTheme.Light;
+        ApplyRequestedTheme();
+    }
+
+    private void ApplyRequestedTheme()
+    {
+        var theme = _isDarkTheme ? ElementTheme.Dark : ElementTheme.Light;
+        Root.RequestedTheme = theme;
+        AuthPage.RequestedTheme = theme;
+        MainShell.RequestedTheme = theme;
     }
 
     private void SaveThemePreference()
@@ -807,9 +789,19 @@ public sealed partial class MainWindow : Window
         _selectedAttraction = null;
         _selectedVisit = null;
         PasswordBox.Password = string.Empty;
+        LoginBox.Text = string.Empty;
+        DisplayNameBox.Text = string.Empty;
+        _isRegisterMode = false;
+        DisplayNamePanel.Visibility = Visibility.Collapsed;
+        AuthEyebrow.Text = "С возвращением";
+        AuthTitle.Text = "С возвращением";
+        AuthSubtitle.Text = "Войди, чтобы продолжить свою историю.";
+        AuthSubmitButton.Content = "Войти в аккаунт";
+        AuthModeButton.Content = "Создать новый аккаунт";
+        ShowPage("home");
         MainShell.Visibility = Visibility.Collapsed;
         AuthPage.Visibility = Visibility.Visible;
-        AuthStatusText.Text = "Облачная база готова. Войди в аккаунт.";
+        SetAuthStatus("Облачная база готова. Войди в аккаунт.", "muted");
     }
 
     private async Task<ContentDialogResult> ConfirmAsync(string title, string message)
@@ -838,6 +830,18 @@ public sealed partial class MainWindow : Window
             XamlRoot = Root.XamlRoot
         };
         await dialog.ShowAsync();
+    }
+
+    private void SetAuthStatus(string message, string tone)
+    {
+        _authStatusTone = tone;
+        AuthStatusText.Text = message;
+        AuthStatusText.Foreground = Brush(tone switch
+        {
+            "success" => "#4F8758",
+            "error" => "#B85D4D",
+            _ => "#7A8980"
+        });
     }
 
     private SolidColorBrush Brush(string color)
