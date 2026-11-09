@@ -60,8 +60,8 @@ var
 begin
   if CurStep = ssPostInstall then
   begin
-    PowerShellPath := ExpandConstant('{sys}\\WindowsPowerShell\\v1.0\\powershell.exe');
-    SetupLogPath := ExpandConstant('{localappdata}\\LocaLoca\\Logs\\CloudSetup.log');
+    PowerShellPath := ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe');
+    SetupLogPath := ExpandConstant('{localappdata}\LocaLoca\Logs\CloudSetup.log');
     if not ForceDirectories(ExtractFileDir(SetupLogPath)) then
       RaiseException('Не удалось создать каталог журнала: ' + ExtractFileDir(SetupLogPath));
     DeleteFile(SetupLogPath);
