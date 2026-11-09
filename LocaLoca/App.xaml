@@ -120,6 +120,14 @@
                     <SolidColorBrush x:Key="AccentDarkBrush" Color="#8EBB48" />
                     <SolidColorBrush x:Key="CoralBrush" Color="#F2B4A5" />
                     <SolidColorBrush x:Key="LineBrush" Color="#E1E7DF" />
+                    <SolidColorBrush x:Key="AuthSurfaceBrush" Color="#F4F5F1" />
+                    <SolidColorBrush x:Key="AuthHeadingBrush" Color="#1A2C26" />
+                    <SolidColorBrush x:Key="AuthTextBrush" Color="#53645B" />
+                    <SolidColorBrush x:Key="AuthMutedTextBrush" Color="#68776E" />
+                    <SolidColorBrush x:Key="InputSurfaceBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="InputForegroundBrush" Color="#172521" />
+                    <SolidColorBrush x:Key="InputPlaceholderBrush" Color="#78877F" />
+                    <SolidColorBrush x:Key="InputBorderBrush" Color="#D5DED6" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="TextControlBackground" Color="#202B26" />
@@ -229,22 +237,30 @@
                     <SolidColorBrush x:Key="AccentDarkBrush" Color="#A5CF65" />
                     <SolidColorBrush x:Key="CoralBrush" Color="#D98D7D" />
                     <SolidColorBrush x:Key="LineBrush" Color="#35433B" />
+                    <SolidColorBrush x:Key="AuthSurfaceBrush" Color="#1B2922" />
+                    <SolidColorBrush x:Key="AuthHeadingBrush" Color="#EDF4EE" />
+                    <SolidColorBrush x:Key="AuthTextBrush" Color="#C8D4CC" />
+                    <SolidColorBrush x:Key="AuthMutedTextBrush" Color="#AAB9AE" />
+                    <SolidColorBrush x:Key="InputSurfaceBrush" Color="#202B26" />
+                    <SolidColorBrush x:Key="InputForegroundBrush" Color="#EDF4EE" />
+                    <SolidColorBrush x:Key="InputPlaceholderBrush" Color="#AAB9AE" />
+                    <SolidColorBrush x:Key="InputBorderBrush" Color="#536259" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
 
             <Style TargetType="TextBox" BasedOn="{StaticResource DefaultTextBoxStyle}">
-                <Setter Property="Background" Value="{ThemeResource Palette_FFFFFF}" />
-                <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
-                <Setter Property="BorderBrush" Value="{ThemeResource Palette_D5DED6}" />
+                <Setter Property="Background" Value="{ThemeResource InputSurfaceBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource InputForegroundBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource InputBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Padding" Value="13,9" />
                 <Setter Property="FontSize" Value="14" />
             </Style>
 
             <Style TargetType="PasswordBox" BasedOn="{StaticResource DefaultPasswordBoxStyle}">
-                <Setter Property="Background" Value="{ThemeResource Palette_FFFFFF}" />
-                <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
-                <Setter Property="BorderBrush" Value="{ThemeResource Palette_D5DED6}" />
+                <Setter Property="Background" Value="{ThemeResource InputSurfaceBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource InputForegroundBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource InputBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="Padding" Value="13,9" />
                 <Setter Property="FontSize" Value="14" />
@@ -253,16 +269,16 @@
             <Style TargetType="ComboBox" BasedOn="{StaticResource DefaultComboBoxStyle}">
                 <Setter Property="Background" Value="{ThemeResource Palette_FFFFFF}" />
                 <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
-                <Setter Property="PlaceholderForeground" Value="{ThemeResource Palette_78877F}" />
+                <Setter Property="PlaceholderForeground" Value="{ThemeResource InputPlaceholderBrush}" />
                 <Setter Property="BorderBrush" Value="{ThemeResource Palette_D5DED6}" />
                 <Setter Property="BorderThickness" Value="1" />
                 <Setter Property="FontSize" Value="14" />
             </Style>
 
             <Style TargetType="DatePicker" BasedOn="{StaticResource DefaultDatePickerStyle}">
-                <Setter Property="Background" Value="{ThemeResource Palette_FFFFFF}" />
-                <Setter Property="Foreground" Value="{ThemeResource Palette_172521}" />
-                <Setter Property="BorderBrush" Value="{ThemeResource Palette_D5DED6}" />
+                <Setter Property="Background" Value="{ThemeResource InputSurfaceBrush}" />
+                <Setter Property="Foreground" Value="{ThemeResource InputForegroundBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource InputBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
             </Style>
 
