@@ -1,5 +1,7 @@
 # Loca Loca
 
+[🌐 Официальный сайт Loca Loca](https://teofobiaa.github.io/LocaLoca/) · [⬇ Скачать для Windows](https://github.com/teofobiaa/LocaLoca/releases/download/latest/LocaLoca-Setup.exe) · [Релизы](https://github.com/teofobiaa/LocaLoca/releases)
+
 [English version](README.en.md) · **Русская версия**
 
 **Loca Loca** — настольное приложение для ведения личного дневника путешествий. Оно помогает отмечать посещённые места на карте, сохранять даты, оценки, заметки и фотографии, а также вести список мест, которые хочется посетить.
