@@ -7,6 +7,8 @@ on:
         description: 'Stable version without v prefix (example: 1.2.0)'
         required: true
         type: string
+  release:
+    types: [published, edited]
 
 permissions:
   contents: write
@@ -31,38 +33,73 @@ jobs:
         shell: pwsh
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_IS_DRAFT: ${{ github.event.release.draft }}
+          RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
-          if ($env:GITHUB_REF -ne 'refs/heads/main') {
-            throw 'Releases must be started from the main branch.'
-          }
+          if ($env:GITHUB_EVENT_NAME -eq 'release') {
+            if ($env:RELEASE_IS_DRAFT -eq 'true' -or $env:RELEASE_IS_PRERELEASE -eq 'true') {
+              throw 'Only published stable releases can receive installer assets.'
+            }
 
-          $version = $env:RELEASE_VERSION.Trim()
-          if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
-            throw "Invalid stable version: $version. Expected MAJOR.MINOR.PATCH, for example 1.2.0."
-          }
+            $tag = $env:RELEASE_TAG.Trim()
+            if ($tag -notmatch '^v((0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*))$') {
+              throw "Invalid stable release tag: $tag. Expected vMAJOR.MINOR.PATCH, for example v1.2.0."
+            }
+            $version = $Matches[1]
 
-          $mainRef = git ls-remote origin refs/heads/main
-          if ($LASTEXITCODE -ne 0 -or -not $mainRef) {
-            throw 'Could not verify the current main branch on origin.'
-          }
+            $tagCommit = git rev-parse ($tag + '^{commit}')
+            if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $env:GITHUB_SHA) {
+              throw "The checked-out commit does not match release tag $tag."
+            }
 
-          $mainSha = ($mainRef -split '\s+')[0]
-          if ($mainSha -ne $env:GITHUB_SHA) {
-            throw 'The selected commit is not the current main branch head. Start the workflow again from the latest main.'
-          }
+            git fetch origin +refs/heads/main:refs/remotes/origin/main --quiet
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Could not fetch main to validate the release commit.'
+            }
 
-          $tag = "v$version"
-          $existingTag = git ls-remote --tags origin "refs/tags/$tag"
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Could not check remote Git tags.'
-          }
+            git merge-base --is-ancestor $tagCommit origin/main
+            if ($LASTEXITCODE -ne 0) {
+              throw "Release tag $tag must point to a commit that is part of main."
+            }
 
-          if (-not [string]::IsNullOrWhiteSpace(($existingTag | Out-String))) {
-            throw "Tag $tag already exists. Choose a new version."
+            Write-Host "Building installer for published release $tag from $tagCommit."
+          }
+          else {
+            if ($env:GITHUB_REF -ne 'refs/heads/main') {
+              throw 'Manual releases must be started from the main branch.'
+            }
+
+            $version = $env:RELEASE_VERSION.Trim()
+            if ($version -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
+              throw "Invalid stable version: $version. Expected MAJOR.MINOR.PATCH, for example 1.2.0."
+            }
+
+            $mainRef = git ls-remote origin refs/heads/main
+            if ($LASTEXITCODE -ne 0 -or -not $mainRef) {
+              throw 'Could not verify the current main branch on origin.'
+            }
+
+            $mainSha = ($mainRef -split '\s+')[0]
+            if ($mainSha -ne $env:GITHUB_SHA) {
+              throw 'The selected commit is not the current main branch head. Start the workflow again from the latest main.'
+            }
+
+            $tag = "v$version"
+            $existingTag = git ls-remote --tags origin "refs/tags/$tag"
+            if ($LASTEXITCODE -ne 0) {
+              throw 'Could not check remote Git tags.'
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace(($existingTag | Out-String))) {
+              throw "Tag $tag already exists. Choose a new version or publish/edit the existing GitHub Release."
+            }
+
+            Write-Host "Preparing new stable release $tag from $mainSha."
           }
 
           "tag=$tag" >> $env:GITHUB_OUTPUT
-          Write-Host "Preparing stable release $tag from $mainSha"
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Install .NET 10 SDK
         uses: actions/setup-dotnet@v4
@@ -110,7 +147,7 @@ jobs:
       - name: Build application and versioned installer
         shell: pwsh
         env:
-          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_VERSION: ${{ steps.validate.outputs.version }}
         run: |
           ./tools/Build-Installer.ps1 -AppVersion $env:RELEASE_VERSION
 
@@ -125,13 +162,13 @@ jobs:
 
           Write-Host "SHA256: $hash"
 
-      - name: Publish stable GitHub Release
+      - name: Publish stable GitHub Release and attach installer
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.validate.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: Loca Loca ${{ steps.validate.outputs.tag }}
-          generate_release_notes: true
+          name: ${{ github.event_name == 'release' && github.event.release.name || format('Loca Loca {0}', steps.validate.outputs.tag) }}
+          generate_release_notes: ${{ github.event_name == 'workflow_dispatch' }}
           make_latest: true
           draft: false
           prerelease: false
