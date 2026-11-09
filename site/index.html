@@ -24,7 +24,7 @@
   <link rel="icon" href="https://raw.githubusercontent.com/teofobiaa/LocaLoca/main/LocaLoca/Assets/loca-loca-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body id="top">
@@ -39,7 +39,7 @@
       <a href="#data">Данные</a>
       <a href="#install">Установка</a>
     </nav>
-    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Переключить на тёмную тему" aria-pressed="false">
+    <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false">
       <span class="theme-toggle-icon" aria-hidden="true">☾</span>
       <span class="theme-toggle-label">Тёмная тема</span>
     </button>
@@ -255,10 +255,6 @@
 
         if (toggle) {
           toggle.setAttribute("aria-pressed", String(isDark));
-          toggle.setAttribute(
-            "aria-label",
-            isDark ? "Переключить на светлую тему" : "Переключить на тёмную тему"
-          );
           toggle.querySelector(".theme-toggle-icon").textContent = isDark ? "☀" : "☾";
           toggle.querySelector(".theme-toggle-label").textContent = isDark
             ? "Светлая тема"
