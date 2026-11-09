@@ -192,7 +192,7 @@ public sealed class ApiIntegrationTests
         var photoId = photo!.Id;
 
         using var ownerPhoto = await ownerClient.GetAsync($"/api/me/photos/{photoId}");
-        using var otherPhoto = await otherClient.GetAsync($"/api/me/photos/{photo.Id}");
+        using var otherPhoto = await otherClient.GetAsync($"/api/me/photos/{photoId}");
 
         Assert.Equal(HttpStatusCode.OK, ownerPhoto.StatusCode);
         Assert.Equal("image/jpeg", ownerPhoto.Content.Headers.ContentType?.MediaType);
