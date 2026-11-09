@@ -8,7 +8,7 @@ using Xunit;
 
 namespace LocaLoca.Api.Tests;
 
-[CollectionDefinition(Name, DisableParallelization = true)]
+[CollectionDefinition("PostgreSQL API integration tests", DisableParallelization = true)]
 public sealed class PostgreSqlApiCollection : ICollectionFixture<PostgreSqlApiFixture>
 {
     public const string Name = "PostgreSQL API integration tests";
