@@ -49,7 +49,7 @@ SQL-файлы не включаются в Windows-установщик и не
 
 Если в старых версиях приложения использовался Supabase publishable/anon key, проверь, что таблицы нельзя читать или изменять напрямую через Data API в обход облачного Loca Loca API.
 
-Для этого предназначен [audits/check_supabase_data_api_access.sql](audits/check_supabase_data_api_access.sql). Это **только диагностический запрос**: он показывает, включён ли RLS на таблицах схемы `public`, и перечисляет прямые права ролей `anon`, `authenticated` и `PUBLIC`, а также default privileges для будущих таблиц. Он ничего не изменяет.
+Для этого предназначен [audits/check_supabase_data_api_access.sql](audits/check_supabase_data_api_access.sql). Это **только диагностический запрос**: он показывает состояние RLS, прямые права `anon`, `authenticated` и `PUBLIC` на таблицы/представления, права `EXECUTE` на функции и процедуры, политики RLS и default privileges для будущих объектов. Он ничего не изменяет.
 
 Запусти его в Supabase SQL Editor под ролью администратора и изучи результат:
 - если RLS выключен и `anon`, `authenticated` или `PUBLIC` имеют права на пользовательские таблицы, проверь потенциальную доступность данных;
