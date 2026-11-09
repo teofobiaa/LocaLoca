@@ -36,8 +36,8 @@ jobs:
         shell: powershell
         run: choco install innosetup --yes --no-progress
 
-      - name: Test cloud installer mode selection
-        shell: pwsh
+      - name: Test cloud installer mode selection (Windows PowerShell 5.1)
+        shell: powershell
         run: .\tools\Test-CloudSetupMode.ps1
 
       - name: Validate PowerShell scripts
