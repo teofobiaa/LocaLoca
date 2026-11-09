@@ -6,6 +6,21 @@
   <meta name="theme-color" content="#f7f8f2">
   <meta name="description" content="Loca Loca — приложение для Windows, в котором можно собирать личную карту мест, планировать посещения и хранить заметки о поездках.">
   <title>Loca Loca — личная карта твоих путешествий</title>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+      let savedTheme = null;
+      try {
+        savedTheme = localStorage.getItem("loca-loca-theme");
+      } catch {
+        // Storage can be unavailable in restricted browser contexts.
+      }
+      root.dataset.theme = savedTheme === "light" || savedTheme === "dark"
+        ? savedTheme
+        : (prefersDark ? "dark" : "light");
+    })();
+  </script>
   <link rel="icon" href="https://raw.githubusercontent.com/teofobiaa/LocaLoca/main/LocaLoca/Assets/loca-loca-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,6 +39,10 @@
       <a href="#data">Данные</a>
       <a href="#install">Установка</a>
     </nav>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Переключить на тёмную тему" aria-pressed="false">
+      <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+      <span class="theme-toggle-label">Тёмная тема</span>
+    </button>
     <a class="nav-download" href="https://github.com/teofobiaa/LocaLoca/releases/download/latest/LocaLoca-Setup.exe">Скачать <span aria-hidden="true">↗</span></a>
   </header>
 
@@ -211,5 +230,69 @@
       </div>
     </div>
   </footer>
+
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const toggle = document.getElementById("themeToggle");
+      const themeColor = document.querySelector('meta[name="theme-color"]');
+      const storageKey = "loca-loca-theme";
+      const colorByTheme = { light: "#f7f8f2", dark: "#111a15" };
+
+      function getSavedTheme() {
+        try {
+          const value = localStorage.getItem(storageKey);
+          return value === "light" || value === "dark" ? value : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function applyTheme(theme, save = false) {
+        const normalizedTheme = theme === "dark" ? "dark" : "light";
+        const isDark = normalizedTheme === "dark";
+        root.dataset.theme = normalizedTheme;
+
+        if (toggle) {
+          toggle.setAttribute("aria-pressed", String(isDark));
+          toggle.setAttribute(
+            "aria-label",
+            isDark ? "Переключить на светлую тему" : "Переключить на тёмную тему"
+          );
+          toggle.querySelector(".theme-toggle-icon").textContent = isDark ? "☀" : "☾";
+          toggle.querySelector(".theme-toggle-label").textContent = isDark
+            ? "Светлая тема"
+            : "Тёмная тема";
+        }
+
+        if (themeColor) {
+          themeColor.setAttribute("content", colorByTheme[normalizedTheme]);
+        }
+
+        if (save) {
+          try {
+            localStorage.setItem(storageKey, normalizedTheme);
+          } catch {
+            // Theme still changes for the current page even if storage is blocked.
+          }
+        }
+      }
+
+      const savedTheme = getSavedTheme();
+      if (toggle) {
+        applyTheme(root.dataset.theme || savedTheme || "light");
+        toggle.addEventListener("click", () => {
+          applyTheme(root.dataset.theme === "dark" ? "light" : "dark", true);
+        });
+      }
+
+      const systemPreference = window.matchMedia?.("(prefers-color-scheme: dark)");
+      systemPreference?.addEventListener?.("change", event => {
+        if (!getSavedTheme()) {
+          applyTheme(event.matches ? "dark" : "light");
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
