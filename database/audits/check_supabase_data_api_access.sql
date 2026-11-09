@@ -25,7 +25,7 @@ LEFT JOIN information_schema.table_privileges AS p
    AND p.table_name = c.relname
    AND p.grantee IN ('anon', 'authenticated', 'PUBLIC')
 WHERE n.nspname = 'public'
-  AND c.relkind IN ('r', 'p')
+  AND c.relkind IN ('r', 'p', 'v', 'm')
 ORDER BY
     c.relname,
     p.grantee NULLS FIRST,
@@ -53,3 +53,18 @@ WHERE acl.grantee = 0
        WHERE rolname IN ('anon', 'authenticated')
    )
 ORDER BY owner_role.rolname, schema_name.nspname, object_type, acl.grantee;
+
+-- Show row-level security policies. A policy is not required for a table
+-- without grants to anon/authenticated, but every exposed table with RLS
+-- enabled should have policies matching the intended user model.
+SELECT
+    schemaname,
+    tablename,
+    policyname,
+    roles,
+    cmd,
+    qual AS using_expression,
+    with_check AS check_expression
+FROM pg_policies
+WHERE schemaname = 'public'
+ORDER BY tablename, policyname;
