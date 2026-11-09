@@ -74,7 +74,7 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
     }
 }
 
-internal sealed class ApiTestFactory : WebApplicationFactory<Program>
+public sealed class ApiTestFactory : WebApplicationFactory<Program>
 {
     private readonly string _dataRoot = Path.Combine(
         Path.GetTempPath(),
