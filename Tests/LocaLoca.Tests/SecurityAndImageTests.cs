@@ -77,7 +77,8 @@ public sealed class SessionStoreTests
         var store = new SessionStore(CreateConfiguration("test-only-session-secret-value-longer-than-32"));
         var token = store.Create(42);
         var characters = token.ToCharArray();
-        characters[^1] = characters[^1] == 'A' ? 'B' : 'A';
+        var signatureStart = token.IndexOf('.') + 1;
+        characters[signatureStart] = characters[signatureStart] == 'A' ? 'B' : 'A';
 
         Assert.False(store.TryGet(new string(characters), out _));
     }
