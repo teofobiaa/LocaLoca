@@ -1,6 +1,16 @@
 $ErrorActionPreference = 'Stop'
 
 $bootstrapPath = Join-Path $PSScriptRoot 'Install-CloudDependencies.ps1'
+
+# Windows PowerShell 5.1 interprets UTF-8 scripts without a BOM using the
+# active ANSI code page. Require the BOM so Russian strings remain valid.
+$bootstrapBytes = [IO.File]::ReadAllBytes($bootstrapPath)
+if ($bootstrapBytes.Length -lt 3 -or
+    $bootstrapBytes[0] -ne 0xEF -or
+    $bootstrapBytes[1] -ne 0xBB -or
+    $bootstrapBytes[2] -ne 0xBF) {
+    throw 'Install-CloudDependencies.ps1 must be encoded as UTF-8 with BOM for Windows PowerShell 5.1.'
+}
 $tokens = $null
 $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($bootstrapPath, [ref]$tokens, [ref]$parseErrors)
