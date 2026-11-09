@@ -5,7 +5,7 @@ using Xunit;
 
 namespace LocaLoca.Database.Tests;
 
-[CollectionDefinition(Name, DisableParallelization = true)]
+[CollectionDefinition("PostgreSQL database tests", DisableParallelization = true)]
 public sealed class PostgreSqlDatabaseCollection : ICollectionFixture<PostgreSqlDatabaseFixture>
 {
     public const string Name = "PostgreSQL database tests";
