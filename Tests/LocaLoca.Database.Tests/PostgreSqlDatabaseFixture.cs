@@ -13,8 +13,7 @@ public sealed class PostgreSqlDatabaseCollection : ICollectionFixture<PostgreSql
 
 public sealed class PostgreSqlDatabaseFixture : IAsyncLifetime
 {
-    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder()
-        .WithImage("postgres:16-alpine")
+    private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
         .WithDatabase("localoca_database_tests")
         .WithUsername("localoca_test")
         .WithPassword(Convert.ToHexString(RandomNumberGenerator.GetBytes(24)))
