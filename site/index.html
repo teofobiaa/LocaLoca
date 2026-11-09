@@ -6,6 +6,21 @@
   <meta name="theme-color" content="#f7f8f2">
   <meta name="description" content="Loca Loca — приложение для Windows, в котором можно собирать личную карту мест, планировать посещения и хранить заметки о поездках.">
   <title>Loca Loca — личная карта твоих путешествий</title>
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
+      let savedTheme = null;
+      try {
+        savedTheme = localStorage.getItem("loca-loca-theme");
+      } catch {
+        // Storage can be unavailable in restricted browser contexts.
+      }
+      root.dataset.theme = savedTheme === "light" || savedTheme === "dark"
+        ? savedTheme
+        : (prefersDark ? "dark" : "light");
+    })();
+  </script>
   <link rel="icon" href="https://raw.githubusercontent.com/teofobiaa/LocaLoca/main/LocaLoca/Assets/loca-loca-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,6 +39,10 @@
       <a href="#data">Данные</a>
       <a href="#install">Установка</a>
     </nav>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Переключить на тёмную тему" aria-pressed="false">
+      <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+      <span class="theme-toggle-label">Тёмная тема</span>
+    </button>
     <a class="nav-download" href="https://github.com/teofobiaa/LocaLoca/releases/download/latest/LocaLoca-Setup.exe">Скачать <span aria-hidden="true">↗</span></a>
   </header>
 
@@ -140,24 +159,24 @@
 
     <section class="section wrap" id="data">
       <div class="section-heading data-heading">
-        <div><span class="eyebrow">ПРОЗРАЧНО О ДАННЫХ</span><h2>Что хранится в облаке,<br><em>а что остаётся на ПК.</em></h2></div>
-        <p>Профиль, записи и фотографии сохраняются в общей PostgreSQL. Локально остаётся только временная копия изображения, когда ты открываешь его во внешнем просмотрщике.</p>
+        <div><span class="eyebrow">АККАУНТ И БЕЗОПАСНОСТЬ</span><h2>Твоя история хранится в облаке.<br><em>Доступ защищён.</em></h2></div>
+        <p>Пароли не сохраняются в открытом виде, а личные записи и фотографии привязаны к аккаунту. Клиент общается с облачным API по защищённому HTTPS-соединению.</p>
       </div>
       <div class="data-grid">
+        <article class="data-card data-security">
+          <div class="data-card-icon">✓</div>
+          <div><span class="data-label">ЗАЩИТА АККАУНТА</span><h3>Пароль не хранится открытым</h3></div>
+          <p>При регистрации сервер рассчитывает PBKDF2-SHA256-хеш с индивидуальной случайной солью. При входе пароль проверяется по этому хешу — исходное значение не сохраняется в базе и не встраивается в приложение.</p>
+          <div class="data-foot"><span class="data-check">✓</span> Для проверки пароля не требуется хранить его исходный текст</div>
+        </article>
         <article class="data-card data-cloud">
           <div class="data-card-icon">☁</div>
           <div><span class="data-label">ОБЛАЧНОЕ ХРАНЕНИЕ</span><h3>Записи, коллекция и фото</h3></div>
-          <p>Профиль, посещения, оценки, заметки, список «Хочу посетить», личные точки и сами фотографии хранятся в PostgreSQL. Изображения записываются в базу как бинарные данные (bytea) через API по HTTPS.</p>
+          <p>Посещения, оценки, заметки, список «Хочу посетить», личные точки и фотографии хранятся в PostgreSQL. Клиент обращается к API по HTTPS, а пароль базы данных и секрет подписи сессий остаются на сервере.</p>
           <div class="data-foot"><span class="data-check">✓</span> Записи и фотографии доступны в том же аккаунте на разных устройствах</div>
         </article>
-        <article class="data-card data-local">
-          <div class="data-card-icon">▣</div>
-          <div><span class="data-label">ЛОКАЛЬНО НА КОМПЬЮТЕРЕ</span><h3>Временные копии для просмотра</h3></div>
-          <p>Когда ты открываешь фотографию во внешнем просмотрщике, приложение создаёт временную копию в профиле Windows. Оригинал хранится в PostgreSQL и не зависит от этой копии.</p>
-          <div class="data-foot"><span class="data-check">✓</span> Удаление приложения не удаляет фото из облачной базы</div>
-        </article>
       </div>
-      <div class="internet-note"><span>i</span><p><b>Нужен интернет.</b> Облачный аккаунт, загрузка данных и отображение карты зависят от подключения. На бесплатном сервере первый запрос после простоя может выполняться дольше обычного.</p></div>
+      <div class="internet-note"><span>i</span><p><b>Нужен интернет.</b> Вход в аккаунт, синхронизация данных и отображение карты зависят от подключения. На бесплатном сервере первый запрос после простоя может выполняться дольше обычного.</p></div>
     </section>
 
     <section class="install-section" id="install">
@@ -211,5 +230,69 @@
       </div>
     </div>
   </footer>
+
+  <script>
+    (() => {
+      const root = document.documentElement;
+      const toggle = document.getElementById("themeToggle");
+      const themeColor = document.querySelector('meta[name="theme-color"]');
+      const storageKey = "loca-loca-theme";
+      const colorByTheme = { light: "#f7f8f2", dark: "#111a15" };
+
+      function getSavedTheme() {
+        try {
+          const value = localStorage.getItem(storageKey);
+          return value === "light" || value === "dark" ? value : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function applyTheme(theme, save = false) {
+        const normalizedTheme = theme === "dark" ? "dark" : "light";
+        const isDark = normalizedTheme === "dark";
+        root.dataset.theme = normalizedTheme;
+
+        if (toggle) {
+          toggle.setAttribute("aria-pressed", String(isDark));
+          toggle.setAttribute(
+            "aria-label",
+            isDark ? "Переключить на светлую тему" : "Переключить на тёмную тему"
+          );
+          toggle.querySelector(".theme-toggle-icon").textContent = isDark ? "☀" : "☾";
+          toggle.querySelector(".theme-toggle-label").textContent = isDark
+            ? "Светлая тема"
+            : "Тёмная тема";
+        }
+
+        if (themeColor) {
+          themeColor.setAttribute("content", colorByTheme[normalizedTheme]);
+        }
+
+        if (save) {
+          try {
+            localStorage.setItem(storageKey, normalizedTheme);
+          } catch {
+            // Theme still changes for the current page even if storage is blocked.
+          }
+        }
+      }
+
+      const savedTheme = getSavedTheme();
+      if (toggle) {
+        applyTheme(root.dataset.theme || savedTheme || "light");
+        toggle.addEventListener("click", () => {
+          applyTheme(root.dataset.theme === "dark" ? "light" : "dark", true);
+        });
+      }
+
+      const systemPreference = window.matchMedia?.("(prefers-color-scheme: dark)");
+      systemPreference?.addEventListener?.("change", event => {
+        if (!getSavedTheme()) {
+          applyTheme(event.matches ? "dark" : "light");
+        }
+      });
+    })();
+  </script>
 </body>
 </html>

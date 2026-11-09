@@ -5,6 +5,7 @@ using System.Text.Json;
 using Npgsql;
 using NpgsqlTypes;
 using Microsoft.AspNetCore.Http.Features;
+using LocaLoca.Api.Security;
 
 var builder = WebApplication.CreateBuilder(args);
 // Local development keeps the loopback endpoint. Render supplies PORT; in the
@@ -69,6 +70,7 @@ var userConfigPath = Path.Combine(dataRoot, "server-config.json");
 // Prefer server environment variables. Do not attempt to decrypt a Windows
 // DPAPI config in Linux containers when the cloud connection string is set.
 var connectionString = builder.Configuration["LOCA_DB_CONNECTION"]
+    ?? builder.Configuration["ConnectionStrings:LocaLoca"]
     ?? builder.Configuration.GetConnectionString("LocaLoca")
     ?? ReadUserConnectionString(userConfigPath);
 string? connectionConfigurationError = null;
@@ -87,7 +89,7 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
             configuredHost.Equals("::1", StringComparison.OrdinalIgnoreCase) ||
             configuredHost.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase);
 
-        if (isLoopbackHost)
+        if (isLoopbackHost && !builder.Environment.IsEnvironment("Testing"))
         {
             connectionString = null;
             connectionConfigurationError =
@@ -95,6 +97,8 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
         }
         else
         {
+            // Testcontainers uses an ephemeral loopback-mapped PostgreSQL port.
+            // This exception is available only inside the isolated Testing host.
             connectionBuilder.Pooling = true;
             // Each desktop installation runs a local API process. Keep its
             // pool small when connecting through Supabase Pooler.
@@ -214,7 +218,7 @@ app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, 
         ON CONFLICT (login) DO NOTHING
         RETURNING user_id", connection);
     command.Parameters.AddWithValue("login", NpgsqlDbType.Varchar, login);
-    command.Parameters.AddWithValue("hash", NpgsqlDbType.Varchar, HashPassword(request.Password));
+    command.Parameters.AddWithValue("hash", NpgsqlDbType.Varchar, PasswordHasher.Hash(request.Password));
     command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
     var result = await command.ExecuteScalarAsync();
     if (result is null) return Results.Conflict(new ErrorDto("Пользователь с таким логином уже существует."));
@@ -230,7 +234,7 @@ app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, Sessio
         "SELECT user_id, password_hash, display_name FROM users WHERE login = @login", connection);
     command.Parameters.AddWithValue("login", NpgsqlDbType.Varchar, login);
     await using var reader = await command.ExecuteReaderAsync();
-    if (!await reader.ReadAsync() || !VerifyPassword(request.Password ?? string.Empty, reader.GetString(1)))
+    if (!await reader.ReadAsync() || !PasswordHasher.Verify(request.Password ?? string.Empty, reader.GetString(1)))
         return Results.Unauthorized();
     var user = new UserDto(reader.GetInt32(0), login, reader.GetString(2));
     return Results.Ok(new AuthResponse(user, sessions.Create(user.Id)));
@@ -392,13 +396,13 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var data = await ReadPhotoDataAsync(file);
-        if (!HasValidImageSignature(data, extension))
+        if (!ImageContentValidator.HasValidImageSignature(data, extension))
             return Results.BadRequest(new ErrorDto($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
         var fileName = $"{Guid.NewGuid():N}{extension}";
         var relativePath = $"Photos/{fileName}";
         var caption = Path.GetFileNameWithoutExtension(file.FileName);
         if (caption.Length > 200) caption = caption[..200];
-        uploads.Add((relativePath, caption, data, ContentTypeFor(relativePath)));
+        uploads.Add((relativePath, caption, data, ImageContentValidator.GetContentType(relativePath)));
     }
 
     await using var connection = await OpenAsync(connectionString);
@@ -486,7 +490,7 @@ app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visi
     var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
     if (!allowed.Contains(extension)) return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
     var data = await ReadPhotoDataAsync(file);
-    if (!HasValidImageSignature(data, extension))
+    if (!ImageContentValidator.HasValidImageSignature(data, extension))
         return Results.BadRequest(new ErrorDto("Содержимое файла не соответствует формату изображения."));
 
     await using var connection = await OpenAsync(connectionString);
@@ -505,7 +509,7 @@ app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visi
     insert.Parameters.AddWithValue("p", NpgsqlDbType.Varchar, relativePath);
     insert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, caption);
     insert.Parameters.AddWithValue("data", NpgsqlDbType.Bytea, data);
-    insert.Parameters.AddWithValue("type", NpgsqlDbType.Varchar, ContentTypeFor(relativePath));
+    insert.Parameters.AddWithValue("type", NpgsqlDbType.Varchar, ImageContentValidator.GetContentType(relativePath));
     var id = Convert.ToInt32(await insert.ExecuteScalarAsync());
     return Results.Ok(new PhotoDto(id, relativePath, caption));
 });
@@ -540,14 +544,14 @@ app.MapGet("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, Htt
         if (!await reader.ReadAsync()) return Results.NotFound();
         relativePath = reader.GetString(0);
         imageData = reader.IsDBNull(1) ? null : reader.GetFieldValue<byte[]>(1);
-        contentType = reader.IsDBNull(2) ? ContentTypeFor(relativePath) : reader.GetString(2);
+        contentType = reader.IsDBNull(2) ? ImageContentValidator.GetContentType(relativePath) : reader.GetString(2);
     }
     if (imageData is not null) return Results.File(imageData, contentType);
 
     // Backward compatibility for records created before the database migration.
     var fullPath = SafePhotoPath(dataRoot, relativePath);
     if (fullPath is null || !File.Exists(fullPath)) return Results.NotFound();
-    return Results.File(fullPath, ContentTypeFor(fullPath));
+    return Results.File(fullPath, ImageContentValidator.GetContentType(fullPath));
 });
 
 app.MapDelete("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
@@ -754,12 +758,12 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var data = await ReadPhotoDataAsync(file);
-        if (!HasValidImageSignature(data, extension))
+        if (!ImageContentValidator.HasValidImageSignature(data, extension))
             return Results.BadRequest(new ErrorDto($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
         var relativePath = $"Photos/{Guid.NewGuid():N}{extension}";
         var caption = Path.GetFileNameWithoutExtension(file.FileName);
         if (caption.Length > 200) caption = caption[..200];
-        uploads.Add((relativePath, caption, data, ContentTypeFor(relativePath)));
+        uploads.Add((relativePath, caption, data, ImageContentValidator.GetContentType(relativePath)));
     }
 
     await using var connection = await OpenAsync(connectionString);
@@ -802,14 +806,14 @@ app.MapGet("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int ph
         if (!await reader.ReadAsync()) return Results.NotFound();
         relativePath = reader.GetString(0);
         imageData = reader.IsDBNull(1) ? null : reader.GetFieldValue<byte[]>(1);
-        contentType = reader.IsDBNull(2) ? ContentTypeFor(relativePath) : reader.GetString(2);
+        contentType = reader.IsDBNull(2) ? ImageContentValidator.GetContentType(relativePath) : reader.GetString(2);
     }
     if (imageData is not null) return Results.File(imageData, contentType);
 
     // Backward compatibility for records created before the database migration.
     var fullPath = SafePhotoPath(dataRoot, relativePath);
     if (fullPath is null || !File.Exists(fullPath)) return Results.NotFound();
-    return Results.File(fullPath, ContentTypeFor(fullPath));
+    return Results.File(fullPath, ImageContentValidator.GetContentType(fullPath));
 });
 
 app.MapGet("/map", IResult () =>
@@ -930,29 +934,6 @@ static bool TryUser(HttpContext context, SessionStore sessions, out int userId)
     return sessions.TryGet(header[7..].Trim(), out userId);
 }
 
-static string HashPassword(string password)
-{
-    const int iterations = 100_000;
-    var salt = RandomNumberGenerator.GetBytes(16);
-    var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, 32);
-    return $"{iterations}.{Convert.ToBase64String(salt)}.{Convert.ToBase64String(hash)}";
-}
-
-static bool VerifyPassword(string password, string stored)
-{
-    try
-    {
-        var parts = stored.Split('.');
-        if (parts.Length != 3 || !int.TryParse(parts[0], out var iterations) || iterations is < 10_000 or > 2_000_000) return false;
-        var salt = Convert.FromBase64String(parts[1]);
-        var expected = Convert.FromBase64String(parts[2]);
-        var actual = Rfc2898DeriveBytes.Pbkdf2(password, salt, iterations, HashAlgorithmName.SHA256, expected.Length);
-        return CryptographicOperations.FixedTimeEquals(actual, expected);
-    }
-    catch (FormatException) { return false; }
-    catch (ArgumentException) { return false; }
-}
-
 static async Task<byte[]> ReadPhotoDataAsync(IFormFile file)
 {
     await using var source = file.OpenReadStream();
@@ -960,19 +941,6 @@ static async Task<byte[]> ReadPhotoDataAsync(IFormFile file)
     await source.CopyToAsync(buffer);
     return buffer.ToArray();
 }
-
-static bool HasValidImageSignature(byte[] bytes, string extension) => extension switch
-{
-    ".jpg" or ".jpeg" => bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF,
-    ".png" => bytes.Length >= 8 && bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E && bytes[3] == 0x47 &&
-              bytes[4] == 0x0D && bytes[5] == 0x0A && bytes[6] == 0x1A && bytes[7] == 0x0A,
-    ".webp" => bytes.Length >= 12 && Encoding.ASCII.GetString(bytes, 0, 4) == "RIFF" &&
-               Encoding.ASCII.GetString(bytes, 8, 4) == "WEBP",
-    ".gif" => bytes.Length >= 6 && Encoding.ASCII.GetString(bytes, 0, 3) == "GIF" &&
-              Encoding.ASCII.GetString(bytes, 3, 3) is "87a" or "89a",
-    ".bmp" => bytes.Length >= 2 && bytes[0] == 0x42 && bytes[1] == 0x4D,
-    _ => false
-};
 
 static string? SafePhotoPath(string dataRoot, string relativePath)
 {
@@ -991,12 +959,6 @@ static void TryDeletePhoto(string dataRoot, string relativePath)
     }
     catch { /* Файловая очистка не должна отменять уже выполненное удаление из БД. */ }
 }
-
-static string ContentTypeFor(string path) => Path.GetExtension(path).ToLowerInvariant() switch
-{
-    ".png" => "image/png", ".webp" => "image/webp", ".gif" => "image/gif", ".bmp" => "image/bmp", _ => "image/jpeg"
-};
-
 
 static class Dpapi
 {
@@ -1045,67 +1007,6 @@ static class Dpapi
     }
 }
 
-sealed class SessionStore
-{
-    private readonly byte[] _secret;
-    private static readonly TimeSpan Lifetime = TimeSpan.FromDays(30);
-
-    public SessionStore(IConfiguration configuration)
-    {
-        var configuredSecret = configuration["LOCA_SESSION_SECRET"];
-        // Local development remains zero-configuration. In Render, startup
-        // explicitly requires a persistent secret so tokens survive restarts.
-        _secret = string.IsNullOrWhiteSpace(configuredSecret)
-            ? RandomNumberGenerator.GetBytes(32)
-            : Encoding.UTF8.GetBytes(configuredSecret);
-        if (_secret.Length < 32)
-            throw new InvalidOperationException("LOCA_SESSION_SECRET must contain at least 32 characters.");
-    }
-
-    public string Create(int userId)
-    {
-        var payload = Encoding.UTF8.GetBytes($"{userId}:{DateTimeOffset.UtcNow.Add(Lifetime).ToUnixTimeSeconds()}");
-        var encodedPayload = Base64UrlEncode(payload);
-        var signature = HMACSHA256.HashData(_secret, Encoding.ASCII.GetBytes(encodedPayload));
-        return $"{encodedPayload}.{Base64UrlEncode(signature)}";
-    }
-
-    public bool TryGet(string token, out int userId)
-    {
-        userId = 0;
-        try
-        {
-            var parts = token.Split('.');
-            if (parts.Length != 2) return false;
-            var suppliedSignature = Base64UrlDecode(parts[1]);
-            var expectedSignature = HMACSHA256.HashData(_secret, Encoding.ASCII.GetBytes(parts[0]));
-            if (!CryptographicOperations.FixedTimeEquals(suppliedSignature, expectedSignature)) return false;
-
-            var fields = Encoding.UTF8.GetString(Base64UrlDecode(parts[0])).Split(':');
-            if (fields.Length != 2 ||
-                !int.TryParse(fields[0], out var parsedUserId) || parsedUserId <= 0 ||
-                !long.TryParse(fields[1], out var expiresAt) ||
-                DateTimeOffset.UtcNow.ToUnixTimeSeconds() >= expiresAt)
-                return false;
-
-            userId = parsedUserId;
-            return true;
-        }
-        catch (FormatException) { return false; }
-        catch (ArgumentException) { return false; }
-    }
-
-    private static string Base64UrlEncode(byte[] value) =>
-        Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
-    private static byte[] Base64UrlDecode(string value)
-    {
-        var base64 = value.Replace('-', '+').Replace('_', '/');
-        base64 = base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '=');
-        return Convert.FromBase64String(base64);
-    }
-}
-
 record RegisterRequest(string Login, string Password, string DisplayName);
 record LoginRequest(string Login, string Password);
 record UpdateDisplayNameRequest(string? DisplayName);
@@ -1133,5 +1034,4 @@ record MapPlaceSavedDto(int Id, string Message);
 record ItemsResponse<T>(IReadOnlyList<T> Items);
 record IntItemsResponse(IReadOnlyList<int> Items);
 
-// Exposed for HTTP integration tests through WebApplicationFactory.
 public partial class Program { }

@@ -1,26 +1,40 @@
-name: API contract tests
+name: Automated tests
 
 on:
   push:
     branches:
       - main
-      - feature/automated-tests
+      - 'feature/**'
+      - 'refactor/**'
+    paths:
+      - 'Tests/**'
+      - 'Server/LocaLoca.Api/**'
+      - 'database/**'
+      - 'global.json'
+      - '.github/workflows/tests.yml'
   pull_request:
     branches:
       - main
+    paths:
+      - 'Tests/**'
+      - 'Server/LocaLoca.Api/**'
+      - 'database/**'
+      - 'global.json'
+      - '.github/workflows/tests.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: api-contract-tests-${{ github.ref }}
+  group: automated-tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  api-contract-tests:
-    name: API tests without external services
-    runs-on: ubuntu-latest
+  unit:
+    name: Unit tests (no Docker)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,15 +42,39 @@ jobs:
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
 
-      - name: Run API contract tests
-        run: dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release --logger "trx;LogFileName=api-contract-tests.trx" --results-directory TestResults
+      - name: Run unit tests
+        run: dotnet test Tests/LocaLoca.Tests/LocaLoca.Tests.csproj --configuration Release --verbosity minimal
 
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v4
+  api:
+    name: API integration tests (isolated PostgreSQL)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
         with:
-          name: api-contract-test-results
-          path: TestResults/*.trx
-          if-no-files-found: ignore
+          global-json-file: global.json
+
+      - name: Run API integration tests
+        run: dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release --verbosity minimal
+
+  database:
+    name: PostgreSQL schema and migration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Run database tests
+        run: dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --configuration Release --verbosity minimal

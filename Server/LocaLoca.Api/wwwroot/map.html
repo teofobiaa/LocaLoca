@@ -38,18 +38,29 @@
     .top{position:absolute;z-index:1000;top:14px;left:50px;background:var(--surface);padding:10px 15px;border-radius:12px;box-shadow:0 2px 14px #17233a22;color:var(--text);border:1px solid var(--border)}
     .top strong{font-size:15px}.top small{display:block;color:var(--muted);margin-top:3px}
     .pin{width:18px;height:18px;border:3px solid white;border-radius:50%;box-shadow:0 1px 7px #18243a77}
-    .leaflet-popup-content{max-height:70vh;overflow-y:auto}
+    .leaflet-popup{max-width:calc(100vw - 24px)}
+    .leaflet-popup-content{box-sizing:border-box;max-height:min(64vh,520px);max-width:calc(100vw - 56px);overflow-y:auto;overflow-x:hidden;margin:12px}
     .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--text)}
     .leaflet-control-zoom a,.leaflet-control-attribution{background:var(--surface)!important;color:var(--text)!important;border-color:var(--border)!important}
-    .place-form{display:grid;gap:7px;min-width:230px;color:var(--text)}
-    .place-form input,.place-form select,.place-form textarea{box-sizing:border-box;width:100%;padding:7px;border:1px solid var(--border);border-radius:6px;font:inherit;background:var(--surface);color:var(--text)}
-    .place-form textarea{resize:vertical;min-height:48px}
-    .place-form button{padding:7px 10px;border:0;border-radius:7px;background:var(--accent);color:var(--accent-text);cursor:pointer}
+    .place-form{display:grid;gap:8px;min-width:0;width:min(270px,calc(100vw - 76px));max-width:100%;color:var(--text)}
+    .place-form input,.place-form textarea{box-sizing:border-box;width:100%;min-width:0;max-width:100%;padding:8px;border:1px solid var(--border);border-radius:7px;font:inherit;background:var(--surface);color:var(--text)}
+    .place-form input:disabled{opacity:.48}
+    .place-form textarea{resize:vertical;min-height:48px;max-height:120px}
+    .place-form button{padding:8px 10px;border:0;border-radius:7px;background:var(--accent);color:var(--accent-text);cursor:pointer;font:inherit}
+    .place-form button:disabled{opacity:.45;cursor:not-allowed}
     .place-form .danger{background:var(--danger-bg);color:var(--danger-text)}
     .place-form label{font-size:12px;color:var(--field-text)}
-    .place-photos{display:grid;gap:5px}.status-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+    .place-photos{display:grid;gap:7px;overflow-wrap:anywhere}
+    .status-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px}
     .status-switch label{display:flex;align-items:center;gap:6px;padding:8px;background:var(--soft);border-radius:8px;font-size:12px;cursor:pointer}
-    .status-switch input{width:auto;margin:0}.field-label{font-size:11px;color:var(--field-text)}
+    .status-switch input{width:auto;margin:0}
+    .rating-switch{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+    .rating-option{position:relative;display:block;min-width:0;cursor:pointer}
+    .rating-option input{position:absolute;opacity:0;width:1px;height:1px;margin:0}
+    .rating-option span{display:block;padding:9px 4px;text-align:center;border:1px solid var(--border);border-radius:7px;background:var(--soft);color:var(--text);font-size:13px}
+    .rating-option input:checked+span{background:var(--accent);border-color:var(--accent);color:var(--accent-text);font-weight:700}
+    .rating-option input:focus-visible+span{outline:2px solid var(--text);outline-offset:2px}
+    .field-label{font-size:11px;color:var(--field-text)}
     :root[data-theme="dark"] .leaflet-tile-pane{filter:brightness(.78) invert(1) hue-rotate(180deg) saturate(.8) contrast(.9)}
   </style>
 </head>
@@ -96,14 +107,31 @@
       return `<div class="status-switch"><label><input type="radio" name="status" value="planned" ${status === 'planned' ? 'checked' : ''}>В планах</label><label><input type="radio" name="status" value="visited" ${status === 'visited' ? 'checked' : ''}>Посещено</label></div>`;
     }
     function getStatus(form) { return form.querySelector('input[name="status"]:checked').value; }
+    function getRating(form) {
+      const selected = form.querySelector('input[name="rating"]:checked');
+      return selected ? Number(selected.value) : null;
+    }
+    function ratingControls(selectedRating = null) {
+      return `<div class="rating-switch" role="radiogroup" aria-label="Оценка">${[1,2,3,4,5].map(value =>
+        `<label class="rating-option"><input type="radio" name="rating" value="${value}" ${Number(selectedRating) === value ? 'checked' : ''}><span>${value}</span></label>`
+      ).join('')}</div>`;
+    }
     function bindStatusFields(form) {
       const update = () => {
         const visited = getStatus(form) === 'visited';
         form.elements.date.disabled = !visited;
-        form.elements.rating.disabled = !visited;
+        form.querySelectorAll('input[name="rating"]').forEach(input => { input.disabled = !visited; });
       };
       form.querySelectorAll('input[name="status"]').forEach(input => input.addEventListener('change', update));
       update();
+    }
+    function popupOptions() {
+      return {
+        maxWidth: 320,
+        maxHeight: Math.max(140, Math.floor(window.innerHeight * 0.64)),
+        autoPan: true,
+        autoPanPadding: [18, 18]
+      };
     }
     function bindPlaceEditor(marker, item) {
       const id = item.userPlaceId;
@@ -111,13 +139,13 @@
       marker.bindPopup(`<form class="place-form" id="edit-${id}">
         <strong>Моё место</strong><input name="name" maxlength="150" required value="${escapeHtml(item.name)}" aria-label="Название места">
         ${statusControls(item.visited ? 'visited' : 'planned')}
-        <label class="field-label">Дата посещения</label><input name="date" type="date" max="${today}" value="${date}"><label class="field-label">Оценка</label><select name="rating"><option value="">Выберите оценку</option>${[1,2,3,4,5].map(n => `<option value="${n}" ${item.rating === n ? 'selected' : ''}>${n} / 5</option>`).join('')}</select>
+        <label class="field-label">Дата посещения</label><input name="date" type="date" max="${today}" value="${date}"><label class="field-label">Оценка</label>        ${ratingControls(item.rating)}
         <textarea name="impressions" maxlength="10000" placeholder="Впечатления">${escapeHtml(item.impressions || '')}</textarea>
         <textarea name="notes" maxlength="10000" placeholder="Личные заметки">${escapeHtml(item.notes || '')}</textarea>
         <button type="submit">Сохранить место</button>
         <label>Фотографии <input id="files-${id}" type="file" accept="image/*" multiple></label><button type="button" id="upload-${id}">Загрузить фото</button>
         <div class="place-photos" id="photos-${id}"></div><button class="danger" type="button" id="delete-${id}">Удалить место</button>
-      </form>`);
+      </form>`, popupOptions());
       marker.on('popupopen', () => {
         const form = document.getElementById(`edit-${id}`);
         bindStatusFields(form);
@@ -125,7 +153,7 @@
           event.preventDefault();
           try {
             await api(`/api/me/map-places/${id}`, { method:'PUT', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({
-              name:form.elements.name.value, status:getStatus(form), visitDate:form.elements.date.value, rating:Number(form.elements.rating.value),
+              name:form.elements.name.value, status:getStatus(form), visitDate:form.elements.date.value, rating:getRating(form),
               impressions:form.elements.impressions.value, notes:form.elements.notes.value
             }) });
             await loadMarkers();
@@ -182,12 +210,12 @@
       const lat = event.latlng.lat.toFixed(6), lon = event.latlng.lng.toFixed(6);
       const defaultStatus = startNewVisit ? 'visited' : 'planned';
       const date = startNewVisit ? today : '';
-      const popup = L.popup().setLatLng(event.latlng).setContent(`<form class="place-form" id="new-place">
+      const popup = L.popup(popupOptions()).setLatLng(event.latlng).setContent(`<form class="place-form" id="new-place">
         <strong>${startNewVisit ? 'Новое посещение' : 'Добавить своё место'}</strong>
         <input name="name" maxlength="150" placeholder="Название места" required>
         ${statusControls(defaultStatus)}
         <label class="field-label">Дата посещения</label><input name="date" type="date" max="${today}" value="${date}"><label class="field-label">Оценка</label>
-        <select name="rating"><option value="">Выберите оценку</option>${[1,2,3,4,5].map(n => `<option value="${n}" ${n === 5 && startNewVisit ? 'selected' : ''}>${n} / 5</option>`).join('')}</select>
+        ${ratingControls(startNewVisit ? 5 : null)}
         <textarea name="impressions" maxlength="10000" placeholder="Впечатления"></textarea>
         <textarea name="notes" maxlength="10000" placeholder="Личные заметки"></textarea>
         <label>Фотографии <input name="photos" type="file" accept="image/*" multiple></label>
@@ -203,12 +231,12 @@
         form.addEventListener('submit', async submitEvent => {
           submitEvent.preventDefault();
           const status = getStatus(form);
-          if (status === 'visited' && (!form.elements.date.value || !form.elements.rating.value)) { alert('Укажите дату и оценку посещения.'); return; }
+          if (status === 'visited' && (!form.elements.date.value || getRating(form) === null)) { alert('Укажите дату и оценку посещения.'); return; }
           let place;
           try {
             place = await api('/api/me/map-places', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({
               name:form.elements.name.value, latitude:Number(lat), longitude:Number(lon), status,
-              visitDate:form.elements.date.value, rating:Number(form.elements.rating.value),
+              visitDate:form.elements.date.value, rating:getRating(form),
               impressions:form.elements.impressions.value, notes:form.elements.notes.value
             }) });
           }
