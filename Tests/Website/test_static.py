@@ -29,10 +29,13 @@ class SiteMarkupParser(HTMLParser):
         self.tags: list[str] = []
         self.meta: list[dict[str, str | None]] = []
         self.nav_labels: list[str] = []
+        self.html_attrs: dict[str, str | None] = {}
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         values = dict(attrs)
         self.tags.append(tag)
+        if tag == "html":
+            self.html_attrs = values
 
         element_id = values.get("id")
         if element_id:
@@ -139,8 +142,7 @@ class WebsiteStaticTests(unittest.TestCase):
         self.assertIn("main", self.parser.tags)
         self.assertEqual(self.html.count("<h1"), 1, "The page must have one primary heading.")
 
-        html_start = self.html.split(">", 1)[0]
-        self.assertIn('lang="ru"', html_start)
+        self.assertEqual(self.parser.html_attrs.get("lang"), "ru")
 
         title = self.html.split("<title>", 1)[-1].split("</title>", 1)[0].strip()
         self.assertTrue(title, "The document title must not be empty.")
