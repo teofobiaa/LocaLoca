@@ -101,27 +101,27 @@
                 </Grid>
             </Border>
 
-            <Border Grid.Column="1" Padding="52,40" Background="{ThemeResource Palette_F4F5F1}">
+            <Border Grid.Column="1" Padding="52,40" Background="{ThemeResource AuthSurfaceBrush}">
                 <Grid>
                 <StackPanel VerticalAlignment="Center" MaxWidth="420" HorizontalAlignment="Center" Spacing="16">
-                    <TextBlock x:Name="AuthEyebrow" Text="С возвращением" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource Palette_809087}" />
-                    <TextBlock x:Name="AuthTitle" Text="С возвращением" FontSize="34" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1A2C26}" />
-                    <TextBlock x:Name="AuthSubtitle" Text="Войди, чтобы продолжить свою историю." FontSize="14" Foreground="{ThemeResource Palette_7A8880}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="AuthEyebrow" Text="С возвращением" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AuthMutedTextBrush}" />
+                    <TextBlock x:Name="AuthTitle" Text="С возвращением" FontSize="34" FontWeight="SemiBold" Foreground="{ThemeResource AuthHeadingBrush}" />
+                    <TextBlock x:Name="AuthSubtitle" Text="Войди, чтобы продолжить свою историю." FontSize="14" Foreground="{ThemeResource AuthTextBrush}" TextWrapping="Wrap" />
                     <StackPanel x:Name="DisplayNamePanel" Spacing="6" Visibility="Collapsed" Margin="0,8,0,0">
-                        <TextBlock Text="Как к тебе обращаться" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource Palette_53645B}" />
+                        <TextBlock Text="Как к тебе обращаться" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AuthTextBrush}" />
                         <TextBox x:Name="DisplayNameBox" PlaceholderText="Твоё имя" Height="46" />
                     </StackPanel>
                     <StackPanel Spacing="6" Margin="0,8,0,0">
-                        <TextBlock Text="Логин" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource Palette_53645B}" />
+                        <TextBlock Text="Логин" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AuthTextBrush}" />
                         <TextBox x:Name="LoginBox" PlaceholderText="Введите логин" Height="46" />
                     </StackPanel>
                     <StackPanel Spacing="6">
-                        <TextBlock Text="Пароль" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource Palette_53645B}" />
+                        <TextBlock Text="Пароль" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AuthTextBrush}" />
                         <PasswordBox x:Name="PasswordBox" PlaceholderText="Не менее 6 символов" Height="46" />
                     </StackPanel>
                     <Button x:Name="AuthSubmitButton" Content="Войти в аккаунт" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="AuthSubmit_Click" Margin="0,12,0,0" />
-                    <Button x:Name="AuthModeButton" Content="Создать новый аккаунт" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource Palette_52665A}" HorizontalAlignment="Center" Click="AuthModeButton_Click" />
-                    <TextBlock x:Name="AuthStatusText" Text="Проверяем локальное подключение…" TextWrapping="Wrap" Foreground="{ThemeResource Palette_86948B}" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center" />
+                    <Button x:Name="AuthModeButton" Content="Создать новый аккаунт" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource AuthMutedTextBrush}" HorizontalAlignment="Center" Click="AuthModeButton_Click" />
+                    <TextBlock x:Name="AuthStatusText" Text="Проверяем локальное подключение…" TextWrapping="Wrap" Foreground="{ThemeResource AuthMutedTextBrush}" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center" />
                         <Button x:Name="RetryConnectionButton" Content="Повторить подключение" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Center" Visibility="Collapsed" Click="RetryConnection_Click" />
                     </StackPanel>
                 </Grid>
