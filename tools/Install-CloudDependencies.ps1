@@ -2,7 +2,9 @@
 param(
     [string]$UserConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json'),
     [string]$LogPath = (Join-Path $env:TEMP 'LocaLoca-CloudSetup.log'),
-    [string]$CloudApiUrl = ''
+    # Ordinary installations use the hosted API by default. Empty string is
+    # reserved for an explicit developer opt-in to legacy direct Supabase setup.
+    [string]$CloudApiUrl = 'https://localoca-api.onrender.com'
 )
 
 $ErrorActionPreference = 'Stop'

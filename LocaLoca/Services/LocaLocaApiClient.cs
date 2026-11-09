@@ -28,6 +28,14 @@ public sealed class LocaLocaApiClient : IDisposable
         if (string.IsNullOrWhiteSpace(configuredBaseUrl))
             configuredBaseUrl = ReadConfiguredApiBaseUrl();
 
+#if !DEBUG
+        // Public Release builds must never fall back to a local API that expects
+        // end-user Supabase credentials. The cloud endpoint is the safe default
+        // even if an older or incomplete installer failed to write client-config.json.
+        if (string.IsNullOrWhiteSpace(configuredBaseUrl))
+            configuredBaseUrl = "https://localoca-api.onrender.com";
+#endif
+
         if (!string.IsNullOrWhiteSpace(configuredBaseUrl))
         {
             if (!Uri.TryCreate(configuredBaseUrl, UriKind.Absolute, out var remoteUri) ||
