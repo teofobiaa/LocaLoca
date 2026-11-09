@@ -25,6 +25,6 @@ Global
         {C8EB9D77-7B4D-4D5A-D30C-2AE0C3E5D335}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
         {C8EB9D77-7B4D-4D5A-D30C-2AE0C3E5D335}.Debug|Any CPU.Build.0 = Debug|Any CPU
         {C8EB9D77-7B4D-4D5A-D30C-2AE0C3E5D335}.Release|Any CPU.ActiveCfg = Release|Any CPU
-        {C8EB9D77-7B4D-4D5A-D30C-2AE0C3E5D335}.Release|Any CPU.Build.0 = Debug|Any CPU
+        {C8EB9D77-7B4D-4D5A-D30C-2AE0C3E5D335}.Release|Any CPU.Build.0 = Release|Any CPU
     EndGlobalSection
 EndGlobal
