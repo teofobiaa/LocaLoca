@@ -98,8 +98,8 @@ begin
     SetArrayLength(SetupLogLines, 1);
     SetupLogLines[0] := 'Loca Loca installer: PowerShell setup started.';
     if not SaveStringsToUTF8File(SetupLogPath, SetupLogLines, False) then
-      RaiseException('Не удалось создать диагностический журнал: ' + SetupLogPath +
-        #13#10 + 'Проверь права записи в каталог LocalAppData.');
+      RaiseException('Не удалось создать диагностический журнал: ' + SetupLogPath + #13#10 +
+        'Проверь права записи в каталог LocalAppData.');
 
     Parameters :=
       '-NoProfile -ExecutionPolicy Bypass -File "' +
