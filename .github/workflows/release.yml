@@ -53,7 +53,7 @@ jobs:
               throw "The checked-out commit does not match release tag $tag."
             }
 
-            git fetch origin main --quiet
+            git fetch origin +refs/heads/main:refs/remotes/origin/main --quiet
             if ($LASTEXITCODE -ne 0) {
               throw 'Could not fetch main to validate the release commit.'
             }
