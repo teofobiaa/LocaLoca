@@ -5,7 +5,10 @@ $tokens = $null
 $parseErrors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($bootstrapPath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count -gt 0) {
-    throw "Bootstrap script has parser errors: $($parseErrors[0].Message)"
+    $details = ($parseErrors | ForEach-Object {
+        "line $($_.Extent.StartLineNumber), column $($_.Extent.StartColumnNumber): $($_.Message)"
+    }) -join [Environment]::NewLine
+    throw ("Bootstrap script has parser errors:" + [Environment]::NewLine + $details)
 }
 
 $functionAst = $ast.Find({
