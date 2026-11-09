@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   --ink: #202d25;
-  --muted: #68776d;
+  --muted: #5f6c62;
   --green: #1c6848;
   --green-deep: #123f30;
   --lime: #d5f08e;
@@ -12,8 +12,8 @@
   --line: #e4e9df;
   --text-strong: #293a2e;
   --text-body: #45554a;
-  --text-subtle: #849087;
-  --footer-text: #657368;
+  --text-subtle: #58665b;
+  --footer-text: #5f6c62;
   --note-green-bg: #e9f4e7;
   --note-green: #2e7950;
   --note-warm-bg: #fff0e8;
@@ -344,7 +344,7 @@ a { color: inherit; }
 }
 .strip-intro h2 { margin: 7px 0 0; font-size: 17px; letter-spacing: -.5px; }
 .strip-step { display: flex; align-items: center; gap: 12px; }
-.step-number { color: #86a47a; font-size: 11px; font-weight: 800; letter-spacing: .8px; }
+.step-number { color: #54724d; font-size: 11px; font-weight: 800; letter-spacing: .8px; }
 .strip-step b { display: block; font-size: 11px; }
 .strip-step p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
 .section { padding-top: 93px; padding-bottom: 94px; }
