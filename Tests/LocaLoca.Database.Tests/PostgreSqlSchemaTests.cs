@@ -124,6 +124,35 @@ public sealed class PostgreSqlSchemaTests
     }
 
     [Fact]
+    public async Task Photo_Constraint_Rejects_An_Unsupported_Content_Type()
+    {
+        await using var connection = await _database.OpenConnectionAsync();
+        var ids = await InsertUserAndAttractionAsync(connection);
+        int visitId;
+
+        await using (var visit = new NpgsqlCommand(@"
+            INSERT INTO visits(user_id, attraction_id, visit_date, rating)
+            VALUES (@user, @attraction, CURRENT_DATE, 5)
+            RETURNING visit_id", connection))
+        {
+            visit.Parameters.AddWithValue("user", ids.UserId);
+            visit.Parameters.AddWithValue("attraction", ids.AttractionId);
+            visitId = Convert.ToInt32(await visit.ExecuteScalarAsync());
+        }
+
+        await using var invalidPhoto = new NpgsqlCommand(@"
+            INSERT INTO photos(visit_id, file_path, caption, image_data, content_type)
+            VALUES (@visit, 'Photos/test.svg', 'invalid MIME type', @data, 'image/svg+xml')",
+            connection);
+        invalidPhoto.Parameters.AddWithValue("visit", visitId);
+        invalidPhoto.Parameters.AddWithValue("data", new byte[] { 0x3C, 0x73, 0x76, 0x67 });
+
+        var exception = await Assert.ThrowsAsync<PostgresException>(
+            () => invalidPhoto.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.CheckViolation, exception.SqlState);
+    }
+
+    [Fact]
     public async Task Deleting_A_User_Cascades_Their_Visits_Photos_Wishlist_And_Map_Places()
     {
         await using var connection = await _database.OpenConnectionAsync();
