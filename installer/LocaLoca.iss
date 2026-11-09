@@ -77,7 +77,7 @@ begin
     if not Exec(PowerShellPath, Parameters, ExpandConstant('{app}'),
       SW_SHOW, ewWaitUntilTerminated, ResultCode) then
     begin
-      RaiseException('Не удалось запустить настройку Supabase для Loca Loca.');
+      RaiseException('Не удалось запустить PowerShell для настройки Loca Loca. Проверь наличие Windows PowerShell в системе.');
     end;
 
     if ResultCode <> 0 then
@@ -90,7 +90,8 @@ begin
         ErrorMessage := ErrorMessage + #13#10#13#10 + UTF8Decode(SetupLogContent)
       else
         ErrorMessage := ErrorMessage + #13#10 +
-          'Диагностический журнал не создан. Путь: ' + SetupLogPath;
+          'Диагностический журнал не удалось создать или прочитать. Путь: ' + SetupLogPath + #13#10 +
+          'Проверь права доступа к каталогу LocalAppData.';
 
       RaiseException(ErrorMessage);
     end;

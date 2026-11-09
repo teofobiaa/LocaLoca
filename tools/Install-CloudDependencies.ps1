@@ -9,23 +9,72 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-if (Test-Path -LiteralPath $LogPath) { Remove-Item -LiteralPath $LogPath -Force -ErrorAction SilentlyContinue }
 $WebViewRuntimeGuid = '{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+$script:SetupLogReady = $false
+
+function Write-SetupLog {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    $entry = "[{0:yyyy-MM-dd HH:mm:ss}] {1}{2}" -f (Get-Date), $Message, [Environment]::NewLine
+    try {
+        $parent = Split-Path -Parent $LogPath
+        if (-not [string]::IsNullOrWhiteSpace($parent)) {
+            [IO.Directory]::CreateDirectory($parent) | Out-Null
+        }
+        [IO.File]::AppendAllText($LogPath, $entry, [Text.UTF8Encoding]::new($false))
+        $script:SetupLogReady = $true
+    }
+    catch {
+        Write-Warning "Не удалось записать журнал '$LogPath': $($_.Exception.Message)"
+    }
+}
+
+try {
+    $parent = Split-Path -Parent $LogPath
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        [IO.Directory]::CreateDirectory($parent) | Out-Null
+    }
+    if (Test-Path -LiteralPath $LogPath) {
+        Remove-Item -LiteralPath $LogPath -Force -ErrorAction Stop
+    }
+    Write-SetupLog 'Запуск настройки Loca Loca.'
+}
+catch {
+    Write-Warning "Не удалось подготовить журнал '$LogPath': $($_.Exception.Message)"
+}
 
 trap {
     $record = $_
     $lineNumber = 0
-    if ($record.InvocationInfo) { $lineNumber = $record.InvocationInfo.ScriptLineNumber }
-    $detail = "Setup failed: $($record.Exception.Message)" + [Environment]::NewLine +
-        "Script line: $lineNumber" + [Environment]::NewLine +
-        "Command: $($record.InvocationInfo.Line)"
-    try {
-        [IO.File]::WriteAllText($LogPath, $detail, [Text.UTF8Encoding]::new($false))
+    $command = ''
+    if ($record.InvocationInfo) {
+        $lineNumber = $record.InvocationInfo.ScriptLineNumber
+        $command = $record.InvocationInfo.Line
     }
-    catch { }
+    $detail = @(
+        'Setup failed.'
+        "Message: $($record.Exception.Message)"
+        "Exception: $($record.Exception.GetType().FullName)"
+        "Script: $($record.InvocationInfo.ScriptName)"
+        "Script line: $lineNumber"
+        "Command: $command"
+        "Position: $($record.InvocationInfo.PositionMessage)"
+        "Category: $($record.CategoryInfo)"
+        "FullyQualifiedErrorId: $($record.FullyQualifiedErrorId)"
+    ) -join [Environment]::NewLine
+    Write-SetupLog $detail
+    try {
+        $parent = Split-Path -Parent $LogPath
+        if (-not [string]::IsNullOrWhiteSpace($parent)) {
+            [IO.Directory]::CreateDirectory($parent) | Out-Null
+        }
+        [IO.File]::WriteAllText($LogPath, $detail + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+    }
+    catch {
+        Write-Host "Не удалось записать журнал '$LogPath': $($_.Exception.Message)" -ForegroundColor Yellow
+    }
     Write-Host ''
     Write-Host "Ошибка настройки Loca Loca: $($record.Exception.Message)" -ForegroundColor Red
-    Write-Host "Подробности записаны в: $LogPath" -ForegroundColor Yellow
+    Write-Host "Путь журнала: $LogPath" -ForegroundColor Yellow
     exit 1
 }
 
@@ -54,6 +103,7 @@ function Test-WebView2Installed {
 }
 
 function Ensure-WebView2 {
+    Write-SetupLog 'Проверка Microsoft Edge WebView2 Runtime.'
     if (Test-WebView2Installed) {
         Write-Host 'WebView2 Runtime уже установлен.' -ForegroundColor Green
         return
@@ -64,6 +114,7 @@ function Ensure-WebView2 {
     if (Test-Path -LiteralPath $installerPath) { Remove-Item -LiteralPath $installerPath -Force }
 
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    Write-SetupLog "Загрузка WebView2 Runtime в '$installerPath'."
     Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $installerPath -UseBasicParsing
 
     $signature = Get-AuthenticodeSignature -FilePath $installerPath
@@ -72,6 +123,7 @@ function Ensure-WebView2 {
         throw 'Не удалось подтвердить подпись установщика WebView2 от Microsoft.'
     }
 
+    Write-SetupLog 'Запуск установщика WebView2 Runtime.'
     $process = Start-Process -FilePath $installerPath -ArgumentList @('/silent', '/install') -Wait -PassThru -WindowStyle Hidden
     if ($process.ExitCode -notin @(0, 3010)) {
         throw "Не удалось установить WebView2 Runtime. Код установщика: $($process.ExitCode)."
@@ -179,6 +231,7 @@ if ($cloudApiUri) {
         apiBaseUrl = $apiBaseUrl
     } | ConvertTo-Json -Compress
 
+    Write-SetupLog "Создание каталога конфигурации '$clientConfigDirectory'."
     [IO.File]::WriteAllText(
         $clientConfigTemporaryPath,
         $clientConfig,
@@ -188,8 +241,10 @@ if ($cloudApiUri) {
 
     # Keep the environment variable as an explicit override for developers.
     [Environment]::SetEnvironmentVariable('LOCA_API_BASE_URL', $apiBaseUrl, 'User')
+    Write-SetupLog "Cloud API configuration saved to '$clientConfigPath'."
     $env:LOCA_API_BASE_URL = $apiBaseUrl
 
+    Write-SetupLog 'Облачная настройка завершена успешно.'
     Write-Host "Облачный API настроен: $apiBaseUrl" -ForegroundColor Green
     Write-Host "Конфигурация сохранена: $clientConfigPath"
     Write-Host 'Прямое подключение Windows-клиента к Supabase не требуется.' -ForegroundColor Gray
