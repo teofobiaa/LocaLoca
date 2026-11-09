@@ -40,7 +40,9 @@ public sealed class ApiIntegrationTests
         var account = await RegisterAsync(client);
         var storedHash = await ReadStoredPasswordHashAsync(account.Login);
 
-        Assert.NotEqual(account.Password, storedHash);
+        Assert.False(
+            string.Equals(account.Password, storedHash, StringComparison.Ordinal),
+            "The stored password representation must differ from the supplied password.");
         Assert.True(PasswordHasher.Verify(account.Password, storedHash));
         Assert.Equal(3, storedHash.Split('.').Length);
     }
