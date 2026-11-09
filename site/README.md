@@ -38,7 +38,7 @@ py -m http.server 8000 --directory site
 
 ## Публикация через GitHub Pages
 
-Workflow [\.github/workflows/pages.yml](../.github/workflows/pages.yml):
+Workflow [.github/workflows/pages.yml](../.github/workflows/pages.yml):
 
 - запускается при push в `main`, если изменились файлы `site/**`, сам workflow или `LocaLoca/Assets/**`;
 - также поддерживает ручной запуск через `workflow_dispatch`;
