@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$UserConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json'),
     [string]$LogPath = (Join-Path $env:TEMP 'LocaLoca-CloudSetup.log'),
