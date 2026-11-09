@@ -109,6 +109,7 @@
                     <SolidColorBrush x:Key="Palette_FBFCF8" Color="#FBFCF8" />
                     <SolidColorBrush x:Key="Palette_FBFCF9" Color="#FBFCF9" />
                     <SolidColorBrush x:Key="Palette_FFFFFF" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="OnDarkSurfaceBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="CanvasBrush" Color="#F4F5F1" />
                     <SolidColorBrush x:Key="SurfaceBrush" Color="#FFFFFF" />
                     <SolidColorBrush x:Key="InkBrush" Color="#172521" />
@@ -208,11 +209,11 @@
                     <SolidColorBrush x:Key="Palette_C9F27A" Color="#C9F27A" />
                     <SolidColorBrush x:Key="Palette_D5DED6" Color="#46554D" />
                     <SolidColorBrush x:Key="Palette_D6E0D8" Color="#BFCFC4" />
-                    <SolidColorBrush x:Key="Palette_D8E7CD" Color="#34452D" />
+                    <SolidColorBrush x:Key="Palette_D8E7CD" Color="#E0EBE3" />
                     <SolidColorBrush x:Key="Palette_DDEBCB" Color="#34452D" />
                     <SolidColorBrush x:Key="Palette_E1E7DF" Color="#35433B" />
                     <SolidColorBrush x:Key="Palette_E3E8E2" Color="#344139" />
-                    <SolidColorBrush x:Key="Palette_E3EBD8" Color="#2C3A2D" />
+                    <SolidColorBrush x:Key="Palette_E3EBD8" Color="#E0EBE3" />
                     <SolidColorBrush x:Key="Palette_E7EBE5" Color="#36443C" />
                     <SolidColorBrush x:Key="Palette_E9ECE6" Color="#3A4840" />
                     <SolidColorBrush x:Key="Palette_E9F0E3" Color="#2C3A30" />
@@ -226,6 +227,7 @@
                     <SolidColorBrush x:Key="Palette_FBFCF8" Color="#202B26" />
                     <SolidColorBrush x:Key="Palette_FBFCF9" Color="#202B26" />
                     <SolidColorBrush x:Key="Palette_FFFFFF" Color="#202B26" />
+                    <SolidColorBrush x:Key="OnDarkSurfaceBrush" Color="#EDF4EE" />
                     <SolidColorBrush x:Key="CanvasBrush" Color="#151D19" />
                     <SolidColorBrush x:Key="SurfaceBrush" Color="#202B26" />
                     <SolidColorBrush x:Key="InkBrush" Color="#E7EFE9" />
