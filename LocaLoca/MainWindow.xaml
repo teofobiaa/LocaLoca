@@ -162,6 +162,9 @@
                     <Button Style="{StaticResource NavButtonStyle}" Click="MapNav_Click">
                         <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE81D;" FontSize="17" /><TextBlock Text="Карта" VerticalAlignment="Center" /></StackPanel>
                     </Button>
+                    <Button x:Name="SupportNavButton" Style="{StaticResource NavButtonStyle}" Click="SupportNav_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE897;" FontSize="17" /><TextBlock Text="Поддержка" VerticalAlignment="Center" /></StackPanel>
+                    </Button>
                 </StackPanel>
                 <Button Grid.Row="3" x:Name="ProfileButton" Background="{ThemeResource Palette_29443D}" Foreground="{ThemeResource Palette_FFFFFF}" BorderThickness="0" CornerRadius="16" Padding="14" Margin="0,20,0,0" HorizontalContentAlignment="Stretch" Click="Profile_Click">
                     <StackPanel Spacing="7">
@@ -322,6 +325,78 @@
                         <Border Grid.Row="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                             <controls:WebView2 x:Name="MapWebView" />
                         </Border>
+                    </Grid>
+
+                    <!-- Profile settings -->
+                    <Grid x:Name="ProfilePage" Visibility="Collapsed">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="18" MaxWidth="820" HorizontalAlignment="Left" Margin="0,0,0,18">
+                                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="24" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="ТВОЙ АККАУНТ" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource AccentDarkBrush}" />
+                                        <TextBlock Text="Настройки профиля" FontSize="24" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
+                                        <TextBlock Text="Здесь можно изменить имя, которое видят в приложении. Логин остаётся постоянным и используется для входа." FontSize="13" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <Grid ColumnDefinitions="1.15*,0.85*" ColumnSpacing="16">
+                                    <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="Данные аккаунта" FontSize="17" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
+                                            <TextBlock Text="Отображаемое имя" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                            <TextBox x:Name="ProfileDisplayNameBox" PlaceholderText="Твоё имя" MaxLength="40" Height="44" />
+                                            <TextBlock Text="Логин для входа" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" Margin="0,5,0,0" />
+                                            <TextBlock x:Name="ProfileLoginText" Text="—" FontSize="14" Foreground="{ThemeResource InkBrush}" />
+                                            <Button x:Name="ProfileSaveButton" Content="Сохранить изменения" Style="{StaticResource PrimaryButtonStyle}" Click="SaveProfile_Click" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                                            <TextBlock x:Name="ProfileStatusText" Text="" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource MutedBrush}" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Text="Оформление" FontSize="17" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
+                                            <ToggleSwitch x:Name="ProfileThemeToggle" Header="Тёмная тема" OnContent="Включена" OffContent="Выключена" Toggled="ProfileTheme_Toggled" />
+                                            <TextBlock Text="Выбранная тема сохраняется на этом компьютере и восстанавливается при следующем запуске." FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                                            <Border Height="1" Background="{ThemeResource LineBrush}" Margin="0,5" />
+                                            <TextBlock Text="Выход из аккаунта" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
+                                            <TextBlock Text="Твои записи останутся в облачной базе. Выход завершает только текущий сеанс на этом компьютере." FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                                            <Button Content="Выйти из аккаунта" Style="{StaticResource QuietButtonStyle}" Click="Logout_Click" HorizontalAlignment="Left" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Grid>
+
+                    <!-- Support -->
+                    <Grid x:Name="SupportPage" Visibility="Collapsed">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="18" MaxWidth="820" HorizontalAlignment="Left" Margin="0,0,0,18">
+                                <Border Background="{ThemeResource Palette_DDEBCB}" CornerRadius="18" Padding="24">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="НУЖНА ПОМОЩЬ?" FontSize="11" FontWeight="SemiBold" Foreground="{ThemeResource Palette_5F7844}" />
+                                        <TextBlock Text="Связь с Loca Loca" FontSize="26" FontWeight="SemiBold" Foreground="{ThemeResource Palette_20352A}" />
+                                        <TextBlock Text="Нашла ошибку, есть идея или хочешь сообщить о проблеме? Используй контакты ниже." FontSize="13" Foreground="{ThemeResource Palette_5D715F}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="16">
+                                    <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                        <StackPanel Spacing="10">
+                                            <TextBlock Text="Электронная почта" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                            <TextBlock Text="Для вопросов и обратной связи" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
+                                            <HyperlinkButton Content="teofobia@outlook.com" NavigateUri="mailto:teofobia@outlook.com" Foreground="{ThemeResource AccentDarkBrush}" HorizontalAlignment="Left" Padding="0" />
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                        <StackPanel Spacing="10">
+                                            <TextBlock Text="Исходный код" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                            <TextBlock Text="Репозиторий проекта на GitHub" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
+                                            <HyperlinkButton Content="github.com/teofobiaa/LocaLoca" NavigateUri="https://github.com/teofobiaa/LocaLoca" Foreground="{ThemeResource AccentDarkBrush}" HorizontalAlignment="Left" Padding="0" />
+                                            <HyperlinkButton Content="Релизы и обновления" NavigateUri="https://github.com/teofobiaa/LocaLoca/releases/latest" Foreground="{ThemeResource AccentDarkBrush}" HorizontalAlignment="Left" Padding="0" />
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                                <TextBlock Text="При обращении укажи версию приложения и кратко опиши шаги, после которых возникла проблема. Не отправляй пароли, токены или строку подключения к базе данных." FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </ScrollViewer>
                     </Grid>
                 </Grid>
 
