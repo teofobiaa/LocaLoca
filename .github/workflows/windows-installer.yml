@@ -36,11 +36,16 @@ jobs:
         shell: powershell
         run: choco install innosetup --yes --no-progress
 
+      - name: Test cloud installer mode selection
+        shell: pwsh
+        run: .\tools\Test-CloudSetupMode.ps1
+
       - name: Validate PowerShell scripts
         shell: pwsh
         run: |
           $files = @(
             'tools/Install-CloudDependencies.ps1',
+            'tools/Test-CloudSetupMode.ps1',
             'tools/Export-AttractionsSeed.ps1',
             'tools/Build-Windows.ps1',
             'tools/Build-Installer.ps1',
