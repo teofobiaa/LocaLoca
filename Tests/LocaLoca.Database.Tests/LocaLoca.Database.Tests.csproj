@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Testcontainers.PostgreSql" Version="4.16.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="../../database/schema/01_schema.sql"
+             Link="Database/schema/01_schema.sql"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/03_migrate_wishlist.sql"
+             Link="Database/migrations/03_migrate_wishlist.sql"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/04_migrate_user_map_places.sql"
+             Link="Database/migrations/04_migrate_user_map_places.sql"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/07_migrate_photo_storage.sql"
+             Link="Database/migrations/07_migrate_photo_storage.sql"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/security/06_update_runtime_permissions.sql"
+             Link="Database/security/06_update_runtime_permissions.sql"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>
