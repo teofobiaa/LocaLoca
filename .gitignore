@@ -11,3 +11,12 @@ publish/
 **/supabase-credentials.json
 LocaLoca/Server/*
 !LocaLoca/Server/.gitkeep
+
+# Test output and local-only developer settings
+**/TestResults/
+TestResults/
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/appsettings.*.local.json
+**/secrets.json
+*.secret
