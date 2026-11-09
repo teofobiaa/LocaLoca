@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using LocaLoca.Api.Security;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -13,9 +15,12 @@ public sealed class PasswordHasherTests
         var first = PasswordHasher.Hash(password);
         var second = PasswordHasher.Hash(password);
 
-        Assert.NotEqual(password, first);
-        Assert.NotEqual(password, second);
-        Assert.NotEqual(first, second);
+        Assert.False(string.Equals(password, first, StringComparison.Ordinal),
+            "A password hash must not equal the original password.");
+        Assert.False(string.Equals(password, second, StringComparison.Ordinal),
+            "A password hash must not equal the original password.");
+        Assert.False(string.Equals(first, second, StringComparison.Ordinal),
+            "Independent hashes must use independent random salts.");
         Assert.True(PasswordHasher.Verify(password, first));
         Assert.True(PasswordHasher.Verify(password, second));
     }
@@ -105,6 +110,33 @@ public sealed class SessionStoreTests
         Assert.True(firstStore.TryGet(token, out var userId));
         Assert.Equal(7, userId);
         Assert.False(secondStore.TryGet(token, out _));
+    }
+
+    [Fact]
+    public void TryGet_Rejects_An_Expired_Session()
+    {
+        const string secret = "test-only-session-secret-value-longer-than-32";
+        var store = new SessionStore(CreateConfiguration(secret));
+        var payload = Encoding.UTF8.GetBytes(
+            $"42:{DateTimeOffset.UtcNow.AddMinutes(-1).ToUnixTimeSeconds()}");
+        var encodedPayload = Convert.ToBase64String(payload)
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        var signature = HMACSHA256.HashData(
+            Encoding.UTF8.GetBytes(secret),
+            Encoding.ASCII.GetBytes(encodedPayload));
+        var encodedSignature = Convert.ToBase64String(signature)
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+        Assert.False(store.TryGet($"{encodedPayload}.{encodedSignature}", out _));
+    }
+
+    [Fact]
+    public void TryGet_Rejects_A_Token_Signed_With_A_Different_Secret()
+    {
+        var first = new SessionStore(CreateConfiguration("test-only-session-secret-value-longer-than-32"));
+        var second = new SessionStore(CreateConfiguration("other-test-secret-value-longer-than-32"));
+
+        Assert.False(second.TryGet(first.Create(42), out _));
     }
 
     [Fact]
