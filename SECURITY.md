@@ -28,6 +28,12 @@ When reporting, include as much of the following information as possible:
 
 For Loca Loca, reports may concern the Windows desktop client, the per-device local ASP.NET Core API, Supabase PostgreSQL access, data or photo handling, installer scripts, and the project's GitHub Actions workflows. Please also indicate whether the issue requires local access or can be triggered remotely.
 
+The repository runs automated secret scanning on pull requests and pushes. Gitleaks scans the checked-out Git history with secret redaction enabled; its findings are reported without printing the matched secret value. Two narrow, documented allowlists cover only XAML palette resource names that contain hex color values and a historical Supabase `sb_publishable_` key format intended for public clients. They do not allow `sb_secret_`, `service_role`, database passwords, or arbitrary JWTs. This reduces accidental disclosure but cannot prove that every possible secret format is detectable.
+
+The historical publishable key is not a database password or a service-role secret and is no longer used by the current desktop client. Its public nature does not make an incorrectly configured Supabase Data API safe: table grants and row-level security must still be reviewed. A read-only check is available at [database/audits/check_supabase_data_api_access.sql](database/audits/check_supabase_data_api_access.sql).
+
+The automated unit, API, and database tests use synthetic data and disposable PostgreSQL containers with credentials generated at runtime. They must never read Render environment variables, use the production Supabase connection string, or require production credentials. Test results and local configuration files are excluded from version control.
+
 The Supabase PostgreSQL connection string and the session-signing secret are server-side secrets. For the deployed application, store them only in protected Render environment variables (`LOCA_DB_CONNECTION` and `LOCA_SESSION_SECRET`); never commit them or embed them in the installer or Windows client. The standard desktop client communicates with the hosted API over HTTPS and does not receive database credentials. In optional local-development mode, the local API can read a per-user `%LOCALAPPDATA%\LocaLoca\server-config.json` file whose password is protected with Windows DPAPI (`CurrentUser`). That file must not be shared or committed. Rotate any database password that has appeared in a commit, even if the current file no longer contains it.
 
 ### Response and Disclosure

@@ -1,0 +1,27 @@
+[extend]
+useDefault = true
+
+# WinUI theme resources use names derived from six-digit hex color values.
+# Match only this XAML resource-key pattern in this one file.
+[[allowlists]]
+description = "WinUI palette resource names are color constants, not credentials."
+paths = ['''LocaLoca/App\.xaml$''']
+regexTarget = "secret"
+regexes = [
+  '''^Palette_[A-Fa-f0-9]{6,8}$''',
+  '''^#[A-Fa-f0-9]{6,8}$''',
+]
+
+# This obsolete historical client configuration used a Supabase publishable
+# key (sb_publishable_), which is explicitly intended for public clients.
+# Do NOT extend this exception to sb_secret_, service_role, passwords or JWTs.
+[[allowlists]]
+description = "Known historical Supabase publishable key format; public by design and no longer used by the current client."
+paths = [
+  '''LocaLoca/MainWindow\.xaml\.cs$''',
+  '''Server/LocaLoca.Api/appsettings\.json$''',
+]
+regexTarget = "secret"
+regexes = [
+  '''^sb_publishable_[A-Za-z0-9_-]+$''',
+]

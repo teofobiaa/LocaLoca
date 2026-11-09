@@ -1,0 +1,80 @@
+name: Automated tests
+
+on:
+  push:
+    branches:
+      - main
+      - 'feature/**'
+      - 'refactor/**'
+    paths:
+      - 'Tests/**'
+      - 'Server/LocaLoca.Api/**'
+      - 'database/**'
+      - 'global.json'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Tests/**'
+      - 'Server/LocaLoca.Api/**'
+      - 'database/**'
+      - 'global.json'
+      - '.github/workflows/tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: automated-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests (no Docker)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Run unit tests
+        run: dotnet test Tests/LocaLoca.Tests/LocaLoca.Tests.csproj --configuration Release --verbosity minimal
+
+  api:
+    name: API integration tests (isolated PostgreSQL)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Run API integration tests
+        run: dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release --verbosity minimal
+
+  database:
+    name: PostgreSQL schema and migration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Run database tests
+        run: dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --configuration Release --verbosity minimal
