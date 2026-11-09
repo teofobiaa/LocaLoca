@@ -187,7 +187,7 @@ public sealed class ApiIntegrationTests
         using var upload = await ownerClient.PostAsync($"/api/me/visits/{visitId}/photos", form);
         Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
 
-        var photo = await upload.Content.ReadFromJsonAsync<PhotoResponse>();
+        var photo = await upload.Content.ReadFromJsonAsync<ApiTestPhotoResponse>();
         Assert.NotNull(photo);
         var photoId = photo!.Id;
 
@@ -224,7 +224,7 @@ public sealed class ApiIntegrationTests
             notes = ""
         });
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
-        var place = await create.Content.ReadFromJsonAsync<MapPlaceResponse>();
+        var place = await create.Content.ReadFromJsonAsync<ApiTestMapPlaceResponse>();
         Assert.NotNull(place);
         var placeId = place!.Id;
 
@@ -274,7 +274,7 @@ public sealed class ApiIntegrationTests
         });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        var auth = await response.Content.ReadFromJsonAsync<ApiTestAuthResponse>();
         Assert.NotNull(auth);
         Assert.False(string.IsNullOrWhiteSpace(auth!.Token));
 
@@ -299,7 +299,7 @@ public sealed class ApiIntegrationTests
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var result = await response.Content.ReadFromJsonAsync<VisitResponse>();
+        var result = await response.Content.ReadFromJsonAsync<ApiTestVisitResponse>();
         Assert.NotNull(result);
         return result!.Id;
     }
@@ -350,9 +350,10 @@ public sealed class ApiIntegrationTests
     }
 
     private sealed record TestAccount(string Login, string Password, string Token, int UserId);
-    private sealed record AuthResponse(UserResponse User, string Token);
-    private sealed record UserResponse(int Id, string Login, string DisplayName);
-    private sealed record VisitResponse(int Id, string Message);
-    private sealed record PhotoResponse(int Id, string FilePath, string Caption);
-    private sealed record MapPlaceResponse(int Id, string Message);
 }
+
+public sealed record ApiTestAuthResponse(ApiTestUserResponse User, string Token);
+public sealed record ApiTestUserResponse(int Id, string Login, string DisplayName);
+public sealed record ApiTestVisitResponse(int Id, string Message);
+public sealed record ApiTestPhotoResponse(int Id, string FilePath, string Caption);
+public sealed record ApiTestMapPlaceResponse(int Id, string Message);
