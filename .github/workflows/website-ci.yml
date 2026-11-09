@@ -1,0 +1,83 @@
+name: Website CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'Tests/Website/**'
+      - 'LocaLoca/Assets/**'
+      - '.github/workflows/website-ci.yml'
+      - '.github/workflows/pages.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'Tests/Website/**'
+      - 'LocaLoca/Assets/**'
+      - '.github/workflows/website-ci.yml'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static:
+    name: HTML, CSS and asset checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: Tests/Website/requirements.txt
+
+      - name: Install test dependencies
+        run: python -m pip install --requirement Tests/Website/requirements.txt
+
+      - name: Validate HTML, CSS, metadata and local links
+        run: python -m unittest discover -s Tests/Website -p "test_static.py" -v
+
+  browser:
+    name: Playwright Chromium and accessibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: Tests/Website/requirements.txt
+
+      - name: Set up Node.js for axe-core
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install test dependencies
+        run: python -m pip install --requirement Tests/Website/requirements.txt
+
+      - name: Install Chromium
+        run: python -m playwright install --with-deps chromium
+
+      - name: Install axe-core
+        run: npm install --prefix "$RUNNER_TEMP/axe" --no-save --no-package-lock axe-core@4.14.0
+
+      - name: Run browser and WCAG accessibility tests
+        env:
+          AXE_CORE_PATH: ${{ runner.temp }}/axe/node_modules/axe-core/axe.min.js
+        run: python -m unittest discover -s Tests/Website -p "test_browser.py" -v
