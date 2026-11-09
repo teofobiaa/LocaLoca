@@ -189,8 +189,9 @@ public sealed class ApiIntegrationTests
 
         var photo = await upload.Content.ReadFromJsonAsync<PhotoResponse>();
         Assert.NotNull(photo);
+        var photoId = photo!.Id;
 
-        using var ownerPhoto = await ownerClient.GetAsync($"/api/me/photos/{photo.Id}");
+        using var ownerPhoto = await ownerClient.GetAsync($"/api/me/photos/{photoId}");
         using var otherPhoto = await otherClient.GetAsync($"/api/me/photos/{photo.Id}");
 
         Assert.Equal(HttpStatusCode.OK, ownerPhoto.StatusCode);
@@ -225,8 +226,9 @@ public sealed class ApiIntegrationTests
         Assert.Equal(HttpStatusCode.OK, create.StatusCode);
         var place = await create.Content.ReadFromJsonAsync<MapPlaceResponse>();
         Assert.NotNull(place);
+        var placeId = place!.Id;
 
-        using var foreignUpdate = await otherClient.PutAsJsonAsync($"/api/me/map-places/{place.Id}", new
+        using var foreignUpdate = await otherClient.PutAsJsonAsync($"/api/me/map-places/{placeId}", new
         {
             name = "Attempted foreign edit",
             status = "planned",
@@ -274,7 +276,7 @@ public sealed class ApiIntegrationTests
 
         var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
         Assert.NotNull(auth);
-        Assert.False(string.IsNullOrWhiteSpace(auth.Token));
+        Assert.False(string.IsNullOrWhiteSpace(auth!.Token));
 
         return new TestAccount(login, password, auth.Token, auth.User.Id);
     }
@@ -299,7 +301,7 @@ public sealed class ApiIntegrationTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<VisitResponse>();
         Assert.NotNull(result);
-        return result.Id;
+        return result!.Id;
     }
 
     private async Task<string> ReadStoredPasswordHashAsync(string login)
