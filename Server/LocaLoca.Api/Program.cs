@@ -89,7 +89,7 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
             configuredHost.Equals("::1", StringComparison.OrdinalIgnoreCase) ||
             configuredHost.Equals("127.0.0.1", StringComparison.OrdinalIgnoreCase);
 
-        if (isLoopbackHost)
+        if (isLoopbackHost && !builder.Environment.IsEnvironment("Testing"))
         {
             connectionString = null;
             connectionConfigurationError =
@@ -97,6 +97,8 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
         }
         else
         {
+            // Testcontainers uses an ephemeral loopback-mapped PostgreSQL port.
+            // This exception is available only inside the isolated Testing host.
             connectionBuilder.Pooling = true;
             // Each desktop installation runs a local API process. Keep its
             // pool small when connecting through Supabase Pooler.
