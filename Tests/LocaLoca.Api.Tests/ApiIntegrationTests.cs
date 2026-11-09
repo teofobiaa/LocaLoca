@@ -198,6 +198,12 @@ public sealed class ApiIntegrationTests
         Assert.Equal("image/jpeg", ownerPhoto.Content.Headers.ContentType?.MediaType);
         Assert.Equal(jpegBytes, await ownerPhoto.Content.ReadAsByteArrayAsync());
         Assert.Equal(HttpStatusCode.NotFound, otherPhoto.StatusCode);
+
+        using var delete = await ownerClient.DeleteAsync($"/api/me/photos/{photoId}");
+        using var afterDelete = await ownerClient.GetAsync($"/api/me/photos/{photoId}");
+
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, afterDelete.StatusCode);
     }
 
     [Fact]
@@ -239,6 +245,54 @@ public sealed class ApiIntegrationTests
         });
 
         Assert.Equal(HttpStatusCode.NotFound, foreignUpdate.StatusCode);
+
+        using var ownerMarkersResponse = await ownerClient.GetAsync("/api/me/map-markers");
+        using var otherMarkersResponse = await otherClient.GetAsync("/api/me/map-markers");
+        var ownerMarkers = await ReadItemsAsync(ownerMarkersResponse);
+        var otherMarkers = await ReadItemsAsync(otherMarkersResponse);
+
+        Assert.Contains(ownerMarkers, item =>
+            item.TryGetProperty("userPlaceId", out var markerId) &&
+            markerId.ValueKind == JsonValueKind.Number &&
+            markerId.GetInt32() == placeId);
+        Assert.DoesNotContain(otherMarkers, item =>
+            item.TryGetProperty("userPlaceId", out var markerId) &&
+            markerId.ValueKind == JsonValueKind.Number &&
+            markerId.GetInt32() == placeId);
+    }
+
+    [Fact]
+    public async Task Owner_Can_Update_And_Delete_Their_Own_Visit()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        var visitId = await CreateVisitAsync(client);
+
+        using var update = await client.PutAsJsonAsync($"/api/me/visits/{visitId}", new
+        {
+            attractionId = _database.AttractionId,
+            visitDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-2)).ToString("yyyy-MM-dd"),
+            rating = 4,
+            impressions = "Updated by owner",
+            notes = "Owner update test"
+        });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+
+        using var afterUpdateResponse = await client.GetAsync("/api/me/visits");
+        var updatedItems = await ReadItemsAsync(afterUpdateResponse);
+        Assert.Contains(updatedItems, item =>
+            item.GetProperty("id").GetInt32() == visitId &&
+            item.GetProperty("rating").GetInt16() == 4);
+
+        using var delete = await client.DeleteAsync($"/api/me/visits/{visitId}");
+        using var afterDeleteResponse = await client.GetAsync("/api/me/visits");
+        var remainingItems = await ReadItemsAsync(afterDeleteResponse);
+
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.DoesNotContain(remainingItems, item => item.GetProperty("id").GetInt32() == visitId);
     }
 
     [Fact]
