@@ -97,13 +97,13 @@ class WebsiteBrowserTests(unittest.TestCase):
 
     def test_theme_toggle_is_accessible_and_persistent(self) -> None:
         self.page.add_init_script(
-            "localStorage.setItem('loca-loca-theme', 'light');"
+            "if (!localStorage.getItem('loca-loca-theme')) localStorage.setItem('loca-loca-theme', 'light');"
         )
         self.open_homepage()
 
         toggle = self.page.get_by_role(
             "button",
-            name="Переключить на тёмную тему",
+            name="Тёмная тема",
         )
         toggle.click()
 
@@ -114,7 +114,7 @@ class WebsiteBrowserTests(unittest.TestCase):
         self.assertEqual(
             self.page.get_by_role(
                 "button",
-                name="Переключить на светлую тему",
+                name="Светлая тема",
             ).get_attribute("aria-pressed"),
             "true",
         )
@@ -138,7 +138,7 @@ class WebsiteBrowserTests(unittest.TestCase):
 
         toggle = self.page.get_by_role(
             "button",
-            name="Переключить на тёмную тему",
+            name="Тёмная тема",
         )
         toggle.focus()
         self.page.keyboard.press("Enter")
@@ -220,7 +220,7 @@ class WebsiteBrowserTests(unittest.TestCase):
 
         self.page.get_by_role(
             "button",
-            name="Переключить на тёмную тему",
+            name="Тёмная тема",
         ).click()
         dark_violations = run_audit()
         self.assertEqual(
