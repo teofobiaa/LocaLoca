@@ -6,12 +6,15 @@ on:
       - main
       - 'feature/**'
       - 'refactor/**'
+      - 'security/**'
     paths:
       - 'Tests/**'
       - 'Server/LocaLoca.Api/**'
       - 'database/**'
       - 'global.json'
       - '.github/workflows/tests.yml'
+      - '.github/dependabot.yml'
+      - '.github/workflows/dependency-security.yml'
   pull_request:
     branches:
       - main
@@ -21,6 +24,8 @@ on:
       - 'database/**'
       - 'global.json'
       - '.github/workflows/tests.yml'
+      - '.github/dependabot.yml'
+      - '.github/workflows/dependency-security.yml'
   workflow_dispatch:
 
 permissions:
