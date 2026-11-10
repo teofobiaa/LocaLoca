@@ -583,7 +583,8 @@ a { color: inherit; }
 .record-meta b { font-size: 15px; }
 .record-meta .rating { color: #80551b; letter-spacing: 1px; }
 :root[data-theme="dark"] .record-meta .rating { color: #edc47e; }
-.rating span { color: var(--muted); font-size: 13px; letter-spacing: 0; }
+:root[data-theme="dark"] .record-meta .rating span { color: #bdcbbf; }
+.record-meta .rating span { color: #59685e; font-size: 13px; letter-spacing: 0; }
 .record-texts { display: grid; gap: 20px; }
 .record-texts p { margin: 6px 0 0; color: var(--text-body); font-size: 15px; line-height: 1.7; }
 .record-photos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 28px; }
