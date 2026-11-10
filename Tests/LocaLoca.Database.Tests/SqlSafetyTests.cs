@@ -37,13 +37,13 @@ public sealed class SqlSafetyTests
         {
             var sql = await File.ReadAllTextAsync(file);
             Assert.DoesNotMatch(
-                new Regex(@"(?i)\\b(?:postgres|postgresql)://[^\\s'"";]+"),
+                new Regex(@"(?i)\b(?:postgres|postgresql)://[^\s'"";]+"),
                 sql);
             Assert.DoesNotMatch(
-                new Regex(@"(?m)^\\s*\\(?:connect|c|!|include|i)\\b"),
+                new Regex(@"(?m)^\s*\(?:connect|c|!|include|i)\b"),
                 sql);
             Assert.DoesNotMatch(
-                new Regex(@"(?is)\\bCOPY\\b[\\s\\S]{0,300}\\bPROGRAM\\b"),
+                new Regex(@"(?is)\bCOPY\b[\s\S]{0,300}\bPROGRAM\b"),
                 sql);
         }
     }
