@@ -56,7 +56,7 @@ dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration R
 dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --configuration Release
 ```
 
-Тесты применяют актуальную схему и проверяют поведение PostgreSQL непосредственно.
+Тесты копируют все SQL-файлы `database/`, проверяют инвентарь и отсутствие внешних connection strings/psql-команд, затем применяют актуальную схему и миграции в одноразовой PostgreSQL 16. Проверяются foreign keys, индексы, CHECK/UNIQUE constraints, каскады и повторное выполнение миграций `03`, `04`, `06`, `07`.
 
 ## Изоляция и безопасная работа с данными
 
@@ -64,7 +64,7 @@ dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --confi
 - API test host получает строку подключения к созданному Testcontainers-контейнеру, случайный HMAC-секрет и отдельный временный каталог.
 - Loopback PostgreSQL разрешён только при `ASPNETCORE_ENVIRONMENT=Testing`; обычный режим приложения по-прежнему отвергает локальную PostgreSQL.
 - Логины и пароли тестовых пользователей синтетические; секреты не выводятся в логи.
-- Для проверки grants в Database-тестах используется временная роль `localoca_app` типа `NOLOGIN` без пароля. Скрипт `05_create_app_role.sql` с placeholder-паролем в автоматических тестах не запускается.
+- Database-тесты запускают `05_create_app_role.sql` только внутри одноразового PostgreSQL-контейнера, затем проверяют runtime-права и отсутствие административных привилегий. Этот скрипт не запускается в Supabase или иной внешней базе.
 - Тестовые контейнеры и временные каталоги удаляются после завершения.
 - CI jobs тестирования получают только необходимые права чтения репозитория; им не передаются production credentials.
 
