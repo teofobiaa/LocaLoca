@@ -40,7 +40,7 @@ public sealed class SqlSafetyTests
                 new Regex(@"(?i)\b(?:postgres|postgresql)://[^\s'"";]+"),
                 sql);
             Assert.DoesNotMatch(
-                new Regex(@"(?m)^\s*\(?:connect|c|!|include|i)\b"),
+                new Regex(@"(?m)^\s*\\(?:connect|c|!|include|i)\b"),
                 sql);
             Assert.DoesNotMatch(
                 new Regex(@"(?is)\bCOPY\b[\s\S]{0,300}\bPROGRAM\b"),
