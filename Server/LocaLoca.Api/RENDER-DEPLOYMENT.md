@@ -10,7 +10,7 @@
 - строка подключения Supabase Session Pooler для отдельной роли приложения `localoca_app.<project-ref>`;
 - возможность создать и безопасно хранить секрет подписи сессий.
 
-Blueprint описывает один Docker Web Service `localoca-api` на Free plan, проверку работоспособности через `/health` и автоматический деплой новых коммитов выбранной ветки.
+Blueprint описывает один Docker Web Service `localoca-api` на Free plan. Автоматический деплой коммитов отключён: публикацией управляет GitHub Actions после успешных .NET-тестов и сборки Docker-образа.
 
 ## Конфигурация секретов
 
@@ -43,6 +43,37 @@ Blueprint описывает один Docker Web Service `localoca-api` на Fre
 8. Скопируй публичный адрес сервиса вида `https://<service>.onrender.com` со страницы Overview.
 
 Render передаёт контейнеру переменную `PORT`. API слушает `0.0.0.0:$PORT`; локальный режим разработки использует `http://127.0.0.1:5181`.
+
+## GitHub Actions: CI/CD и автоматический деплой
+
+Workflow `.github/workflows/api-docker-build.yml` выполняет для pull request и push в поддерживаемые ветки:
+
+1. `dotnet restore Tests/LocaLoca.Tests.sln`;
+2. `dotnet build Server/LocaLoca.Api/LocaLoca.Api.csproj --configuration Release`;
+3. `dotnet test Tests/LocaLoca.Tests.sln` — unit-, API- и PostgreSQL integration tests (последние запускают изолированные PostgreSQL-контейнеры);
+4. сборку Docker-образа API без публикации в registry.
+
+Только push в `main`, прошедший оба CI job, запускает Render Deploy Hook. После запроса workflow ожидает, пока оба endpoint вернут HTTP 200: `/health` и `/ready`. Если проверка готовности БД не проходит в течение 10 минут, deploy job завершается ошибкой.
+
+### Однократная настройка GitHub
+
+В настройках репозитория открой **Settings → Secrets and variables → Actions → New repository secret** и добавь:
+
+| Secret | Значение |
+| --- | --- |
+| `RENDER_DEPLOY_HOOK` | URL Deploy Hook для сервиса `localoca-api` из Render → Settings |
+| `RENDER_SERVICE_URL` | Публичный URL сервиса, например `https://localoca-api.onrender.com` |
+
+Не добавляй эти URL в исходный код. Deploy Hook является секретом, поскольку любой обладатель URL может инициировать деплой.
+
+### Важные условия
+
+- В Render Blueprint должно быть применено `autoDeployTrigger: off`. Иначе Render сможет начать деплой до завершения GitHub CI.
+- Секреты `LOCA_DB_CONNECTION` и `LOCA_SESSION_SECRET` остаются только в переменных окружения Render.
+- `/health` проверяет доступность процесса API; `/ready` дополнительно проверяет соединение с PostgreSQL, схему и права runtime-роли.
+- Deploy Hook запускает сборку и деплой на стороне Render после успешного CI. GitHub Docker job отдельно проверяет, что Dockerfile собирается, но не отправляет образ в registry.
+- Pull request и push в feature-ветки проходят CI и Docker build, но не запускают production deploy.
+
 
 ## Проверка после деплоя
 
