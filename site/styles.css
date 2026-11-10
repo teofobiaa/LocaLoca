@@ -1,11 +1,8 @@
 :root {
   color-scheme: light;
   --ink: #202d25;
- site-redesign
   --muted: #5d6c62;
-=======
   --muted: #5f6c62;
- main
   --green: #1c6848;
   --green-deep: #123f30;
   --lime: #d5f08e;
@@ -15,14 +12,12 @@
   --surface-alt: #edf1e9;
   --line: #e0e6da;
   --text-strong: #293a2e;
- site-redesign
   --text-body: #3f4f44;
-  --text-subtle: #6f7d73;
-  --footer-text: #4f5f54;
+  --text-subtle: #59685e;
+  --footer-text: #45564a;
   --text-body: #45554a;
   --text-subtle: #58665b;
   --footer-text: #5f6c62;
- main
   --note-green-bg: #e9f4e7;
   --note-green: #2e7950;
   --note-warm-bg: #fff0e8;
@@ -54,8 +49,8 @@
   --line: #33443a;
   --text-strong: #dce8df;
   --text-body: #c4d3c8;
-  --text-subtle: #a2b2a6;
-  --footer-text: #adbcb0;
+  --text-subtle: #bdcbbf;
+  --footer-text: #c5d2c8;
   --note-green-bg: #293e31;
   --note-green: #a1d5a8;
   --note-warm-bg: #44342d;
@@ -446,7 +441,6 @@ a { color: inherit; }
 .note-heart { background: var(--note-warm-bg); color: var(--note-warm); }
 .note-top { top: 10px; left: 3px; }
 .note-bottom { bottom: 35px; right: -6px; }
- site-redesign
 
 /* ---------- О проекте ---------- */
 .about-layout { display: grid; grid-template-columns: .8fr 1.2fr; gap: 72px; align-items: center; }
@@ -573,7 +567,6 @@ a { color: inherit; }
   background: var(--surface);
   box-shadow: var(--shadow);
 }
- main
 .record-card-top { display: flex; align-items: center; justify-content: space-between; }
 .record-type, .data-label { color: var(--text-subtle); font-size: 11px; font-weight: 800; letter-spacing: 1.3px; }
 .visited-pill { padding: 6px 12px; border-radius: 50px; background: var(--note-green-bg); color: var(--note-green); font-size: 12px; font-weight: 800; }
@@ -588,7 +581,7 @@ a { color: inherit; }
 .record-meta > div { display: flex; flex-direction: column; gap: 6px; }
 .record-meta small, .record-texts small { color: var(--text-subtle); font-size: 11px; font-weight: 800; letter-spacing: 1px; }
 .record-meta b { font-size: 15px; }
-.record-meta .rating { color: #d79d46; letter-spacing: 1px; }
+.record-meta .rating { color: #65451f; color: #d79d46; letter-spacing: 1px; }
 .rating span { color: var(--muted); font-size: 13px; letter-spacing: 0; }
 .record-texts { display: grid; gap: 20px; }
 .record-texts p { margin: 6px 0 0; color: var(--text-body); font-size: 15px; line-height: 1.7; }
