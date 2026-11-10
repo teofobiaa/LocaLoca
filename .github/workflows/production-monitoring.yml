@@ -1,0 +1,92 @@
+name: Production Monitoring
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+    - cron: "0 8 * * *"
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: "Optional API base URL override"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-monitoring
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Check production services
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SITE_URL: ${{ vars.PRODUCTION_SITE_URL || 'https://teofobiaa.github.io/LocaLoca/' }}
+      API_URL: ${{ inputs.api_url || vars.PRODUCTION_API_URL || 'https://localoca-api.onrender.com' }}
+    steps:
+      - name: Validate monitoring configuration
+        shell: bash
+        run: |
+          if [[ -z "$API_URL" ]]; then
+            echo "::error::Set the repository variable PRODUCTION_API_URL to the public Render service URL."
+            exit 1
+          fi
+          echo "Monitoring site: $SITE_URL"
+          echo "Monitoring API: $API_URL"
+
+      - name: Check website, API liveness and database readiness
+        id: checks
+        shell: bash
+        run: |
+          set +e
+          failures=0
+          report="$RUNNER_TEMP/monitor-report.md"
+          echo "| Service | Endpoint | HTTP | Result |" > "$report"
+          echo "|---|---|---:|---|" >> "$report"
+
+          check() {
+            label="$1"
+            url="$2"
+            code="$(curl --location --silent --show-error --output /dev/null --write-out '%{http_code}' --connect-timeout 10 --max-time 25 --retry 2 --retry-delay 2 "$url" 2>/dev/null)"
+            rc=$?
+            if [[ $rc -eq 0 && "$code" =~ ^2[0-9][0-9]$ ]]; then
+              result="OK"
+            else
+              result="FAIL"
+              failures=$((failures + 1))
+              echo "::error::$label failed: $url (HTTP ${code:-000}, curl exit $rc)"
+            fi
+            echo "| $label | $url | ${code:-000} | $result |" >> "$report"
+          }
+
+          check "Website" "$SITE_URL"
+          check "API liveness" "${API_URL%/}/health"
+          check "API + PostgreSQL readiness" "${API_URL%/}/ready"
+
+          cat "$report" >> "$GITHUB_STEP_SUMMARY"
+          echo "failures=$failures" >> "$GITHUB_OUTPUT"
+          if [[ $failures -gt 0 ]]; then
+            echo "**Monitoring detected $failures failing check(s).**" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "**All production checks passed.**" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Daily service status report
+        if: always() && (github.event_name == 'schedule' && github.event.schedule == '0 8 * * *')
+        shell: bash
+        run: |
+          {
+            echo ""
+            echo "## Daily production status"
+            echo "- Date (UTC): $(date -u '+%Y-%m-%d %H:%M')"
+            echo "- Website: $SITE_URL"
+            echo "- API: $API_URL"
+            if [[ "${{ steps.checks.outputs.failures }}" == "0" ]]; then
+              echo "- Overall: HEALTHY"
+            else
+              echo "- Overall: DEGRADED — ${{ steps.checks.outputs.failures }} check(s) failed"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

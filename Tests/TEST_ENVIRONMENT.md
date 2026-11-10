@@ -45,13 +45,13 @@ Loopback PostgreSQL разрешён только в окружении `Testing
 
 ## Database integration tests
 
-Проект `Tests/LocaLoca.Database.Tests` поднимает отдельную PostgreSQL 16, загружает актуальную схему и проверяет constraints, foreign keys, каскады, миграции и runtime grants.
+Проект `Tests/LocaLoca.Database.Tests` поднимает отдельную PostgreSQL 16, загружает актуальную схему и проверяет SQL-инвентарь, ограничения, foreign keys, индексы, каскады, повторное выполнение миграций и least-privilege runtime grants. В CI копируются все SQL-файлы из `database/`; проверяются отсутствие внешних connection strings и psql-команд.
 
 ```powershell
 dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --configuration Release
 ```
 
-Для проверки grants временно создаётся роль `localoca_app` типа `NOLOGIN` без пароля. Скрипт `05_create_app_role.sql`, содержащий placeholder-пароль для реальной настройки, в автоматическом тесте не запускается.
+В изолированном контейнере выполняется `security/05_create_app_role.sql` с его безопасным placeholder-паролем, затем повторно применяются миграции `03`, `04`, `06` и `07`. Тест проверяет необходимые права роли и отсутствие административных атрибутов, `CREATE` на схему и доступа к `pg_read_all_data`. Скрипт не выполняется ни в какой внешней базе.
 
 ## CI
 
