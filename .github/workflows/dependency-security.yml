@@ -1,0 +1,86 @@
+name: Dependency and container security
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - 'security/**'
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nuget-audit:
+    name: NuGet vulnerability audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore with NuGet vulnerability audit
+        run: dotnet restore Tests/LocaLoca.Tests.sln -p:NuGetAudit=true -p:NuGetAuditLevel=low -p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904
+
+      - name: Report transitive package vulnerabilities
+        run: |
+          dotnet list Tests/LocaLoca.Tests.sln package --vulnerable --include-transitive
+
+  dependency-review:
+    name: Review dependency changes
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Review dependency diff
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: low
+          comment-summary-in-pr: always
+
+  docker-image:
+    name: Build and scan API container
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Server/LocaLoca.Api/Dockerfile
+          load: true
+          push: false
+          tags: localoca-api:security
+
+      - name: Scan image for OS and library vulnerabilities
+        uses: aquasecurity/trivy-action@0.35.0
+        with:
+          image-ref: localoca-api:security
+          scan-type: image
+          format: table
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
