@@ -24,7 +24,7 @@
   <link rel="icon" href="https://raw.githubusercontent.com/teofobiaa/LocaLoca/main/LocaLoca/Assets/loca-loca-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body id="top">
@@ -39,7 +39,7 @@
       <a href="#data">Данные</a>
       <a href="#install">Установка</a>
     </nav>
-    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Переключить на тёмную тему" aria-pressed="false">
+    <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false">
       <span class="theme-toggle-icon" aria-hidden="true">☾</span>
       <span class="theme-toggle-label">Тёмная тема</span>
     </button>
@@ -58,14 +58,14 @@
           </a>
           <a class="hero-link" href="#features">Посмотреть возможности <span aria-hidden="true">→</span></a>
         </div>
-        <div class="hero-facts" aria-label="Кратко о приложении">
+        <div class="hero-facts" role="group" aria-label="Кратко о приложении">
           <span><b>Windows 10 / 11</b><small>x64</small></span>
           <span><b>Личный аккаунт</b><small>Общие записи в облаке</small></span>
           <span><b>Интернет нужен</b><small>Для карты и синхронизации</small></span>
         </div>
       </div>
 
-      <div class="hero-visual" aria-label="Маскот Loca Loca с картой">
+      <div class="hero-visual" role="group" aria-label="Маскот Loca Loca с картой">
         <div class="visual-halo"></div>
         <div class="map-preview" aria-hidden="true">
           <div class="preview-top"><span>МОЯ КАРТА</span><span class="preview-status"><i></i> МОЯ КОЛЛЕКЦИЯ</span></div>
@@ -141,7 +141,7 @@
           <p>Вместо разрозненных заметок в телефоне — отдельная запись о месте. Отметь посещение, поставь оценку, запиши впечатления и прикрепи снимки.</p>
           <p class="record-caption">Ниже — пример состава записи, а не скриншот интерфейса приложения.</p>
         </div>
-        <div class="record-card" aria-label="Иллюстративный пример записи о месте">
+        <div class="record-card" role="group" aria-label="Иллюстративный пример записи о месте">
           <div class="record-card-top"><span class="record-type">ПРИМЕР ЗАПИСИ</span><span class="visited-pill"><i></i> Посещено</span></div>
           <div class="record-place">
             <div class="place-thumb"><span>⌖</span></div>
@@ -255,10 +255,6 @@
 
         if (toggle) {
           toggle.setAttribute("aria-pressed", String(isDark));
-          toggle.setAttribute(
-            "aria-label",
-            isDark ? "Переключить на светлую тему" : "Переключить на тёмную тему"
-          );
           toggle.querySelector(".theme-toggle-icon").textContent = isDark ? "☀" : "☾";
           toggle.querySelector(".theme-toggle-label").textContent = isDark
             ? "Светлая тема"
