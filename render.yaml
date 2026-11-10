@@ -4,7 +4,7 @@ services:
     runtime: docker
     plan: free
     # GitHub Actions triggers deployments only after API CI and Docker build pass.
-    autoDeployTrigger: off
+    autoDeployTrigger: "off"
     dockerfilePath: ./Server/LocaLoca.Api/Dockerfile
     dockerContext: .
     healthCheckPath: /health
