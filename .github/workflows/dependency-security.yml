@@ -75,7 +75,7 @@ jobs:
           tags: localoca-api:security
 
       - name: Scan image for OS and library vulnerabilities
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: localoca-api:security
           scan-type: image
