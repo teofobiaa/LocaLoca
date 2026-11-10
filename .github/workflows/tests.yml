@@ -6,6 +6,7 @@ on:
       - main
       - 'feature/**'
       - 'refactor/**'
+      - 'test/**'
     paths:
       - 'Tests/**'
       - 'Server/LocaLoca.Api/**'
