@@ -51,7 +51,7 @@ Workflow `.github/workflows/api-docker-build.yml` выполняет для pull
 1. `dotnet restore Tests/LocaLoca.Tests.sln`;
 2. `dotnet build Server/LocaLoca.Api/LocaLoca.Api.csproj --configuration Release`;
 3. `dotnet test Tests/LocaLoca.Tests.sln` — unit-, API- и PostgreSQL integration tests (последние запускают изолированные PostgreSQL-контейнеры);
-4. сборку Docker-образа API без публикации в registry.
+4. сборку Docker-образа API; при push в `main` или ручном запуске workflow из `main` — публикацию образа в GitHub Container Registry (`ghcr.io/teofobiaa/localoca-api`) с тегами `latest` и коротким SHA коммита.
 
 Только push в `main`, прошедший оба CI job, запускает Render Deploy Hook. После запроса workflow ожидает, пока оба endpoint вернут HTTP 200: `/health` и `/ready`. Если проверка готовности БД не проходит в течение 10 минут, deploy job завершается ошибкой.
 
@@ -71,7 +71,7 @@ Workflow `.github/workflows/api-docker-build.yml` выполняет для pull
 - В Render Blueprint должно быть применено `autoDeployTrigger: off`. Иначе Render сможет начать деплой до завершения GitHub CI.
 - Секреты `LOCA_DB_CONNECTION` и `LOCA_SESSION_SECRET` остаются только в переменных окружения Render.
 - `/health` проверяет доступность процесса API; `/ready` дополнительно проверяет соединение с PostgreSQL, схему и права runtime-роли.
-- Deploy Hook запускает сборку и деплой на стороне Render после успешного CI. GitHub Docker job отдельно проверяет, что Dockerfile собирается, но не отправляет образ в registry.
+- GitHub Actions публикует Docker-образ в GHCR только после успешных .NET-тестов и только для `main`; pull request и feature-ветки выполняют проверочную сборку без публикации. Для push используется встроенный `GITHUB_TOKEN` с правом `packages: write`.
 - Pull request и push в feature-ветки проходят CI и Docker build, но не запускают production deploy.
 
 
@@ -126,6 +126,16 @@ https://<service>.onrender.com/ready
 ```powershell
 [Environment]::SetEnvironmentVariable("LOCA_API_BASE_URL", $null, "User")
 ```
+
+## Публикуемый Docker-пакет GHCR
+
+После успешного workflow образ доступен в [GitHub Packages](https://github.com/teofobiaa/LocaLoca/packages) как `ghcr.io/teofobiaa/localoca-api`. Для загрузки:
+
+```powershell
+docker pull ghcr.io/teofobiaa/localoca-api:latest
+```
+
+Для приватного пакета сначала выполни `docker login ghcr.io`; для публичного пакета вход не требуется. Видимость пакета (Public/Private) настраивается в настройках самого пакета GitHub.
 
 ## Локальная проверка Docker-образа
 
