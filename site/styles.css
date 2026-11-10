@@ -13,8 +13,8 @@
   --line: #e0e6da;
   --text-strong: #293a2e;
   --text-body: #3f4f44;
-  --text-subtle: #59685e;
-  --footer-text: #45564a;
+  --text-subtle: #58665b;
+  --footer-text: #4b5c50;
   --text-body: #45554a;
   --text-subtle: #58665b;
   --footer-text: #5f6c62;
@@ -581,7 +581,8 @@ a { color: inherit; }
 .record-meta > div { display: flex; flex-direction: column; gap: 6px; }
 .record-meta small, .record-texts small { color: var(--text-subtle); font-size: 11px; font-weight: 800; letter-spacing: 1px; }
 .record-meta b { font-size: 15px; }
-.record-meta .rating { color: #65451f; color: #d79d46; letter-spacing: 1px; }
+.record-meta .rating { color: #80551b; letter-spacing: 1px; }
+:root[data-theme="dark"] .record-meta .rating { color: #edc47e; }
 .rating span { color: var(--muted); font-size: 13px; letter-spacing: 0; }
 .record-texts { display: grid; gap: 20px; }
 .record-texts p { margin: 6px 0 0; color: var(--text-body); font-size: 15px; line-height: 1.7; }
