@@ -106,6 +106,12 @@
 }
 :root[data-theme="dark"] .support-link small { color: #b0bfb4; }
 
+:root[data-theme="dark"] .floating-note {
+  background: #1b2922;
+  color: #e5eee7;
+}
+:root[data-theme="dark"] .floating-note small { color: #bdcbbf; }
+
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 88px; }
 body {
