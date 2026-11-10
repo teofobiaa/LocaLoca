@@ -110,6 +110,8 @@
   background: #1b2922;
   color: #e5eee7;
 }
+:root[data-theme="dark"] .floating-note > span:last-child,
+:root[data-theme="dark"] .floating-note b { color: #e5eee7; }
 :root[data-theme="dark"] .floating-note small { color: #bdcbbf; }
 
 * { box-sizing: border-box; }
