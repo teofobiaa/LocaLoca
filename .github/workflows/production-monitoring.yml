@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 5
     env:
       SITE_URL: ${{ vars.PRODUCTION_SITE_URL || 'https://teofobiaa.github.io/LocaLoca/' }}
-      API_URL: ${{ inputs.api_url || vars.PRODUCTION_API_URL }}
+      API_URL: ${{ inputs.api_url || vars.PRODUCTION_API_URL || 'https://localoca-api.onrender.com' }}
     steps:
       - name: Validate monitoring configuration
         shell: bash
