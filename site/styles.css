@@ -63,7 +63,48 @@
   --acc-warm: #ebbf9c;
   --acc-blue: #b9c4ee;
   --shadow: 0 22px 55px rgba(0, 0, 0, .32);
+
 }
+
+/*
+ * Keep the dark-theme text palette explicit on the components that carry
+ * their own foreground colors. This protects contrast even when a component
+ * does not inherit the page-level text color.
+ */
+:root[data-theme="dark"] .brand { color: #e5eee7; }
+:root[data-theme="dark"] .brand b { color: #91c99d; }
+
+:root[data-theme="dark"] .main-nav a { color: #b0bfb4; }
+:root[data-theme="dark"] .main-nav a:hover,
+:root[data-theme="dark"] .main-nav a[aria-current="true"] {
+  color: #91c99d;
+  background: #293e31;
+}
+
+:root[data-theme="dark"] .fcard h3 { color: #dce8df; }
+:root[data-theme="dark"] .fcard p { color: #c4d3c8; }
+:root[data-theme="dark"] .fc-green .fcard-tag,
+:root[data-theme="dark"] .fc-green .chips span { color: #a9dcb0; }
+:root[data-theme="dark"] .fc-warm .fcard-tag,
+:root[data-theme="dark"] .fc-warm .chips span { color: #ebbf9c; }
+:root[data-theme="dark"] .fc-blue .fcard-tag,
+:root[data-theme="dark"] .fc-blue .chips span { color: #b9c4ee; }
+
+:root[data-theme="dark"] .button-green {
+  background: #d5f08e;
+  color: #183d2b;
+}
+:root[data-theme="dark"] #copyMail {
+  background: #1b2922;
+  color: #e5eee7;
+  border-color: #33443a;
+}
+
+:root[data-theme="dark"] .support-link {
+  background: #1b2922;
+  color: #e5eee7;
+}
+:root[data-theme="dark"] .support-link small { color: #b0bfb4; }
 
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: 88px; }
