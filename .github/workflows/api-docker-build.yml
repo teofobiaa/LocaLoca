@@ -111,11 +111,19 @@ jobs:
           ready_ok=false
 
           for attempt in $(seq 1 40); do
-            health_code=$(curl --connect-timeout 10 --max-time 20 --silent --show-error \
-              --output /tmp/health.json --write-out '%{http_code}' "$base_url/health" || true)
-            ready_code=$(curl --connect-timeout 10 --max-time 20 --silent --show-error \
-              --output /tmp/ready.json --write-out '%{http_code}' "$base_url/ready" || true)
+            curl --connect-timeout 5 --max-time 8 --silent \
+              --output /tmp/health.json --write-out '%{http_code}' "$base_url/health" \
+              > /tmp/health.code 2>/dev/null &
+            health_pid=$!
+            curl --connect-timeout 5 --max-time 8 --silent \
+              --output /tmp/ready.json --write-out '%{http_code}' "$base_url/ready" \
+              > /tmp/ready.code 2>/dev/null &
+            ready_pid=$!
+            wait "$health_pid" || true
+            wait "$ready_pid" || true
 
+            health_code=$(cat /tmp/health.code 2>/dev/null || true)
+            ready_code=$(cat /tmp/ready.code 2>/dev/null || true)
             if [ "$health_code" = "200" ] && [ "$ready_code" = "200" ]; then
               health_ok=true
               ready_ok=true
@@ -123,11 +131,11 @@ jobs:
             fi
 
             echo "Smoke test attempt $attempt/40: /health=$health_code, /ready=$ready_code"
-            sleep 15
+            sleep 10
           done
 
           if [ "$health_ok" != "true" ] || [ "$ready_ok" != "true" ]; then
-            echo "::error::Render deployment did not pass /health and /ready within 10 minutes."
+            echo "::error::Render deployment did not pass /health and /ready within approximately 12 minutes."
             echo "Last /health response:"
             cat /tmp/health.json 2>/dev/null || true
             echo
