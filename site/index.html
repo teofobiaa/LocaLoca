@@ -43,7 +43,7 @@
         <a href="#support">Поддержка</a>
       </nav>
       <div class="topbar-actions">
-        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Переключить тему" aria-pressed="false">
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Тёмная тема" aria-pressed="false">
           <span class="theme-toggle-icon" aria-hidden="true">☾</span>
           <span class="sr-only theme-toggle-label">Тёмная тема</span>
         </button>
@@ -129,7 +129,7 @@
         <li class="route-step"><span class="route-node">4</span><h3>Допиши историю</h3><p>Дата, оценка, впечатления, заметки и фотографии складываются в одну запись.</p></li>
       </ol>
       <div class="record-block"><div class="record-intro"><span class="eyebrow">ЗАПИСЬ О МЕСТЕ</span><h3>Что остаётся после четвёртого шага</h3><p>Так выглядит заполненная запись о посещении. Место и текст в примере придуманы, а набор полей такой же, как в приложении.</p></div>
-        <div class="record-card" aria-label="Пример записи о посещении с вымышленными данными">
+        <div class="record-card" role="group" aria-label="Пример записи о посещении с вымышленными данными">
           <img class="record-mascot" src="assets/mascot-thumbs-up.webp" alt="" width="305" height="328" loading="lazy">
           <div class="record-card-top"><span class="record-type">ПРИМЕР ЗАПИСИ</span><span class="visited-pill"><i></i> Посещено</span></div>
           <div class="record-body"><div class="record-main"><div class="record-place"><div class="place-thumb" aria-hidden="true">⌖</div><div><h4>Старый город</h4><p>Прага · Чехия</p></div></div>
@@ -146,7 +146,7 @@
         <article class="principle"><span class="principle-number">01</span><div><h3>Карта в центре</h3><p>Каталог, списки и записи нужны, чтобы наполнять карту. Она остаётся главным экраном дневника.</p></div></article>
         <article class="principle"><span class="principle-number">02</span><div><h3>Бумага и заметки</h3><p>Записи оформлены как карточки: светлые поверхности, крупные заголовки, мягкие тени и минимум служебных элементов.</p></div></article>
         <article class="principle"><span class="principle-number">03</span><div><h3>Спутник в панаме</h3><p>Маскот-путешественник встречает в приложении и на сайте. Он ищет, снимает, записывает и радуется поездкам.</p></div></article>
-      </div><div class="palette" aria-label="Цвета проекта">
+      </div><div class="palette" role="group" aria-label="Цвета проекта">
         <div class="swatch sw-green"><i></i><b>Лесной зелёный</b><small>основной цвет, карта и маршруты</small></div><div class="swatch sw-deep"><i></i><b>Тёмная хвоя</b><small>глубина и акцентные блоки</small></div><div class="swatch sw-lime"><i></i><b>Лайм</b><small>главные кнопки и акценты</small></div><div class="swatch sw-warm"><i></i><b>Песочный</b><small>планы и заметки</small></div>
       </div></div>
       <ul class="moods" aria-label="Маскот в разных ситуациях">
@@ -212,7 +212,7 @@
         const isDark = normalized === "dark";
         if (toggle) {
           toggle.setAttribute("aria-pressed", String(isDark));
-          toggle.setAttribute("aria-label", isDark ? "Переключить на светлую тему" : "Переключить на тёмную тему");
+          toggle.setAttribute("aria-label", isDark ? "Светлая тема" : "Тёмная тема");
           toggle.querySelector(".theme-toggle-icon").textContent = isDark ? "☀" : "☾";
           toggle.querySelector(".theme-toggle-label").textContent = isDark ? "Светлая тема" : "Тёмная тема";
         }
