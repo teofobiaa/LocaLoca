@@ -382,7 +382,7 @@
                                         <StackPanel Spacing="10">
                                             <TextBlock Text="Электронная почта" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
                                             <TextBlock Text="Для вопросов и обратной связи" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
-                                            <HyperlinkButton Content="teofobia@outlook.com" NavigateUri="mailto:teofobia@outlook.com" Foreground="{ThemeResource AccentDarkBrush}" HorizontalAlignment="Left" Padding="0" />
+                                            <HyperlinkButton Content="teofobia@proton.me" NavigateUri="mailto:teofobia@proton.me" Foreground="{ThemeResource AccentDarkBrush}" HorizontalAlignment="Left" Padding="0" />
                                         </StackPanel>
                                     </Border>
                                     <Border Grid.Column="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">

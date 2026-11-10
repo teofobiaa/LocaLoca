@@ -4,8 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#f7f8f2">
-  <meta name="description" content="Loca Loca — приложение для Windows, в котором можно собирать личную карту мест, планировать посещения и хранить заметки о поездках.">
-  <title>Loca Loca — личная карта твоих путешествий</title>
+  <meta name="description" content="Loca Loca — дневник путешествий для Windows: каталог достопримечательностей, личная карта мест, оценки, заметки и фотографии. Записи синхронизируются между компьютерами через аккаунт.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Loca Loca — дневник путешествий для Windows">
+  <meta property="og:description" content="Каталог достопримечательностей, личная карта, оценки, заметки и фотографии в одном приложении.">
+  <meta property="og:image" content="https://teofobiaa.github.io/LocaLoca/assets/icon.png">
+  <meta property="og:url" content="https://teofobiaa.github.io/LocaLoca/">
+  <title>Loca Loca — дневник путешествий для Windows</title>
   <script>
     (() => {
       const root = document.documentElement;
@@ -21,213 +26,458 @@
         : (prefersDark ? "dark" : "light");
     })();
   </script>
-  <link rel="icon" href="https://raw.githubusercontent.com/teofobiaa/LocaLoca/main/LocaLoca/Assets/loca-loca-icon.png">
+  <link rel="icon" href="assets/icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body id="top">
-  <header class="topbar">
-    <a class="brand" href="#top" aria-label="Loca Loca — на главную">
-      <img src="https://raw.githubusercontent.com/teofobiaa/LocaLoca/main/LocaLoca/Assets/loca-loca-icon.png" alt="">
-      <span>Loca <b>Loca</b></span>
-    </a>
-    <nav class="main-nav" aria-label="Основная навигация">
-      <a href="#features">Возможности</a>
-      <a href="#workflow">Как работает</a>
-      <a href="#data">Данные</a>
-      <a href="#install">Установка</a>
-    </nav>
-    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Переключить на тёмную тему" aria-pressed="false">
-      <span class="theme-toggle-icon" aria-hidden="true">☾</span>
-      <span class="theme-toggle-label">Тёмная тема</span>
-    </button>
-    <a class="nav-download" href="https://github.com/teofobiaa/LocaLoca/releases/download/latest/LocaLoca-Setup.exe">Скачать <span aria-hidden="true">↗</span></a>
+  <a class="skip-link" href="#main">К содержимому</a>
+
+  <header class="topbar-wrap" id="siteHeader">
+    <div class="topbar">
+      <a class="brand" href="#top" aria-label="Loca Loca — на главную">
+        <img src="assets/icon.png" alt="" width="36" height="36">
+        <span>Loca <b>Loca</b></span>
+      </a>
+      <nav class="main-nav" aria-label="Основная навигация">
+        <a href="#about">О проекте</a>
+        <a href="#features">Возможности</a>
+        <a href="#how">Как это работает</a>
+        <a href="#data">Данные</a>
+        <a href="#install">Установка</a>
+        <a href="#support">Поддержка</a>
+      </nav>
+      <div class="topbar-actions">
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Переключить на тёмную тему" aria-pressed="false">
+          <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+          <span class="sr-only theme-toggle-label">Тёмная тема</span>
+        </button>
+        <a class="nav-download" href="https://github.com/teofobiaa/LocaLoca/releases/download/latest/LocaLoca-Setup.exe">Скачать</a>
+        <details class="mobile-menu" id="mobileMenu">
+          <summary aria-label="Открыть меню"><span class="burger" aria-hidden="true"></span></summary>
+          <nav class="mobile-nav" aria-label="Меню для телефона">
+            <a href="#about">О проекте</a>
+            <a href="#features">Возможности</a>
+            <a href="#how">Как это работает</a>
+            <a href="#design">Визуальная концепция</a>
+            <a href="#data">Данные</a>
+            <a href="#install">Установка</a>
+            <a href="#support">Поддержка</a>
+          </nav>
+        </details>
+      </div>
+    </div>
   </header>
 
-  <main>
+  <main id="main">
     <section class="hero wrap">
       <div class="hero-copy">
-        <div class="eyebrow eyebrow-light"><span class="live-dot"></span> ЛИЧНАЯ КАРТА ПУТЕШЕСТВИЙ ДЛЯ WINDOWS</div>
+        <div class="eyebrow eyebrow-light"><span class="live-dot"></span> ДНЕВНИК ПУТЕШЕСТВИЙ ДЛЯ WINDOWS</div>
         <h1>Места, которые хочется <em>запомнить.</em></h1>
-        <p class="hero-lead">Loca Loca собирает твои поездки в одном месте. Сохраняй интересные локации, отмечай посещённые, добавляй даты, оценки, заметки и фотографии.</p>
+        <p class="hero-lead">Loca Loca превращает поездки в личную карту. Находи достопримечательности в каталоге, отмечай посещённые, а к каждому месту добавляй дату, оценку, заметку и фотографии.</p>
         <div class="hero-actions">
           <a class="button button-lime" href="https://github.com/teofobiaa/LocaLoca/releases/download/latest/LocaLoca-Setup.exe">
             <span aria-hidden="true">↓</span> Скачать для Windows
           </a>
-          <a class="hero-link" href="#features">Посмотреть возможности <span aria-hidden="true">→</span></a>
+          <a class="hero-link" href="#how">Как это работает <span aria-hidden="true">→</span></a>
         </div>
         <div class="hero-facts" aria-label="Кратко о приложении">
-          <span><b>Windows 10 / 11</b><small>x64</small></span>
-          <span><b>Личный аккаунт</b><small>Общие записи в облаке</small></span>
-          <span><b>Интернет нужен</b><small>Для карты и синхронизации</small></span>
+          <span><b>Windows 10 и 11</b><small>64-бит</small></span>
+          <span><b>Каталог из 19 стран</b><small>и свои точки на карте</small></span>
+          <span><b>Код на GitHub</b><small>репозиторий публичный</small></span>
         </div>
       </div>
 
-      <div class="hero-visual" aria-label="Маскот Loca Loca с картой">
+      <div class="hero-visual" role="img" aria-label="Зелёный маскот-путешественник Loca Loca держит карту">
         <div class="visual-halo"></div>
         <div class="map-preview" aria-hidden="true">
-          <div class="preview-top"><span>МОЯ КАРТА</span><span class="preview-status"><i></i> МОЯ КОЛЛЕКЦИЯ</span></div>
+          <div class="preview-top"><span>МОЯ КАРТА</span><span class="preview-status"><i></i> 2 ПОСЕЩЕНО · 1 В ПЛАНАХ</span></div>
           <div class="map-lines"></div>
-          <span class="map-pin pin-a">●</span>
-          <span class="map-pin pin-b">●</span>
-          <span class="map-pin pin-c">●</span>
+          <span class="map-pin pin-a"></span>
+          <span class="map-pin pin-b"></span>
+          <span class="map-pin pin-c"></span>
           <div class="map-label label-a">Старый город</div>
           <div class="map-label label-b">Парк</div>
           <div class="map-label label-c">Музей</div>
           <div class="map-legend"><span><i class="legend-visited"></i> Посещено</span><span><i class="legend-wish"></i> В планах</span></div>
         </div>
-        <img class="hero-mascot" src="https://raw.githubusercontent.com/teofobiaa/LocaLoca/main/LocaLoca/Assets/Mascot/mascot-map.png" alt="Зелёный маскот-путешественник Loca Loca держит карту">
-        <div class="floating-note note-top"><span class="note-icon note-pin">⌖</span><span><b>Свои места</b><small>На одной карте</small></span></div>
-        <div class="floating-note note-bottom"><span class="note-icon note-heart">♡</span><span><b>Новые планы</b><small>В списке желаний</small></span></div>
+        <img class="hero-mascot" src="assets/mascot-map.webp" alt="" width="331" height="344">
+        <div class="floating-note note-top" aria-hidden="true">
+          <span class="note-icon note-pin"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg></span>
+          <span><b>Свои места</b><small>рядом с каталогом</small></span>
+        </div>
+        <div class="floating-note note-bottom" aria-hidden="true">
+          <span class="note-icon note-heart"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></span>
+          <span><b>Хочу посетить</b><small>отдельный список</small></span>
+        </div>
       </div>
     </section>
 
-    <section class="workflow-strip wrap" id="workflow" aria-label="Как устроена работа с приложением">
-      <div class="strip-intro"><span class="eyebrow">ПРОСТОЙ СЦЕНАРИЙ</span><h2>От идеи до воспоминания</h2></div>
-      <div class="strip-step"><span class="step-number">01</span><div><b>Найди место</b><p>В каталоге или на карте.</p></div></div>
-      <div class="strip-step"><span class="step-number">02</span><div><b>Сохрани или отметь</b><p>В планах или посещениях.</p></div></div>
-      <div class="strip-step"><span class="step-number">03</span><div><b>Добавь детали</b><p>Дату, оценку, заметку и фото.</p></div></div>
+    <section class="section wrap" id="about">
+      <div class="about-layout">
+        <div class="about-art" aria-hidden="true">
+          <div class="about-blob"></div>
+          <img src="assets/mascot-binoculars.webp" alt="" width="304" height="329">
+        </div>
+        <div class="about-copy">
+          <span class="eyebrow">О ПРОЕКТЕ</span>
+          <h2>Дневник, карта и список желаний <em>в одном приложении</em></h2>
+          <p>Поездки обычно рассыпаются по телефону: адреса лежат в закладках, впечатления — в заметках, фотографии — в галерее, а список «хочу туда» живёт в голове. Loca Loca собирает всё это вокруг самого места: у каждой достопримечательности и у каждой собственной точки на карте появляется своя запись.</p>
+          <p>Приложение не строит маршруты и не продаёт билеты. Его задача проще: чтобы через год можно было открыть карту и вспомнить, где ты был, что понравилось и куда ещё собирался.</p>
+        </div>
+      </div>
+
+      <div class="goals-head">
+        <span class="eyebrow">КЛЮЧЕВЫЕ ЗАДАЧИ</span>
+        <h3>Что приложение должно делать хорошо</h3>
+      </div>
+      <div class="goals">
+        <article class="goal">
+          <span class="goal-number">01</span>
+          <h4>Собрать места в одну коллекцию</h4>
+          <p>Готовый каталог достопримечательностей плюс собственные точки для всего, чего в каталоге нет.</p>
+        </article>
+        <article class="goal">
+          <span class="goal-number">02</span>
+          <h4>Не смешивать планы и воспоминания</h4>
+          <p>Список «Хочу посетить» хранится отдельно от посещённых мест, поэтому сразу видно, что уже было, а что только впереди.</p>
+        </article>
+        <article class="goal">
+          <span class="goal-number">03</span>
+          <h4>Сохранить впечатление целиком</h4>
+          <p>В одной записи лежат дата, оценка от 1 до 5, впечатления, заметки и фотографии, и ничего не нужно искать в разных местах.</p>
+        </article>
+        <article class="goal">
+          <span class="goal-number">04</span>
+          <h4>Открываться на любом компьютере</h4>
+          <p>Данные привязаны к аккаунту, а не к одному устройству: войди на другом ПК, и коллекция будет на месте.</p>
+        </article>
+      </div>
     </section>
 
-    <section class="section wrap" id="features">
+    <section class="section wrap features" id="features">
       <div class="section-heading">
-        <div><span class="eyebrow">ЧТО УМЕЕТ LOCA LOCA</span><h2>Не просто список мест.<br><em>Твоя история поездок.</em></h2></div>
-        <p>Функции собраны вокруг трёх задач: находить, фиксировать и возвращаться к уже пережитому.</p>
+        <div><span class="eyebrow">ВОЗМОЖНОСТИ</span><h2>Всё для дневника, <em>ничего лишнего</em></h2></div>
+        <p>Шесть частей приложения, из которых складывается личная карта путешествий.</p>
       </div>
-      <div class="feature-groups">
-        <article class="feature-group group-plan">
-          <div class="group-number">01 / ПЛАНИРУЙ</div>
-          <div class="group-icon">⌖</div>
-          <h3>Собирай места в коллекцию</h3>
-          <p>Сохраняй идеи для будущих поездок и отмечай собственные точки, которых нет в каталоге.</p>
-          <ul>
-            <li>Каталог достопримечательностей с поиском и фильтрами</li>
-            <li>Список «Хочу посетить»</li>
-            <li>Личные точки на карте</li>
-          </ul>
+
+      <div class="feature-grid">
+        <article class="fcard fc-green">
+          <div class="fcard-art"><img src="assets/mascot-binoculars.webp" alt="" width="304" height="329" loading="lazy"></div>
+          <div class="fcard-body">
+            <span class="fcard-tag">КАТАЛОГ</span>
+            <h3>Достопримечательности с историей</h3>
+            <p>Поиск по названию места, города или страны и выбор категории. У каждого места есть описание и краткая история, их удобно прочитать до поездки или после неё.</p>
+            <div class="chips"><span>7 категорий</span><span>19 стран</span><span>описание и история</span></div>
+          </div>
         </article>
-        <article class="feature-group group-record">
-          <div class="group-number">02 / ФИКСИРУЙ</div>
-          <div class="group-icon">✎</div>
-          <h3>Запоминай детали посещения</h3>
-          <p>У каждой записи остаётся контекст: когда ты был в месте и какое впечатление оно оставило.</p>
-          <ul>
-            <li>Дата посещения и личная оценка</li>
-            <li>Заметки и впечатления</li>
-            <li>Фотографии к посещениям и своим точкам</li>
-          </ul>
+
+        <article class="fcard fc-warm">
+          <div class="fcard-art"><img src="assets/mascot-thinking.webp" alt="" width="274" height="321" loading="lazy"></div>
+          <div class="fcard-body">
+            <span class="fcard-tag">ПЛАНЫ</span>
+            <h3>Список «Хочу посетить»</h3>
+            <p>Сохраняй идеи для будущих поездок отдельно от посещённых мест. Съездил — добавь посещение, а ненужную идею можно убрать из списка.</p>
+            <div class="chips"><span>отдельный список</span><span>добавление из каталога</span><span>можно убрать</span></div>
+          </div>
         </article>
-        <article class="feature-group group-review">
-          <div class="group-number">03 / ВОЗВРАЩАЙСЯ</div>
-          <div class="group-icon">▦</div>
-          <h3>Смотри на свою географию</h3>
-          <p>Открывай карту и статистику, чтобы видеть, сколько мест уже стало частью твоей истории.</p>
-          <ul>
-            <li>Карта каталога и личных отметок</li>
-            <li>Разделение планов и посещённых мест</li>
-            <li>Статистика личной коллекции</li>
-          </ul>
+
+        <article class="fcard fc-blue">
+          <div class="fcard-art"><img src="assets/mascot-note.webp" alt="" width="303" height="323" loading="lazy"></div>
+          <div class="fcard-body">
+            <span class="fcard-tag">ПОСЕЩЕНИЯ</span>
+            <h3>Запись о каждом визите</h3>
+            <p>Дата, оценка по пятибалльной шкале, впечатления и заметки. Записи можно открыть, отредактировать или удалить, когда захочется что-то поправить.</p>
+            <div class="chips"><span>оценка 1–5</span><span>впечатления и заметки</span><span>редактирование</span></div>
+          </div>
         </article>
+
+        <article class="fcard fc-warm">
+          <div class="fcard-art"><img src="assets/mascot-camera.webp" alt="" width="318" height="325" loading="lazy"></div>
+          <div class="fcard-body">
+            <span class="fcard-tag">ФОТО</span>
+            <h3>Фотографии к местам</h3>
+            <p>Прикрепляй снимки к посещениям и к собственным точкам. Они хранятся в облаке вместе с записью, поэтому не пропадут при смене компьютера.</p>
+            <div class="chips"><span>JPG, PNG, WebP, BMP, GIF</span><span>хранятся в облаке</span></div>
+          </div>
+        </article>
+
+        <article class="fcard fc-blue">
+          <div class="fcard-art"><img src="assets/mascot-map.webp" alt="" width="331" height="344" loading="lazy"></div>
+          <div class="fcard-body">
+            <span class="fcard-tag">СВОИ ТОЧКИ</span>
+            <h3>Места, которых нет в каталоге</h3>
+            <p>Кофейня во дворе, смотровая за городом, дача друзей. Поставь собственную точку и заполни её так же подробно, как любое место из каталога.</p>
+            <div class="chips"><span>статус: план или посещено</span><span>дата и оценка</span><span>заметки и фото</span></div>
+          </div>
+        </article>
+
+        <article class="fcard fc-green">
+          <div class="fcard-art"><img src="assets/mascot-celebrate.webp" alt="" width="337" height="343" loading="lazy"></div>
+          <div class="fcard-body">
+            <span class="fcard-tag">КАРТА И ЦИФРЫ</span>
+            <h3>Вся география на одном экране</h3>
+            <p>Коллекция показана на карте целиком. На главном экране считаются места, города и страны, а также посещения и загруженные фотографии.</p>
+            <div class="chips"><span>карта коллекции</span><span>города и страны</span><span>посещения и фото</span></div>
+          </div>
+        </article>
+      </div>
+
+      <div class="extras">
+        <span class="extras-label">А ещё в приложении</span>
+        <span>имя профиля на главном экране</span>
+        <span>светлая и тёмная темы</span>
+        <span>страница поддержки внутри приложения</span>
       </div>
     </section>
 
-    <section class="record-section">
-      <div class="wrap record-layout">
-        <div class="record-copy">
-          <span class="eyebrow">ОДНО МЕСТО — ЦЕЛАЯ ИСТОРИЯ</span>
-          <h2>Сохраняй не только <em>куда</em>, но и <em>как прошло.</em></h2>
-          <p>Вместо разрозненных заметок в телефоне — отдельная запись о месте. Отметь посещение, поставь оценку, запиши впечатления и прикрепи снимки.</p>
-          <p class="record-caption">Ниже — пример состава записи, а не скриншот интерфейса приложения.</p>
+    <section class="how" id="how">
+      <div class="wrap">
+        <div class="section-heading">
+          <div><span class="eyebrow">КАК ЭТО РАБОТАЕТ</span><h2>От регистрации до <em>воспоминания</em></h2></div>
+          <p>Четыре шага — и первое место уже лежит в твоей коллекции.</p>
         </div>
-        <div class="record-card" aria-label="Иллюстративный пример записи о месте">
-          <div class="record-card-top"><span class="record-type">ПРИМЕР ЗАПИСИ</span><span class="visited-pill"><i></i> Посещено</span></div>
-          <div class="record-place">
-            <div class="place-thumb"><span>⌖</span></div>
-            <div><h3>Старый город</h3><p>Личная коллекция · Прогулка</p></div>
+
+        <ol class="route">
+          <li class="route-step">
+            <span class="route-node">1</span>
+            <h3>Создай аккаунт</h3>
+            <p>Придумай логин и пароль (не короче шести символов) и напиши, как к тебе обращаться.</p>
+          </li>
+          <li class="route-step">
+            <span class="route-node">2</span>
+            <h3>Найди или добавь место</h3>
+            <p>Ищи в каталоге по названию, городу или стране либо поставь собственную точку на карте.</p>
+          </li>
+          <li class="route-step">
+            <span class="route-node">3</span>
+            <h3>Выбери статус</h3>
+            <p>«Хочу посетить», если только собираешься, и «Добавить посещение», если уже побывал.</p>
+          </li>
+          <li class="route-step">
+            <span class="route-node">4</span>
+            <h3>Допиши историю</h3>
+            <p>Дата, оценка, впечатления, заметки и фотографии складываются в одну запись.</p>
+          </li>
+        </ol>
+
+        <div class="record-block">
+          <div class="record-intro">
+            <span class="eyebrow">ЗАПИСЬ О МЕСТЕ</span>
+            <h3>Что остаётся после четвёртого шага</h3>
+            <p>Так выглядит заполненная запись о посещении. Место и текст в примере придуманы, а набор полей такой же, как в приложении.</p>
           </div>
-          <div class="record-meta">
-            <div><small>ДАТА ПОСЕЩЕНИЯ</small><b>14 сентября 2026</b></div>
-            <div><small>ЛИЧНАЯ ОЦЕНКА</small><b class="rating">★★★★★ <span>5 / 5</span></b></div>
+
+          <div class="record-card" aria-label="Пример записи о посещении с вымышленными данными">
+            <div class="record-mascot" aria-hidden="true"><img src="assets/mascot-thumbs-up.webp" alt="" width="305" height="328" loading="lazy"></div>
+            <div class="record-card-top">
+              <span class="record-type">ПРИМЕР ЗАПИСИ</span>
+              <span class="visited-pill"><i></i> Посещено</span>
+            </div>
+            <div class="record-body">
+              <div class="record-main">
+                <div class="record-place">
+                  <div class="place-thumb" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></svg></div>
+                  <div><h4>Старый город</h4><p>Прага · Чехия</p></div>
+                </div>
+                <div class="record-meta">
+                  <div><small>ДАТА ПОСЕЩЕНИЯ</small><b>14 сентября 2026</b></div>
+                  <div><small>ОЦЕНКА</small><b class="rating">★★★★★ <span>5 из 5</span></b></div>
+                </div>
+              </div>
+              <div class="record-texts">
+                <div><small>ВПЕЧАТЛЕНИЯ</small><p>Утром почти нет туристов, а свет в узких улицах оказался лучшим за всю поездку.</p></div>
+                <div><small>ЗАМЕТКА</small><p>Кофейня на углу у площади — вернуться за круассанами. Билеты в музей лучше взять заранее.</p></div>
+              </div>
+            </div>
+            <div class="record-photos" aria-hidden="true">
+              <div class="photo photo-one"></div>
+              <div class="photo photo-two"></div>
+              <div class="photo photo-three"></div>
+              <div class="photo photo-add">+ фото</div>
+            </div>
           </div>
-          <div class="record-note"><small>ЗАМЕТКА</small><p>Красивые улочки, уютные кафе и отличный маршрут для неспешной прогулки.</p></div>
-          <div class="record-photos"><div class="photo photo-one"></div><div class="photo photo-two"></div><div class="photo photo-three"></div><span>+ фотографии</span></div>
         </div>
       </div>
+    </section>
+
+    <section class="section wrap design" id="design">
+      <div class="section-heading">
+        <div><span class="eyebrow">ВИЗУАЛЬНАЯ КОНЦЕПЦИЯ</span><h2>Тёплый дневник, <em>а не таблица</em></h2></div>
+        <p>Облик Loca Loca строится на трёх идеях: карта, бумажные заметки и спутник-маскот.</p>
+      </div>
+
+      <div class="design-grid">
+        <div class="principles">
+          <article class="principle">
+            <span class="principle-number">01</span>
+            <div><h3>Карта в центре</h3><p>Каталог, списки и записи нужны, чтобы наполнять карту. Она остаётся главным экраном дневника, и на неё хочется возвращаться.</p></div>
+          </article>
+          <article class="principle">
+            <span class="principle-number">02</span>
+            <div><h3>Бумага и заметки</h3><p>Записи оформлены как карточки: светлые поверхности, крупные заголовки, мягкие тени и минимум служебных элементов. Тёмная тема сохраняет ту же логику для вечернего просмотра.</p></div>
+          </article>
+          <article class="principle">
+            <span class="principle-number">03</span>
+            <div><h3>Спутник в панаме</h3><p>Маскот-путешественник с рюкзаком встречает в приложении и на сайте. Он отражает настроение поездки: ищет, снимает, записывает, радуется и вовремя отдыхает.</p></div>
+          </article>
+        </div>
+
+        <div class="palette" aria-label="Цвета проекта">
+          <div class="swatch sw-green"><i></i><b>Лесной зелёный</b><small>основной цвет, карта и маршруты</small></div>
+          <div class="swatch sw-deep"><i></i><b>Тёмная хвоя</b><small>глубина, фоны и акцентные блоки</small></div>
+          <div class="swatch sw-lime"><i></i><b>Лайм</b><small>главные кнопки и яркие акценты</small></div>
+          <div class="swatch sw-warm"><i></i><b>Песочный</b><small>планы, «Хочу посетить» и заметки</small></div>
+        </div>
+      </div>
+
+      <ul class="moods" aria-label="Маскот в разных ситуациях">
+        <li><img src="assets/mascot-binoculars.webp" alt="" width="304" height="329" loading="lazy"><span>Ищет места</span></li>
+        <li><img src="assets/mascot-camera.webp" alt="" width="318" height="325" loading="lazy"><span>Делает снимок</span></li>
+        <li><img src="assets/mascot-note.webp" alt="" width="303" height="323" loading="lazy"><span>Записывает впечатления</span></li>
+        <li><img src="assets/mascot-happy.webp" alt="" width="337" height="345" loading="lazy"><span>Радуется поездке</span></li>
+        <li><img src="assets/mascot-coffee.webp" alt="" width="250" height="290" loading="lazy"><span>Пауза на кофе</span></li>
+        <li><img src="assets/mascot-sleeping.webp" alt="" width="387" height="280" loading="lazy"><span>Отдыхает после дороги</span></li>
+      </ul>
     </section>
 
     <section class="section wrap" id="data">
-      <div class="section-heading data-heading">
-        <div><span class="eyebrow">АККАУНТ И БЕЗОПАСНОСТЬ</span><h2>Твоя история хранится в облаке.<br><em>Доступ защищён.</em></h2></div>
-        <p>Пароли не сохраняются в открытом виде, а личные записи и фотографии привязаны к аккаунту. Клиент общается с облачным API по защищённому HTTPS-соединению.</p>
+      <div class="section-heading">
+        <div><span class="eyebrow">АККАУНТ И ДАННЫЕ</span><h2>Твоя история хранится в облаке <em>и привязана к аккаунту</em></h2></div>
+        <p>Что происходит с паролем, записями и фотографиями — простыми словами.</p>
       </div>
+
       <div class="data-grid">
-        <article class="data-card data-security">
-          <div class="data-card-icon">✓</div>
-          <div><span class="data-label">ЗАЩИТА АККАУНТА</span><h3>Пароль не хранится открытым</h3></div>
-          <p>При регистрации сервер рассчитывает PBKDF2-SHA256-хеш с индивидуальной случайной солью. При входе пароль проверяется по этому хешу — исходное значение не сохраняется в базе и не встраивается в приложение.</p>
-          <div class="data-foot"><span class="data-check">✓</span> Для проверки пароля не требуется хранить его исходный текст</div>
+        <article class="data-card">
+          <div class="data-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+          <h3>Пароль нигде не хранится</h3>
+          <p>Сервер запоминает не сам пароль, а его защищённый «отпечаток». По нему можно проверить вход, но нельзя узнать пароль: его не видно даже в базе данных.</p>
         </article>
-        <article class="data-card data-cloud">
-          <div class="data-card-icon">☁</div>
-          <div><span class="data-label">ОБЛАЧНОЕ ХРАНЕНИЕ</span><h3>Записи, коллекция и фото</h3></div>
-          <p>Посещения, оценки, заметки, список «Хочу посетить», личные точки и фотографии хранятся в PostgreSQL. Клиент обращается к API по HTTPS, а пароль базы данных и секрет подписи сессий остаются на сервере.</p>
-          <div class="data-foot"><span class="data-check">✓</span> Записи и фотографии доступны в том же аккаунте на разных устройствах</div>
+        <article class="data-card">
+          <div class="data-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/><path d="m9 12 2 2 4-4"/></svg></div>
+          <h3>Защищённая связь</h3>
+          <p>Приложение общается с сервером по протоколу HTTPS. Пароль от базы данных не попадает на твой компьютер и не встроен в установщик.</p>
+        </article>
+        <article class="data-card">
+          <div class="data-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 18a4 4 0 0 1-.5-7.97A5.5 5.5 0 0 1 17 8.5a4.5 4.5 0 0 1 .5 9.5H7z"/></svg></div>
+          <h3>Записи и фото в облаке</h3>
+          <p>Посещения, оценки, заметки, планы, личные точки и фотографии лежат в облачной базе. Войди в тот же аккаунт на другом компьютере, и всё откроется.</p>
+        </article>
+        <article class="data-card">
+          <div class="data-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg></div>
+          <h3>Удалил программу — данные остались</h3>
+          <p>Деинсталлятор убирает приложение и временные файлы с компьютера, но не трогает аккаунт. После новой установки достаточно войти. Вопросы об удалении данных аккаунта можно задать в поддержку.</p>
         </article>
       </div>
-      <div class="internet-note"><span>i</span><p><b>Нужен интернет.</b> Вход в аккаунт, синхронизация данных и отображение карты зависят от подключения. На бесплатном сервере первый запрос после простоя может выполняться дольше обычного.</p></div>
     </section>
 
     <section class="install-section" id="install">
       <div class="wrap install-layout">
         <div class="install-main">
           <span class="eyebrow eyebrow-light">УСТАНОВКА</span>
-          <h2>Начни собирать свою карту.</h2>
-          <p>Установщик подготовит приложение для Windows и настроит подключение к облачному API. Вводить пароль от базы данных на компьютере не нужно.</p>
+          <h2>Установи и сохрани первое место</h2>
+          <p>Установщик ставит приложение, проверяет компонент Microsoft Edge WebView2, который нужен для карты, и сам подключает облачный сервер. Вводить параметры базы данных не нужно.</p>
           <div class="install-actions">
             <a class="button button-lime" href="https://github.com/teofobiaa/LocaLoca/releases/download/latest/LocaLoca-Setup.exe">Скачать LocaLoca-Setup.exe <span aria-hidden="true">↓</span></a>
-            <a class="install-release-link" href="https://github.com/teofobiaa/LocaLoca/releases/latest">Посмотреть релизы и историю изменений ↗</a>
+            <a class="install-release-link" href="https://github.com/teofobiaa/LocaLoca/releases/latest">Все релизы и история изменений ↗</a>
           </div>
-          <div class="install-specs">
-            <div><small>СИСТЕМА</small><b>Windows 10 22H2 / Windows 11</b></div>
-            <div><small>АРХИТЕКТУРА</small><b>x64</b></div>
-            <div><small>ФОРМАТ</small><b>Установщик .exe</b></div>
-          </div>
+          <dl class="install-specs">
+            <div><dt>СИСТЕМА</dt><dd>Windows 10 версии 22H2 или Windows 11</dd></div>
+            <div><dt>РАЗРЯДНОСТЬ</dt><dd>x64</dd></div>
+            <div><dt>ИНТЕРНЕТ</dt><dd>нужен для входа, синхронизации и карты</dd></div>
+            <div><dt>ФАЙЛ</dt><dd>установщик .exe</dd></div>
+          </dl>
         </div>
         <div class="install-aside">
-          <div class="aside-number">3 шага</div>
-          <h3>Первый запуск</h3>
+          <img class="aside-mascot" src="assets/mascot-celebrate.webp" alt="" width="337" height="343" loading="lazy">
+          <div class="aside-number">ПЕРВЫЙ ЗАПУСК</div>
           <ol>
-            <li><span>1</span><div><b>Скачай установщик</b><small>Актуальная версия находится в GitHub Releases.</small></div></li>
-            <li><span>2</span><div><b>Запусти установку</b><small>Следуй подсказкам мастера и дождись завершения.</small></div></li>
-            <li><span>3</span><div><b>Создай аккаунт</b><small>Войди в Loca Loca и сохрани первое место.</small></div></li>
+            <li><span>1</span><div><b>Запусти установщик</b><small>Следуй подсказкам мастера до конца.</small></div></li>
+            <li><span>2</span><div><b>Открой Loca Loca</b><small>Если нужного компонента для карты нет, установщик это заметит.</small></div></li>
+            <li><span>3</span><div><b>Создай аккаунт</b><small>После входа добавь первое место в коллекцию.</small></div></li>
           </ol>
-          <p class="aside-foot">Для карты требуется Microsoft Edge WebView2 Runtime. Установщик проверяет его наличие.</p>
         </div>
       </div>
     </section>
 
-    <section class="faq-section wrap">
-      <div class="faq-heading"><span class="eyebrow">ЧАСТЫЕ ВОПРОСЫ</span><h2>Перед установкой</h2></div>
+    <section class="support-section" id="support">
+      <div class="wrap">
+        <div class="section-heading">
+          <div><span class="eyebrow">ПОДДЕРЖКА</span><h2>Что-то не работает или есть идея? <em>Напиши.</em></h2></div>
+          <p>Вопросы по установке, ошибки в приложении, пожелания к функциям — всё можно присылать на почту.</p>
+        </div>
+
+        <div class="support-layout">
+          <div class="contact-card">
+            <img class="contact-mascot" src="assets/mascot-coffee.webp" alt="" width="250" height="290" loading="lazy">
+            <span class="data-label">ПОЧТА ПОДДЕРЖКИ</span>
+            <a class="contact-mail" id="supportMail" href="mailto:teofobia@proton.me?subject=Loca%20Loca%3A%20%D0%B2%D0%BE%D0%BF%D1%80%D0%BE%D1%81&amp;body=%D0%92%D0%B5%D1%80%D1%81%D0%B8%D1%8F%20Windows%3A%0A%D0%A7%D1%82%D0%BE%20%D0%B4%D0%B5%D0%BB%D0%B0%D0%BB%28%D0%B0%29%3A%0A%D0%A7%D1%82%D0%BE%20%D0%BF%D1%80%D0%BE%D0%B8%D0%B7%D0%BE%D1%88%D0%BB%D0%BE%3A%0A%0A%28%D0%9F%D0%B0%D1%80%D0%BE%D0%BB%D0%B8%20%D0%B8%20%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5%20%D0%BA%D0%B0%D1%80%D1%82%20%D0%BF%D1%80%D0%B8%D1%81%D1%8B%D0%BB%D0%B0%D1%82%D1%8C%20%D0%BD%D0%B5%20%D0%BD%D1%83%D0%B6%D0%BD%D0%BE.%29">teofobia@proton.me</a>
+            <div class="contact-actions">
+              <a class="button button-green" href="mailto:teofobia@proton.me?subject=Loca%20Loca%3A%20%D0%B2%D0%BE%D0%BF%D1%80%D0%BE%D1%81&amp;body=%D0%92%D0%B5%D1%80%D1%81%D0%B8%D1%8F%20Windows%3A%0A%D0%A7%D1%82%D0%BE%20%D0%B4%D0%B5%D0%BB%D0%B0%D0%BB%28%D0%B0%29%3A%0A%D0%A7%D1%82%D0%BE%20%D0%BF%D1%80%D0%BE%D0%B8%D0%B7%D0%BE%D1%88%D0%BB%D0%BE%3A%0A%0A%28%D0%9F%D0%B0%D1%80%D0%BE%D0%BB%D0%B8%20%D0%B8%20%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D0%B5%20%D0%BA%D0%B0%D1%80%D1%82%20%D0%BF%D1%80%D0%B8%D1%81%D1%8B%D0%BB%D0%B0%D1%82%D1%8C%20%D0%BD%D0%B5%20%D0%BD%D1%83%D0%B6%D0%BD%D0%BE.%29">Написать письмо</a>
+              <button class="button button-outline" id="copyMail" type="button" data-email="teofobia@proton.me">Скопировать адрес</button>
+              <span class="copy-status" id="copyStatus" role="status" aria-live="polite"></span>
+            </div>
+            <p class="contact-hint">Чтобы ответить быстрее, укажи версию Windows, что ты делал и что произошло вместо ожидаемого. Скриншот поможет. Пароли и данные карт присылать не нужно.</p>
+          </div>
+
+          <div class="support-links">
+            <a class="support-link" href="https://github.com/teofobiaa/LocaLoca/issues/new">
+              <span class="support-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v5M12 16h.01"/></svg></span>
+              <span><b>Ошибка или предложение</b><small>Открытое обращение на GitHub: его увидят и другие пользователи.</small></span>
+              <i aria-hidden="true">↗</i>
+            </a>
+            <a class="support-link" href="https://github.com/teofobiaa/LocaLoca/discussions">
+              <span class="support-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H10l-5 4V5z"/></svg></span>
+              <span><b>Вопрос или идея</b><small>Обсуждения проекта: можно спросить, как что-то устроено.</small></span>
+              <i aria-hidden="true">↗</i>
+            </a>
+            <a class="support-link" href="https://github.com/teofobiaa/LocaLoca/security/policy">
+              <span class="support-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6l7-3z"/></svg></span>
+              <span><b>Нашёл уязвимость</b><small>Не публикуй её в открытых обращениях. Порядок сообщения описан в политике безопасности.</small></span>
+              <i aria-hidden="true">↗</i>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="faq-section wrap" id="faq">
+      <div class="faq-heading">
+        <span class="eyebrow">ЧАСТЫЕ ВОПРОСЫ</span>
+        <h2>Перед установкой</h2>
+        <img src="assets/mascot-thinking.webp" alt="" width="274" height="321" loading="lazy">
+      </div>
       <div class="faq-list">
-        <details><summary>Можно ли открыть свою коллекцию на другом компьютере?</summary><p>Записи и фотографии хранятся в общей PostgreSQL и привязаны к аккаунту. После входа в тот же аккаунт коллекция и изображения доступны и на другом компьютере.</p></details>
-        <details><summary>Можно ли пользоваться приложением без интернета?</summary><p>Для входа в аккаунт, получения данных из облака и загрузки карты требуется интернет-соединение. Полноценный автономный режим сейчас не заявлен.</p></details>
-        <details><summary>Что произойдёт с данными после удаления приложения?</summary><p>Деинсталлятор удаляет программу и временные локальные копии для просмотра. Данные аккаунта, посещения, личные точки и фотографии, уже сохранённые в PostgreSQL, остаются в облачной базе.</p></details>
-        <details><summary>Где посмотреть исходный код и обновления?</summary><p>Исходный код, список изменений и актуальные сборки опубликованы в GitHub проекта.</p></details>
+        <details><summary>Можно ли открыть коллекцию на другом компьютере?</summary><p>Да. Записи и фотографии привязаны к аккаунту, а не к устройству. Установи Loca Loca на втором компьютере и войди с тем же логином.</p></details>
+        <details><summary>Работает ли приложение без интернета?</summary><p>Нет. Вход, получение данных из облака и загрузка карты требуют подключения. Автономного режима пока нет.</p></details>
+        <details><summary>Почему первый вход иногда занимает много времени?</summary><p>Сервер размещён на бесплатном тарифе и засыпает, если им долго не пользовались. Первый запрос после паузы будит его и может идти заметно дольше обычного, дальше всё работает быстро.</p></details>
+        <details><summary>Что будет с данными, если удалить приложение?</summary><p>Программа и временные файлы на компьютере удалятся, а аккаунт, посещения, личные точки и фотографии останутся в облаке. После новой установки достаточно войти.</p></details>
+        <details><summary>Какие форматы фотографий поддерживаются?</summary><p>JPG, PNG, WebP, BMP и GIF.</p></details>
+        <details><summary>Где исходный код и обновления?</summary><p>В репозитории проекта на GitHub: там же опубликованы релизы и история изменений.</p></details>
       </div>
     </section>
   </main>
 
   <footer class="footer">
     <div class="wrap footer-inner">
-      <a class="brand footer-brand" href="#top"><img src="https://raw.githubusercontent.com/teofobiaa/LocaLoca/main/LocaLoca/Assets/loca-loca-icon.png" alt=""><span>Loca <b>Loca</b></span></a>
-      <p>Сохраняй места. Возвращайся к историям.</p>
-      <div class="footer-links">
-        <a href="mailto:teofobia@outlook.com">Поддержка</a>
-        <a href="https://github.com/teofobiaa/LocaLoca">Исходный код ↗</a>
-        <a href="https://github.com/teofobiaa/LocaLoca/releases/latest">Релизы ↗</a>
+      <div class="footer-top">
+        <div class="footer-about">
+          <a class="brand footer-brand" href="#top"><img src="assets/icon.png" alt="" width="30" height="30"><span>Loca <b>Loca</b></span></a>
+          <p>Сохраняй места. Возвращайся к историям.</p>
+        </div>
+        <nav class="footer-links" aria-label="Ссылки в подвале">
+          <a href="#support">Поддержка</a>
+          <a href="https://github.com/teofobiaa/LocaLoca">Исходный код ↗</a>
+          <a href="https://github.com/teofobiaa/LocaLoca/releases/latest">Релизы ↗</a>
+        </nav>
+        <div class="footer-contact">
+          <small>ПОЧТА</small>
+          <a href="mailto:teofobia@proton.me">teofobia@proton.me</a>
+        </div>
       </div>
+      <p class="footer-stack">Сделано на WinUI 3, .NET, ASP.NET Core и PostgreSQL.</p>
     </div>
   </footer>
 
@@ -291,6 +541,59 @@
         if (!getSavedTheme()) {
           applyTheme(event.matches ? "dark" : "light");
         }
+      });
+
+      // Шапка: тень при прокрутке и закрытие мобильного меню после перехода.
+      const header = document.getElementById("siteHeader");
+      const mobileMenu = document.getElementById("mobileMenu");
+      const onScroll = () => header?.classList.toggle("is-scrolled", window.scrollY > 8);
+      onScroll();
+      window.addEventListener("scroll", onScroll, { passive: true });
+      mobileMenu?.querySelectorAll("a").forEach(link => {
+        link.addEventListener("click", () => mobileMenu.removeAttribute("open"));
+      });
+
+      // Подсветка текущего раздела в навигации.
+      const navLinks = [...document.querySelectorAll(".main-nav a")];
+      const sections = navLinks
+        .map(link => document.querySelector(link.getAttribute("href")))
+        .filter(Boolean);
+      if ("IntersectionObserver" in window && sections.length) {
+        const observer = new IntersectionObserver(entries => {
+          entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            navLinks.forEach(link => {
+              const active = link.getAttribute("href") === "#" + entry.target.id;
+              if (active) link.setAttribute("aria-current", "true");
+              else link.removeAttribute("aria-current");
+            });
+          });
+        }, { rootMargin: "-40% 0px -55% 0px" });
+        sections.forEach(section => observer.observe(section));
+      }
+
+      // Копирование адреса поддержки.
+      const copyButton = document.getElementById("copyMail");
+      const copyStatus = document.getElementById("copyStatus");
+      copyButton?.addEventListener("click", async () => {
+        const email = copyButton.dataset.email;
+        let copied = false;
+        try {
+          await navigator.clipboard.writeText(email);
+          copied = true;
+        } catch {
+          const field = document.createElement("textarea");
+          field.value = email;
+          field.setAttribute("readonly", "");
+          field.style.position = "fixed";
+          field.style.opacity = "0";
+          document.body.appendChild(field);
+          field.select();
+          try { copied = document.execCommand("copy"); } catch { copied = false; }
+          field.remove();
+        }
+        copyStatus.textContent = copied ? "Адрес скопирован" : "Не удалось скопировать, выдели адрес вручную";
+        window.setTimeout(() => { copyStatus.textContent = ""; }, 3000);
       });
     })();
   </script>
