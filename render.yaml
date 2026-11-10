@@ -3,7 +3,8 @@ services:
     name: localoca-api
     runtime: docker
     plan: free
-    autoDeployTrigger: commit
+    # GitHub Actions triggers deployments only after API CI and Docker build pass.
+    autoDeployTrigger: "off"
     dockerfilePath: ./Server/LocaLoca.Api/Dockerfile
     dockerContext: .
     healthCheckPath: /health

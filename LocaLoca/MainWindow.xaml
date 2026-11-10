@@ -7,6 +7,9 @@
 
     <Grid x:Name="Root" Background="{ThemeResource CanvasBrush}" Loaded="Root_Loaded">
         <Grid.Resources>
+            <!-- These panels stay dark in both app themes, so their text color must not
+                 depend on the active theme dictionary. -->
+            <SolidColorBrush x:Key="DarkPanelTextBrush" Color="#F2F6F2" />
             <Style x:Key="PrimaryButtonStyle" TargetType="Button">
                 <Setter Property="Background" Value="{ThemeResource AccentBrush}" />
                 <Setter Property="Foreground" Value="{ThemeResource AccentForegroundBrush}" />
@@ -81,23 +84,23 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Orientation="Horizontal" Spacing="10">
                     <Image Source="Assets/loca-loca-icon.png" Width="36" Height="36" Stretch="Uniform" />
-                    <TextBlock Text="loca loca" FontSize="24" FontWeight="Bold" Foreground="{ThemeResource Palette_FFFFFF}" VerticalAlignment="Center" />
+                    <TextBlock Text="loca loca" FontSize="24" FontWeight="Bold" Foreground="{StaticResource DarkPanelTextBrush}" VerticalAlignment="Center" />
                 </StackPanel>
                 <StackPanel Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" MaxWidth="600" Spacing="20">
                     <Border Background="{ThemeResource Palette_29443D}" CornerRadius="20" Padding="14,8" HorizontalAlignment="Left">
-                        <TextBlock Text="ДНЕВНИК ПУТЕШЕСТВИЙ" FontSize="10" FontWeight="Bold" Foreground="{ThemeResource Palette_D8E7CD}" />
+                        <TextBlock Text="ДНЕВНИК ПУТЕШЕСТВИЙ" FontSize="10" FontWeight="Bold" Foreground="{StaticResource DarkPanelTextBrush}" />
                     </Border>
-                    <TextBlock Text="Мир большой.&#x0a;Сохрани своё." FontSize="54" FontWeight="SemiBold" Foreground="{ThemeResource Palette_FFFFFF}" TextWrapping="WrapWholeWords" LineHeight="58" />
+                    <TextBlock Text="Мир большой.&#x0a;Сохрани своё." FontSize="54" FontWeight="SemiBold" Foreground="{StaticResource DarkPanelTextBrush}" TextWrapping="WrapWholeWords" LineHeight="58" />
                     <TextBlock Text="Места, которые стали частью твоей истории. Фотографии, впечатления и маленькие открытия — в одном пространстве." FontSize="17" Foreground="{ThemeResource Palette_C4D2C8}" TextWrapping="Wrap" MaxWidth="480" LineHeight="25" />
                     <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,10,0,0">
-                        <Border Background="{ThemeResource Palette_314C43}" CornerRadius="14" Padding="14,10"><TextBlock Text="✦  Впечатления" Foreground="{ThemeResource Palette_E3EBD8}" /></Border>
-                        <Border Background="{ThemeResource Palette_314C43}" CornerRadius="14" Padding="14,10"><TextBlock Text="⌖  Карта" Foreground="{ThemeResource Palette_E3EBD8}" /></Border>
-                        <Border Background="{ThemeResource Palette_314C43}" CornerRadius="14" Padding="14,10"><TextBlock Text="♡  Избранное" Foreground="{ThemeResource Palette_E3EBD8}" /></Border>
+                        <Border Background="{ThemeResource Palette_314C43}" CornerRadius="14" Padding="14,10"><TextBlock Text="✦  Впечатления" Foreground="{StaticResource DarkPanelTextBrush}" /></Border>
+                        <Border Background="{ThemeResource Palette_314C43}" CornerRadius="14" Padding="14,10"><TextBlock Text="⌖  Карта" Foreground="{StaticResource DarkPanelTextBrush}" /></Border>
+                        <Border Background="{ThemeResource Palette_314C43}" CornerRadius="14" Padding="14,10"><TextBlock Text="♡  Избранное" Foreground="{StaticResource DarkPanelTextBrush}" /></Border>
                     </StackPanel>
                     <TextBlock Text="Путешественник уже собирает маршрут вместе с тобой." FontSize="12" Foreground="{ThemeResource Palette_C4D2C8}" TextWrapping="Wrap" MaxWidth="420" />
                 </StackPanel>
                 <Image Grid.Row="1" Grid.Column="1" Source="Assets/Mascot/mascot-map.png" Width="156" Height="156" Stretch="Uniform" VerticalAlignment="Center" Margin="4,0,0,0" />
-                <TextBlock Grid.Row="2" Text="Твоя история путешествий начинается здесь" FontSize="11" Foreground="{ThemeResource Palette_8FA79A}" />
+                <TextBlock Grid.Row="2" Text="Твоя история путешествий начинается здесь" FontSize="11" Foreground="{StaticResource DarkPanelTextBrush}" />
                 </Grid>
             </Border>
 
@@ -141,7 +144,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="4,0,0,34">
                     <Image Source="Assets/loca-loca-icon.png" Width="36" Height="36" Stretch="Uniform" />
                     <StackPanel VerticalAlignment="Center" Spacing="0">
-                        <TextBlock Text="loca loca" FontSize="22" FontWeight="Bold" Foreground="{ThemeResource Palette_FFFFFF}" />
+                        <TextBlock Text="loca loca" FontSize="22" FontWeight="Bold" Foreground="{StaticResource DarkPanelTextBrush}" />
                         <TextBlock Text="ДНЕВНИК ПУТЕШЕСТВИЙ" FontSize="9" Foreground="{ThemeResource Palette_9BB1A3}" />
                     </StackPanel>
                 </StackPanel>
@@ -166,13 +169,13 @@
                         <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE897;" FontSize="17" /><TextBlock Text="Поддержка" VerticalAlignment="Center" /></StackPanel>
                     </Button>
                 </StackPanel>
-                <Button Grid.Row="3" x:Name="ProfileButton" Background="{ThemeResource Palette_29443D}" Foreground="{ThemeResource Palette_FFFFFF}" BorderThickness="0" CornerRadius="16" Padding="14" Margin="0,20,0,0" HorizontalContentAlignment="Stretch" Click="Profile_Click">
+                <Button Grid.Row="3" x:Name="ProfileButton" Background="{ThemeResource Palette_29443D}" Foreground="{StaticResource DarkPanelTextBrush}" BorderThickness="0" CornerRadius="16" Padding="14" Margin="0,20,0,0" HorizontalContentAlignment="Stretch" Click="Profile_Click">
                     <StackPanel Spacing="7">
                         <Grid ColumnDefinitions="*,Auto">
                             <TextBlock Text="МОЙ ПРОФИЛЬ" FontSize="10" FontWeight="SemiBold" Foreground="{ThemeResource Palette_A6BAAD}" VerticalAlignment="Center" />
                             <FontIcon Grid.Column="1" Glyph="&#xE76C;" FontSize="13" Foreground="{ThemeResource Palette_C4D3C8}" />
                         </Grid>
-                        <TextBlock x:Name="ProfileNameText" Text="Путешественник" FontSize="15" FontWeight="SemiBold" Foreground="{ThemeResource Palette_FFFFFF}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock x:Name="ProfileNameText" Text="Путешественник" FontSize="15" FontWeight="SemiBold" Foreground="{StaticResource DarkPanelTextBrush}" TextTrimming="CharacterEllipsis" />
                         <TextBlock Text="Настройки аккаунта и оформления" FontSize="11" Foreground="{ThemeResource Palette_C4D3C8}" TextWrapping="Wrap" />
                     </StackPanel>
                 </Button>

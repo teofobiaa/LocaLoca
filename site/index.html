@@ -29,10 +29,11 @@
   <link rel="icon" href="assets/icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body id="top">
+  site-redesign
   <a class="skip-link" href="#main">К содержимому</a>
 
   <header class="topbar-wrap" id="siteHeader">
@@ -69,6 +70,23 @@
         </details>
       </div>
     </div>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="Loca Loca — на главную">
+      <img src="https://raw.githubusercontent.com/teofobiaa/LocaLoca/main/LocaLoca/Assets/loca-loca-icon.png" alt="">
+      <span>Loca <b>Loca</b></span>
+    </a>
+    <nav class="main-nav" aria-label="Основная навигация">
+      <a href="#features">Возможности</a>
+      <a href="#workflow">Как работает</a>
+      <a href="#data">Данные</a>
+      <a href="#install">Установка</a>
+    </nav>
+    <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false">
+      <span class="theme-toggle-icon" aria-hidden="true">☾</span>
+      <span class="theme-toggle-label">Тёмная тема</span>
+    </button>
+    <a class="nav-download" href="https://github.com/teofobiaa/LocaLoca/releases/download/latest/LocaLoca-Setup.exe">Скачать <span aria-hidden="true">↗</span></a>
+ main
   </header>
 
   <main id="main">
@@ -83,6 +101,7 @@
           </a>
           <a class="hero-link" href="#how">Как это работает <span aria-hidden="true">→</span></a>
         </div>
+ site-redesign
         <div class="hero-facts" aria-label="Кратко о приложении">
           <span><b>Windows 10 и 11</b><small>64-бит</small></span>
           <span><b>Каталог из 19 стран</b><small>и свои точки на карте</small></span>
@@ -91,6 +110,15 @@
       </div>
 
       <div class="hero-visual" role="img" aria-label="Зелёный маскот-путешественник Loca Loca держит карту">
+        <div class="hero-facts" role="group" aria-label="Кратко о приложении">
+          <span><b>Windows 10 / 11</b><small>x64</small></span>
+          <span><b>Личный аккаунт</b><small>Общие записи в облаке</small></span>
+          <span><b>Интернет нужен</b><small>Для карты и синхронизации</small></span>
+        </div>
+      </div>
+
+      <div class="hero-visual" role="group" aria-label="Маскот Loca Loca с картой">
+ main
         <div class="visual-halo"></div>
         <div class="map-preview" aria-hidden="true">
           <div class="preview-top"><span>МОЯ КАРТА</span><span class="preview-status"><i></i> 2 ПОСЕЩЕНО · 1 В ПЛАНАХ</span></div>
@@ -239,6 +267,7 @@
           <div><span class="eyebrow">КАК ЭТО РАБОТАЕТ</span><h2>От регистрации до <em>воспоминания</em></h2></div>
           <p>Четыре шага — и первое место уже лежит в твоей коллекции.</p>
         </div>
+ site-redesign
 
         <ol class="route">
           <li class="route-step">
@@ -268,6 +297,13 @@
             <span class="eyebrow">ЗАПИСЬ О МЕСТЕ</span>
             <h3>Что остаётся после четвёртого шага</h3>
             <p>Так выглядит заполненная запись о посещении. Место и текст в примере придуманы, а набор полей такой же, как в приложении.</p>
+
+        <div class="record-card" role="group" aria-label="Иллюстративный пример записи о месте">
+          <div class="record-card-top"><span class="record-type">ПРИМЕР ЗАПИСИ</span><span class="visited-pill"><i></i> Посещено</span></div>
+          <div class="record-place">
+            <div class="place-thumb"><span>⌖</span></div>
+            <div><h3>Старый город</h3><p>Личная коллекция · Прогулка</p></div>
+ main
           </div>
 
           <div class="record-card" aria-label="Пример записи о посещении с вымышленными данными">
@@ -505,10 +541,6 @@
 
         if (toggle) {
           toggle.setAttribute("aria-pressed", String(isDark));
-          toggle.setAttribute(
-            "aria-label",
-            isDark ? "Переключить на светлую тему" : "Переключить на тёмную тему"
-          );
           toggle.querySelector(".theme-toggle-icon").textContent = isDark ? "☀" : "☾";
           toggle.querySelector(".theme-toggle-label").textContent = isDark
             ? "Светлая тема"

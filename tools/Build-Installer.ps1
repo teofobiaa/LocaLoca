@@ -1,4 +1,8 @@
-﻿$ErrorActionPreference = 'Stop'
+﻿param(
+    [string]$AppVersion
+)
+
+$ErrorActionPreference = 'Stop'
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $BuildScript = Join-Path $PSScriptRoot 'Build-Windows.ps1'
 $InstallerScript = Join-Path $ProjectRoot 'installer/LocaLoca.iss'
@@ -35,6 +39,12 @@ if (-not (Test-Path -LiteralPath $InstallerScript)) { throw "Не найден �
 if (-not (Test-Path -LiteralPath $InstallerIcon)) { throw "Не найдена иконка установщика: $InstallerIcon" }
 if (-not (Test-Path -LiteralPath $BootstrapScript)) { throw "Не найден сценарий настройки облачной БД: $BootstrapScript" }
 
+if (-not [string]::IsNullOrWhiteSpace($AppVersion)) {
+	if ($AppVersion -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
+		throw "Некорректная стабильная версия установщика: $AppVersion. Ожидается MAJOR.MINOR.PATCH, например 1.2.0."
+	}
+}
+
 & $BuildScript
 if ($LASTEXITCODE -ne 0) { throw 'Сборка приложения завершилась ошибкой.' }
 if (-not (Test-Path -LiteralPath (Join-Path $WindowsOutput 'LocaLoca.exe'))) {
@@ -53,7 +63,11 @@ if (Test-Path -LiteralPath $InstallerOutput) {
 }
 New-Item -ItemType Directory -Path $InstallerOutput -Force | Out-Null
 
-& $isccPath $InstallerScript
+if ([string]::IsNullOrWhiteSpace($AppVersion)) {
+	& $isccPath $InstallerScript
+} else {
+	& $isccPath "/DAppVersion=$AppVersion" $InstallerScript
+}
 if ($LASTEXITCODE -ne 0) { throw 'Компиляция установщика завершилась ошибкой.' }
 
 $installer = Join-Path $InstallerOutput 'LocaLoca-Setup.exe'

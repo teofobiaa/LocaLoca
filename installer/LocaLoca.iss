@@ -1,10 +1,14 @@
+#ifndef AppVersion
+  #define AppVersion "1.0.1"
+#endif
 #define BuildDir "..\Builds\Windows"
 #define SetupIcon "Assets\LocaLoca-Installer.ico"
 
 [Setup]
 AppId={{1A6F10BC-6F72-4E6F-A481-C47C3B32A8DA}
 AppName=Loca Loca
-AppVersion=1.0.1
+AppVersion={#AppVersion}
+VersionInfoVersion={#AppVersion}
 AppPublisher=Loca Loca
 DefaultDirName={localappdata}\Programs\LocaLoca
 DefaultGroupName=Loca Loca

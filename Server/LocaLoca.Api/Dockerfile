@@ -16,6 +16,12 @@ RUN dotnet publish Server/LocaLoca.Api/LocaLoca.Api.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 ENV ASPNETCORE_ENVIRONMENT=Production
+
+# Apply the latest Ubuntu security updates to the runtime image.
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish .
 EXPOSE 10000
 ENTRYPOINT ["dotnet", "LocaLoca.Api.dll"]
