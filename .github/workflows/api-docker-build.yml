@@ -1,28 +1,68 @@
-name: API Docker build
+name: API CI/CD
 
 on:
   push:
     branches:
       - main
+      - "feature/**"
+      - "ci/**"
+      - "refactor/**"
     paths:
       - "Server/LocaLoca.Api/**"
+      - "Tests/**"
+      - "database/**"
       - "global.json"
+      - "render.yaml"
       - ".github/workflows/api-docker-build.yml"
   pull_request:
+    branches:
+      - main
     paths:
       - "Server/LocaLoca.Api/**"
+      - "Tests/**"
+      - "database/**"
       - "global.json"
+      - "render.yaml"
       - ".github/workflows/api-docker-build.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: api-cicd-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  docker-build:
-    name: Build ASP.NET Core API image
-    runs-on: ubuntu-latest
+  dotnet:
+    name: .NET restore, build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
     steps:
-      - name: Check out repository
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore API and test solution
+        run: dotnet restore Tests/LocaLoca.Tests.sln
+
+      - name: Build ASP.NET Core API
+        run: dotnet build Server/LocaLoca.Api/LocaLoca.Api.csproj --configuration Release --no-restore
+
+      - name: Run unit, API and PostgreSQL integration tests
+        run: dotnet test Tests/LocaLoca.Tests.sln --configuration Release --no-restore --verbosity minimal
+
+  docker:
+    name: Build API Docker image
+    runs-on: ubuntu-24.04
+    needs: dotnet
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
@@ -35,3 +75,65 @@ jobs:
           file: Server/LocaLoca.Api/Dockerfile
           push: false
           tags: localoca-api:ci
+
+  deploy:
+    name: Deploy to Render and smoke-test
+    runs-on: ubuntu-24.04
+    needs:
+      - dotnet
+      - docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 15
+    steps:
+      - name: Trigger Render deployment
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "::error::Missing GitHub Actions secret RENDER_DEPLOY_HOOK."
+            exit 1
+          fi
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK"
+
+      - name: Wait for deployment and smoke-test API
+        env:
+          RENDER_SERVICE_URL: ${{ secrets.RENDER_SERVICE_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RENDER_SERVICE_URL" ]; then
+            echo "::error::Missing GitHub Actions secret RENDER_SERVICE_URL."
+            exit 1
+          fi
+
+          base_url="${RENDER_SERVICE_URL%/}"
+          health_ok=false
+          ready_ok=false
+
+          for attempt in $(seq 1 40); do
+            health_code=$(curl --connect-timeout 10 --max-time 20 --silent --show-error \
+              --output /tmp/health.json --write-out '%{http_code}' "$base_url/health" || true)
+            ready_code=$(curl --connect-timeout 10 --max-time 20 --silent --show-error \
+              --output /tmp/ready.json --write-out '%{http_code}' "$base_url/ready" || true)
+
+            if [ "$health_code" = "200" ] && [ "$ready_code" = "200" ]; then
+              health_ok=true
+              ready_ok=true
+              break
+            fi
+
+            echo "Smoke test attempt $attempt/40: /health=$health_code, /ready=$ready_code"
+            sleep 15
+          done
+
+          if [ "$health_ok" != "true" ] || [ "$ready_ok" != "true" ]; then
+            echo "::error::Render deployment did not pass /health and /ready within 10 minutes."
+            echo "Last /health response:"
+            cat /tmp/health.json 2>/dev/null || true
+            echo
+            echo "Last /ready response:"
+            cat /tmp/ready.json 2>/dev/null || true
+            exit 1
+          fi
+
+          echo "Smoke tests passed: /health and /ready both returned HTTP 200."
