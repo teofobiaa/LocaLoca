@@ -214,6 +214,13 @@ class WebsiteBrowserTests(unittest.TestCase):
                 }"""
             )
 
+        # Let the browser finish applying the current theme before axe reads
+        # computed foreground/background colors.
+        self.page.evaluate(
+            """() => new Promise((resolve) => {
+                requestAnimationFrame(() => requestAnimationFrame(resolve));
+            })"""
+        )
         light_violations = run_audit()
         self.assertEqual(
             light_violations,
@@ -229,6 +236,11 @@ class WebsiteBrowserTests(unittest.TestCase):
             self.page.locator("html").get_attribute("data-theme"),
             "dark",
             "The dark-theme accessibility audit must run with dark theme enabled.",
+        )
+        self.page.evaluate(
+            """() => new Promise((resolve) => {
+                requestAnimationFrame(() => requestAnimationFrame(resolve));
+            })"""
         )
         dark_violations = run_audit()
         self.assertEqual(
