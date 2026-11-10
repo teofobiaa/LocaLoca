@@ -180,6 +180,9 @@ class WebsiteBrowserTests(unittest.TestCase):
             AXE_CORE_PATH and Path(AXE_CORE_PATH).is_file(),
             "AXE_CORE_PATH must point to the installed axe-core/axe.min.js file.",
         )
+        # Accessibility checks must inspect stable final colors, not an in-flight
+        # CSS transition between the two themes.
+        self.page.emulate_media(reduced_motion="reduce")
         self.open_homepage()
         self.page.add_script_tag(path=AXE_CORE_PATH)
 
@@ -222,6 +225,11 @@ class WebsiteBrowserTests(unittest.TestCase):
             "button",
             name="Тёмная тема",
         ).click()
+        self.assertEqual(
+            self.page.locator("html").get_attribute("data-theme"),
+            "dark",
+            "The dark-theme accessibility audit must run with dark theme enabled.",
+        )
         dark_violations = run_audit()
         self.assertEqual(
             dark_violations,
