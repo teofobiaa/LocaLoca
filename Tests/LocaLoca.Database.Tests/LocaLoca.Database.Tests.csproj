@@ -19,20 +19,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="../../database/schema/01_schema.sql"
-             Link="Database/schema/01_schema.sql"
-             CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="../../database/migrations/03_migrate_wishlist.sql"
-             Link="Database/migrations/03_migrate_wishlist.sql"
-             CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="../../database/migrations/04_migrate_user_map_places.sql"
-             Link="Database/migrations/04_migrate_user_map_places.sql"
-             CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="../../database/migrations/07_migrate_photo_storage.sql"
-             Link="Database/migrations/07_migrate_photo_storage.sql"
-             CopyToOutputDirectory="PreserveNewest" />
-    <Content Include="../../database/security/06_update_runtime_permissions.sql"
-             Link="Database/security/06_update_runtime_permissions.sql"
+    <Content Include="../../database/**/*.sql"
+             Link="Database/%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

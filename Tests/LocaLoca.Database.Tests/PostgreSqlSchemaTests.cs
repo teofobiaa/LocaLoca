@@ -234,12 +234,7 @@ public sealed class PostgreSqlSchemaTests
     {
         await using var connection = await _database.OpenConnectionAsync();
 
-        await using (var createRole = new NpgsqlCommand(
-            "CREATE ROLE localoca_app NOLOGIN",
-            connection))
-        {
-            await createRole.ExecuteNonQueryAsync();
-        }
+        await _database.ExecuteSqlFileAsync("security", "05_create_app_role.sql");
 
         await _database.ExecuteSqlFileAsync("migrations", "03_migrate_wishlist.sql");
         await _database.ExecuteSqlFileAsync("migrations", "03_migrate_wishlist.sql");
@@ -261,10 +256,65 @@ public sealed class PostgreSqlSchemaTests
                 AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE')
                 AND has_column_privilege('localoca_app', 'public.photos', 'image_data', 'SELECT')
-                AND has_column_privilege('localoca_app', 'public.user_map_place_photos', 'image_data', 'INSERT')",
+                AND has_column_privilege('localoca_app', 'public.user_map_place_photos', 'image_data', 'INSERT')
+                AND NOT (SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls
+                         FROM pg_roles WHERE rolname = 'localoca_app')
+                AND NOT has_schema_privilege('localoca_app', 'public', 'CREATE')
+                AND NOT has_table_privilege('localoca_app', 'public.users', 'DELETE')
+                AND NOT pg_has_role('localoca_app', 'pg_read_all_data', 'MEMBER')",
             connection);
 
         Assert.True((bool)(await permissionCheck.ExecuteScalarAsync() ?? false));
+    }
+
+    [Fact]
+    public async Task Schema_Contains_Expected_Foreign_Keys_And_Query_Indexes()
+    {
+        await using var connection = await _database.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(@"
+            SELECT
+                EXISTS (SELECT 1 FROM pg_constraint
+                        WHERE conrelid = 'public.cities'::regclass
+                          AND confrelid = 'public.countries'::regclass AND contype = 'f')
+                AND EXISTS (SELECT 1 FROM pg_constraint
+                            WHERE conrelid = 'public.attractions'::regclass
+                              AND confrelid = 'public.categories'::regclass AND contype = 'f')
+                AND EXISTS (SELECT 1 FROM pg_constraint
+                            WHERE conrelid = 'public.visits'::regclass
+                              AND confrelid = 'public.users'::regclass AND contype = 'f'
+                              AND confdeltype = 'c')
+                AND EXISTS (SELECT 1 FROM pg_constraint
+                            WHERE conrelid = 'public.photos'::regclass
+                              AND confrelid = 'public.visits'::regclass AND contype = 'f'
+                              AND confdeltype = 'c')
+                AND EXISTS (SELECT 1 FROM pg_constraint
+                            WHERE conrelid = 'public.user_map_place_photos'::regclass
+                              AND confrelid = 'public.user_map_places'::regclass AND contype = 'f'
+                              AND confdeltype = 'c')
+                AND to_regclass('public.ix_attractions_city') IS NOT NULL
+                AND to_regclass('public.ix_attractions_category') IS NOT NULL
+                AND to_regclass('public.ix_visits_user_date') IS NOT NULL
+                AND to_regclass('public.ix_visits_attraction') IS NOT NULL
+                AND to_regclass('public.ix_photos_visit') IS NOT NULL
+                AND to_regclass('public.ix_wishlist_attraction') IS NOT NULL
+                AND to_regclass('public.ix_user_map_places_user') IS NOT NULL
+                AND to_regclass('public.ix_user_map_place_photos') IS NOT NULL",
+            connection);
+
+        Assert.True((bool)(await command.ExecuteScalarAsync() ?? false));
+    }
+
+    [Fact]
+    public async Task Foreign_Keys_Reject_References_To_Missing_Parents()
+    {
+        await using var connection = await _database.OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(@"
+            INSERT INTO visits(user_id, attraction_id, visit_date, rating)
+            VALUES (-1, -1, CURRENT_DATE, 5)", connection);
+
+        var exception = await Assert.ThrowsAsync<PostgresException>(
+            () => command.ExecuteNonQueryAsync());
+        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, exception.SqlState);
     }
 
     private static async Task<(int UserId, int AttractionId)> InsertUserAndAttractionAsync(
