@@ -51,7 +51,7 @@ cd LocaLoca
 Установите клиентские зависимости и задайте облачный адрес API:
 
 ```powershell
-.\\tools\\Install-CloudDependencies.ps1
+.\tools\Install-CloudDependencies.ps1
 ```
 
 Откройте `LocaLoca.sln`, дождитесь восстановления пакетов, выберите `Debug / x64 / Unpackaged` и запустите приложение клавишей F5.
