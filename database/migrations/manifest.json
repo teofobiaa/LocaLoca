@@ -1,0 +1,74 @@
+{
+  "manifestVersion": 1,
+  "currentSchemaVersion": 9,
+  "baseline": {
+    "version": 9,
+    "path": "schema/01_schema.sql",
+    "includesSchemaMigrations": [
+      3,
+      4,
+      7,
+      8,
+      9
+    ],
+    "sha256": "60bff727b210ba46a771589dec8bac3e30115d08fc10ca16c9f34e87f4b1f072"
+  },
+  "seed": {
+    "version": 2,
+    "path": "seed/02_seed.sql",
+    "sha256": "c7ddb1ac9aca2819f921147a12b108c268cf805e2a53c17a56ed30bae95024c2"
+  },
+  "trackingBootstrap": {
+    "version": 0,
+    "path": "migrations/00_migration_history.sql",
+    "sha256": "14feaf864ac9d48fa19ff2612ac2347307a8a0dbd72109e4482f9d00e5bb0426"
+  },
+  "schemaMigrations": [
+    {
+      "version": 3,
+      "name": "migrate_wishlist",
+      "path": "migrations/03_migrate_wishlist.sql",
+      "sha256": "57ec949a489cb85d6c074fb87a7bbd0be69030a2969bca502f395db99bf48850"
+    },
+    {
+      "version": 4,
+      "name": "migrate_user_map_places",
+      "path": "migrations/04_migrate_user_map_places.sql",
+      "sha256": "4202ce438a1b6c7e1180e94eb2a5c933e80f7d95c74dec49dccc118345248291"
+    },
+    {
+      "version": 7,
+      "name": "migrate_photo_storage",
+      "path": "migrations/07_migrate_photo_storage.sql",
+      "sha256": "2d36fdbe65ef34897426dad41fbc73b75d48a1fb734367774c22dbd01693f571"
+    },
+    {
+      "version": 8,
+      "name": "server_sessions",
+      "path": "migrations/08_server_sessions.sql",
+      "sha256": "6977f852e9a88e5227697e86784a7e8d91f91710c0b0539d306daf5bbd1e1bb5"
+    },
+    {
+      "version": 9,
+      "name": "map_marker_viewport_indexes",
+      "path": "migrations/09_map_marker_viewport_indexes.sql",
+      "sha256": "fafecaed7798d7767a18f2c2d21fc26da32e2ad7384c7a34c858bc78f3692fbf"
+    }
+  ],
+  "securityScripts": [
+    {
+      "version": 5,
+      "name": "create_app_role",
+      "path": "security/05_create_app_role.sql",
+      "repeatable": false,
+      "sha256": "52bd80f5e0911105a27d99384a2138dde60cab67de400c27539fccd9e779bf08"
+    },
+    {
+      "version": 6,
+      "name": "update_runtime_permissions",
+      "path": "security/06_update_runtime_permissions.sql",
+      "repeatable": true,
+      "sha256": "d0b3785b4b367823fea965770976d4f92b381f08626dfac6642d3aa98bed2243"
+    }
+  ]
+}
