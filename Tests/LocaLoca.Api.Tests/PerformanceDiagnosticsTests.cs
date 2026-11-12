@@ -39,13 +39,13 @@ public sealed class PerformanceDiagnosticsTests(PostgreSqlApiFixture fixture)
         using var response = await client.GetAsync("/ready");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains(
-            measurements.GetValueOrDefault(PerformanceDiagnosticsExtensions.HttpRequestDurationName)
-                ?? [],
-            duration => duration >= 0);
-        Assert.Contains(
-            measurements.GetValueOrDefault(PerformanceDiagnosticsExtensions.DbCommandDurationName)
-                ?? [],
-            duration => duration >= 0);
+        Assert.True(
+            measurements.TryGetValue(PerformanceDiagnosticsExtensions.HttpRequestDurationName, out var httpDurations) &&
+            httpDurations.Any(duration => duration >= 0),
+            "The HTTP request histogram did not record a measurement.");
+        Assert.True(
+            measurements.TryGetValue(PerformanceDiagnosticsExtensions.DbCommandDurationName, out var dbDurations) &&
+            dbDurations.Any(duration => duration >= 0),
+            "The PostgreSQL command histogram did not record a measurement.");
     }
 }
