@@ -11,6 +11,8 @@ using LocaLoca.Api;
 using LocaLoca.Api.Security;
 
 var builder = WebApplication.CreateBuilder(args);
+var passwordHashIterations = PasswordHasher.GetConfiguredIterations(
+    builder.Configuration["LOCA_PASSWORD_PBKDF2_ITERATIONS"]);
 // Local development keeps the loopback endpoint. Render supplies PORT; in the
 // container the API must listen on all interfaces so the platform can reach it.
 var renderPort = builder.Configuration["PORT"];
@@ -265,7 +267,7 @@ app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, 
         ON CONFLICT (login) DO NOTHING
         RETURNING user_id", connection);
     command.Parameters.AddWithValue("login", NpgsqlDbType.Varchar, login);
-    command.Parameters.AddWithValue("hash", NpgsqlDbType.Varchar, PasswordHasher.Hash(request.Password));
+    command.Parameters.AddWithValue("hash", NpgsqlDbType.Varchar, PasswordHasher.Hash(request.Password, passwordHashIterations));
     command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
     var result = await command.ExecuteScalarAsync(cancellationToken);
     if (result is null) return Results.Conflict(new ApiErrorResponse("Пользователь с таким логином уже существует."));
@@ -276,14 +278,58 @@ app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, 
 app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     var login = (request.Login ?? string.Empty).Trim().ToLowerInvariant();
+    var password = request.Password ?? string.Empty;
     await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(
         "SELECT user_id, password_hash, display_name FROM users WHERE login = @login", connection);
     command.Parameters.AddWithValue("login", NpgsqlDbType.Varchar, login);
-    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-    if (!await reader.ReadAsync(cancellationToken) || !PasswordHasher.Verify(request.Password ?? string.Empty, reader.GetString(1)))
+
+    int userId;
+    string storedHash;
+    string displayName;
+    await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+    {
+        if (!await reader.ReadAsync(cancellationToken))
+            return Results.Unauthorized();
+
+        userId = reader.GetInt32(0);
+        storedHash = reader.GetString(1);
+        displayName = reader.GetString(2);
+    }
+
+    if (!PasswordHasher.Verify(password, storedHash))
         return Results.Unauthorized();
-    var user = new UserDto(reader.GetInt32(0), login, reader.GetString(2));
+
+    if (PasswordHasher.NeedsRehash(storedHash, passwordHashIterations))
+    {
+        var upgradedHash = PasswordHasher.Hash(
+            password,
+            PasswordHasher.GetUpgradeIterations(storedHash, passwordHashIterations));
+
+        // Compare-and-swap avoids overwriting a concurrent password reset.
+        await using var updateCommand = new NpgsqlCommand(@"
+            UPDATE users
+            SET password_hash = @new_hash
+            WHERE user_id = @user_id AND password_hash = @old_hash", connection);
+        updateCommand.Parameters.AddWithValue("new_hash", NpgsqlDbType.Varchar, upgradedHash);
+        updateCommand.Parameters.AddWithValue("user_id", NpgsqlDbType.Integer, userId);
+        updateCommand.Parameters.AddWithValue("old_hash", NpgsqlDbType.Varchar, storedHash);
+
+        var updated = await updateCommand.ExecuteNonQueryAsync(cancellationToken);
+        if (updated == 0)
+        {
+            // Another login may have upgraded first. Issue a session only if the
+            // current password record still matches the submitted password.
+            await using var currentHashCommand = new NpgsqlCommand(
+                "SELECT password_hash FROM users WHERE user_id = @user_id", connection);
+            currentHashCommand.Parameters.AddWithValue("user_id", NpgsqlDbType.Integer, userId);
+            var currentHash = await currentHashCommand.ExecuteScalarAsync(cancellationToken) as string;
+            if (!PasswordHasher.Verify(password, currentHash ?? string.Empty))
+                return Results.Unauthorized();
+        }
+    }
+
+    var user = new UserDto(userId, login, displayName);
     return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!, cancellationToken)));
 }).RequireRateLimiting("auth-login");
 

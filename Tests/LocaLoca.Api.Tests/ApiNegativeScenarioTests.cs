@@ -414,13 +414,53 @@ public sealed class ApiNegativeScenarioTests
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
     private const string ValidJpegBase64 =
-        "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABQODxIPDRQSEBIXFRQYHjIhHhwcHj0sLiQySUBMS0dARkVQWnNiUFVtVkVGZIhlbXd7gYKBTmCNl4x9lnN+gXz/2wBDARUXFx4aHjshITt8U0ZTfHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHz/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIwAH//Z";
+        "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABQODxIPDRQSEBIXFRQYHjIhHhwcHj0sLiQySUBMS0dARkVQWnNiUFVtVkVGZIhlbXd7gYKBTmCNl4x9lnN+gXz/2wBDARUXFx4aHjshITt8U0ZTfHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHz/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIwAH//Z";
 
     private static byte[] CreateJpeg(int size)
     {
         var validJpeg = Convert.FromBase64String(ValidJpegBase64);
-        var bytes = new byte[Math.Max(size, validJpeg.Length)];
-        Buffer.BlockCopy(validJpeg, 0, bytes, 0, validJpeg.Length);
+        if (size <= validJpeg.Length)
+            return validJpeg;
+
+        // Insert legal JPEG COM segments after the JFIF header so the test payload
+        // has the requested byte length without trailing junk after the EOI marker.
+        var insertionOffset = 2;
+        if (validJpeg.Length >= 6 && validJpeg[2] == 0xFF && validJpeg[3] == 0xE0)
+        {
+            var app0Length = (validJpeg[4] << 8) | validJpeg[5];
+            insertionOffset = 4 + app0Length;
+        }
+
+        var paddingBytes = size - validJpeg.Length;
+        var segmentCount = (int)Math.Ceiling(paddingBytes / 65_537d);
+        var bytes = new byte[size];
+        Buffer.BlockCopy(validJpeg, 0, bytes, 0, insertionOffset);
+
+        var outputOffset = insertionOffset;
+        var remainingPadding = paddingBytes;
+        for (var index = 0; index < segmentCount; index++)
+        {
+            var remainingSegments = segmentCount - index - 1;
+            var segmentSize = Math.Min(65_537, remainingPadding - (remainingSegments * 4));
+            if (segmentSize < 4)
+                throw new InvalidOperationException("Unable to encode the requested JPEG padding.");
+
+            bytes[outputOffset] = 0xFF;
+            bytes[outputOffset + 1] = 0xFE;
+            var markerLength = segmentSize - 2;
+            bytes[outputOffset + 2] = (byte)(markerLength >> 8);
+            bytes[outputOffset + 3] = (byte)markerLength;
+
+            outputOffset += segmentSize;
+            remainingPadding -= segmentSize;
+        }
+
+        Buffer.BlockCopy(
+            validJpeg,
+            insertionOffset,
+            bytes,
+            outputOffset,
+            validJpeg.Length - insertionOffset);
         return bytes;
     }
 
