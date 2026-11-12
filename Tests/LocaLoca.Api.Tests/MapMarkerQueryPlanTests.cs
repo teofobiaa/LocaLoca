@@ -112,7 +112,7 @@ SELECT
     'Map plan personal place ' || generated.id,
     round((-90 + random() * 180)::numeric, 6),
     round((-180 + random() * 360)::numeric, 6),
-    CASE WHEN generated.id % 2 = 0 THEN 'planned' ELSE 'visited' END
+    'planned'
 FROM generate_series(1, @count) AS generated(id)", connection))
         {
             personalPlaces.Parameters.AddWithValue("user", userId);
