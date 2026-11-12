@@ -816,6 +816,21 @@ app.MapGet("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int ph
     return Results.File(fullPath, ImageContentValidator.GetContentType(fullPath));
 });
 
+app.MapDelete("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
+{
+    if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+    await using var connection = await OpenAsync(connectionString);
+    await using var command = new NpgsqlCommand(@"DELETE FROM user_map_place_photos p USING user_map_places m
+        WHERE p.user_map_place_id = m.user_map_place_id AND p.photo_id = @p AND m.user_id = @u
+        RETURNING p.file_path", connection);
+    command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
+    command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
+    var path = await command.ExecuteScalarAsync() as string;
+    if (path is null) return Results.NotFound();
+    TryDeletePhoto(dataRoot, path);
+    return Results.Ok(new MessageDto("Фотография удалена."));
+});
+
 app.MapGet("/map", IResult () =>
 {
     var path = Path.Combine(app.Environment.ContentRootPath, "wwwroot", "map.html");

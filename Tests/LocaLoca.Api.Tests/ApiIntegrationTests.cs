@@ -290,6 +290,72 @@ public sealed class ApiIntegrationTests
     }
 
     [Fact]
+    public async Task Personal_Map_Place_Photo_Can_Be_Deleted_Only_By_Its_Owner()
+    {
+        using var factory = _database.CreateFactory();
+        using var ownerClient = factory.CreateClient();
+        using var otherClient = factory.CreateClient();
+        using var anonymousClient = factory.CreateClient();
+
+        var owner = await RegisterAsync(ownerClient);
+        var other = await RegisterAsync(otherClient);
+        SetBearer(ownerClient, owner.Token);
+        SetBearer(otherClient, other.Token);
+
+        using var createPlace = await ownerClient.PostAsJsonAsync("/api/me/map-places", new
+        {
+            name = "Photo deletion test point",
+            latitude = 52.52,
+            longitude = 13.405,
+            status = "planned",
+            visitDate = (string?)null,
+            rating = (int?)null,
+            impressions = "",
+            notes = ""
+        });
+        Assert.Equal(HttpStatusCode.OK, createPlace.StatusCode);
+        var place = await createPlace.Content.ReadFromJsonAsync<ApiTestMapPlaceResponse>();
+        Assert.NotNull(place);
+        var placeId = place!.Id;
+
+        byte[] jpegBytes = [0xFF, 0xD8, 0xFF, 0xD9];
+        using var form = new MultipartFormDataContent();
+        var image = new ByteArrayContent(jpegBytes);
+        image.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
+        form.Add(image, "photos", "map-place-photo.jpg");
+
+        using var upload = await ownerClient.PostAsync($"/api/me/map-places/{placeId}/photos", form);
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+
+        using var photosResponse = await ownerClient.GetAsync($"/api/me/map-places/{placeId}/photos");
+        var photos = await ReadItemsAsync(photosResponse);
+        var photo = Assert.Single(photos);
+        var photoId = photo.GetProperty("id").GetInt32();
+
+        using var ownerPhoto = await ownerClient.GetAsync($"/api/me/map-place-photos/{photoId}");
+        Assert.Equal(HttpStatusCode.OK, ownerPhoto.StatusCode);
+        Assert.Equal(jpegBytes, await ownerPhoto.Content.ReadAsByteArrayAsync());
+
+        using var foreignRead = await otherClient.GetAsync($"/api/me/map-place-photos/{photoId}");
+        using var anonymousDelete = await anonymousClient.DeleteAsync($"/api/me/map-place-photos/{photoId}");
+        using var foreignDelete = await otherClient.DeleteAsync($"/api/me/map-place-photos/{photoId}");
+        Assert.Equal(HttpStatusCode.NotFound, foreignRead.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousDelete.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, foreignDelete.StatusCode);
+
+        using var stillAvailable = await ownerClient.GetAsync($"/api/me/map-place-photos/{photoId}");
+        Assert.Equal(HttpStatusCode.OK, stillAvailable.StatusCode);
+
+        using var delete = await ownerClient.DeleteAsync($"/api/me/map-place-photos/{photoId}");
+        using var afterDelete = await ownerClient.GetAsync($"/api/me/map-place-photos/{photoId}");
+        using var photosAfterDelete = await ownerClient.GetAsync($"/api/me/map-places/{place.Id}/photos");
+
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, afterDelete.StatusCode);
+        Assert.Empty(await ReadItemsAsync(photosAfterDelete));
+    }
+
+    [Fact]
     public async Task Owner_Can_Update_And_Delete_Their_Own_Visit()
     {
         using var factory = _database.CreateFactory();
