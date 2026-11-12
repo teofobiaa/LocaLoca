@@ -90,6 +90,8 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
 
     private string ConnectionString { get; }
 
+    public string SessionSecretForTests => _sessionSecret;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
