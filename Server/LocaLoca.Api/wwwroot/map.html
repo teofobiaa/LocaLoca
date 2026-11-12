@@ -250,23 +250,69 @@
         });
       }, 0);
     });
+
+    let markerRequestId = 0;
+    let mapMoveTimer = null;
+    const markerPageSize = 500;
+
+    function normalizeLongitude(value) {
+      return ((value + 180) % 360 + 360) % 360 - 180;
+    }
+
     async function loadMarkers() {
+      const requestId = ++markerRequestId;
       try {
-        for (const urls of photoUrls.values()) for (const url of urls) URL.revokeObjectURL(url);
+        const bounds = map.getBounds();
+        const rawWest = bounds.getWest();
+        const rawEast = bounds.getEast();
+        const spansWorld = rawEast - rawWest >= 359.999;
+        const query = new URLSearchParams({
+          south: bounds.getSouth().toFixed(6),
+          west: (spansWorld ? -180 : normalizeLongitude(rawWest)).toFixed(6),
+          north: bounds.getNorth().toFixed(6),
+          east: (spansWorld ? 180 : normalizeLongitude(rawEast)).toFixed(6),
+          page: '1',
+          pageSize: String(markerPageSize)
+        });
+
+        const data = await api('/api/me/map-markers?' + query.toString());
+        if (requestId !== markerRequestId) return;
+
+        for (const urls of photoUrls.values())
+          for (const url of urls) URL.revokeObjectURL(url);
         photoUrls.clear();
         markers.clearLayers();
-        const data = await api('/api/me/map-markers');
-        const bounds = [];
+
         data.items.forEach(item => {
           const color = item.visited ? palette.visited : (item.wished ? palette.wished : palette.normal);
           const marker = L.marker([item.latitude, item.longitude], { icon:markerIcon(color) }).addTo(markers);
           if (item.userPlaceId) bindPlaceEditor(marker, item);
-          else marker.bindPopup(`<b>${escapeHtml(item.name)}</b><br>${item.visited ? 'Посещено' : (item.wished ? 'Хочу посетить' : 'В каталоге')}`);
-          bounds.push([item.latitude, item.longitude]);
+          else marker.bindPopup(
+            '<b>' + escapeHtml(item.name) + '</b><br>' +
+            (item.visited ? 'Посещено' : (item.wished ? 'Хочу посетить' : 'В каталоге'))
+          );
         });
-        if (bounds.length) map.fitBounds(bounds, { padding:[35,35], maxZoom:6 });
-      } catch (e) { alert(e.message); }
+
+        const hint = document.getElementById('map-hint');
+        if (data.hasMore) {
+          hint.textContent = 'Показаны первые ' + data.items.length + ' из ' + data.totalCount +
+            ' точек в этой области. Приблизьте карту, чтобы сузить выдачу.';
+        } else {
+          hint.textContent = data.totalCount
+            ? 'Точек в видимой области: ' + data.totalCount + '. Нажмите на карту, чтобы добавить своё место'
+            : 'В этой области пока нет точек. Нажмите на карту, чтобы добавить своё место';
+        }
+      } catch (error) {
+        if (requestId === markerRequestId)
+          document.getElementById('map-hint').textContent = error.message;
+      }
     }
+
+    map.on('moveend', () => {
+      window.clearTimeout(mapMoveTimer);
+      mapMoveTimer = window.setTimeout(loadMarkers, 180);
+    });
+
     function escapeHtml(value) { return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     loadMarkers();
   </script>

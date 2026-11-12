@@ -193,20 +193,17 @@ public sealed class LocaLocaApiClient : IDisposable
         if (!string.IsNullOrWhiteSpace(search)) parts.Add("search=" + Uri.EscapeDataString(search.Trim()));
         if (categoryId.HasValue) parts.Add("categoryId=" + categoryId.Value.ToString(CultureInfo.InvariantCulture));
         var path = "api/catalog" + (parts.Count == 0 ? string.Empty : "?" + string.Join("&", parts));
-        var result = await GetJsonAsync<ItemsResponse<AttractionDto>>(path, cancellationToken);
-        return result.Items;
+        return await GetAllPagesAsync<AttractionDto>(path, cancellationToken);
     }
 
     public async Task<List<VisitDto>> GetVisitsAsync(CancellationToken cancellationToken = default)
     {
-        var result = await GetJsonAsync<ItemsResponse<VisitDto>>("api/me/visits", cancellationToken);
-        return result.Items;
+        return await GetAllPagesAsync<VisitDto>("api/me/visits", cancellationToken);
     }
 
     public async Task<List<int>> GetWishlistAsync(CancellationToken cancellationToken = default)
     {
-        var result = await GetJsonAsync<IntItemsResponse>("api/me/wishlist", cancellationToken);
-        return result.Items;
+        return await GetAllPagesAsync<int>("api/me/wishlist", cancellationToken);
     }
 
     public Task<SummaryDto> GetSummaryAsync(CancellationToken cancellationToken = default) =>
@@ -378,6 +375,32 @@ public sealed class LocaLocaApiClient : IDisposable
         }
         catch (HttpRequestException) { return null; }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { return null; }
+    }
+
+    private async Task<List<TItem>> GetAllPagesAsync<TItem>(string path, CancellationToken cancellationToken)
+    {
+        const int pageSize = 100;
+        const int maximumItems = 100_000;
+        var items = new List<TItem>();
+        var separator = path.Contains('?') ? "&" : "?";
+
+        for (var page = 1; ; page++)
+        {
+            var pagePath = path + separator +
+                "page=" + page.ToString(CultureInfo.InvariantCulture) +
+                "&pageSize=" + pageSize.ToString(CultureInfo.InvariantCulture);
+            var result = await GetJsonAsync<PagedItemsResponse<TItem>>(pagePath, cancellationToken);
+
+            if (result.Items.Count > pageSize || (result.HasMore && result.Items.Count == 0))
+                throw new InvalidOperationException("Сервер вернул некорректную страницу данных.");
+
+            items.AddRange(result.Items);
+            if (items.Count > maximumItems)
+                throw new InvalidOperationException("Выдача слишком велика для загрузки в один экран. Уточните поиск или фильтр.");
+
+            if (!result.HasMore)
+                return items;
+        }
     }
 
     private async Task<T> GetJsonAsync<T>(string path, CancellationToken cancellationToken)
