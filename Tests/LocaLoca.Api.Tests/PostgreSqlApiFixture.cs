@@ -74,7 +74,37 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
     // stop and restart the shared isolated PostgreSQL container.
     public Task StopDatabaseAsync() => _postgres.StopAsync();
 
-    public Task StartDatabaseAsync() => _postgres.StartAsync();
+    public async Task StartDatabaseAsync()
+    {
+        await _postgres.StartAsync();
+
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(15);
+        Exception? lastError = null;
+        var connectionString = new NpgsqlConnectionStringBuilder(ConnectionString)
+        {
+            Pooling = false,
+            Timeout = 2
+        }.ConnectionString;
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            try
+            {
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync();
+                return;
+            }
+            catch (Exception ex) when (ex is NpgsqlException or TimeoutException)
+            {
+                lastError = ex;
+                await Task.Delay(TimeSpan.FromMilliseconds(150));
+            }
+        }
+
+        throw new TimeoutException(
+            "The isolated PostgreSQL container did not accept connections after restart.",
+            lastError);
+    }
 
     public async Task DisposeAsync()
     {

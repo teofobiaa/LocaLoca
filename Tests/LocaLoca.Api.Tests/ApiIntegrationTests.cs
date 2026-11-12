@@ -563,7 +563,11 @@ public sealed class ApiIntegrationTests
         using var ready = await client.GetAsync("/ready");
         using var recovered = await client.GetAsync("/api/me/visits");
 
-        Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
+        var readyBody = await ready.Content.ReadAsStringAsync();
+        Assert.True(
+            ready.StatusCode == HttpStatusCode.OK,
+            $"API readiness did not recover after PostgreSQL restart. Status: {(int)ready.StatusCode}; body: {readyBody}");
+
         var recoveredVisits = await ReadItemsAsync(recovered);
         Assert.Contains(recoveredVisits, item => item.GetProperty("id").GetInt32() == visitId);
     }
