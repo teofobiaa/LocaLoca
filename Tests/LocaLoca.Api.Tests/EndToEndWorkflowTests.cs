@@ -67,7 +67,8 @@ public sealed class EndToEndWorkflowTests
         using var placeJson = JsonDocument.Parse(await placeResponse.Content.ReadAsStringAsync());
         var placeId = placeJson.RootElement.GetProperty("id").GetInt32();
 
-        byte[] imageBytes = [0xFF, 0xD8, 0xFF, 0xD9];
+        byte[] imageBytes = Convert.FromBase64String(
+            "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCQgKADv//Z");
         using var form = new MultipartFormDataContent();
         var image = new ByteArrayContent(imageBytes);
         image.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");

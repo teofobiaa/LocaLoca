@@ -413,12 +413,14 @@ public sealed class ApiNegativeScenarioTests
     private static void SetBearer(HttpClient client, string token) =>
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
+    private const string ValidJpegBase64 =
+        "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCQgKADv//Z";
+
     private static byte[] CreateJpeg(int size)
     {
-        var bytes = new byte[size];
-        bytes[0] = 0xFF;
-        bytes[1] = 0xD8;
-        bytes[2] = 0xFF;
+        var validJpeg = Convert.FromBase64String(ValidJpegBase64);
+        var bytes = new byte[Math.Max(size, validJpeg.Length)];
+        Buffer.BlockCopy(validJpeg, 0, bytes, 0, validJpeg.Length);
         return bytes;
     }
 

@@ -211,7 +211,8 @@ public sealed class ApiIntegrationTests
         SetBearer(otherClient, other.Token);
 
         var visitId = await CreateVisitAsync(ownerClient);
-        byte[] jpegBytes = [0xFF, 0xD8, 0xFF, 0xD9];
+        byte[] jpegBytes = Convert.FromBase64String(
+            "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCQgKADv//Z");
 
         using var form = new MultipartFormDataContent();
         var image = new ByteArrayContent(jpegBytes);
@@ -350,7 +351,8 @@ public sealed class ApiIntegrationTests
         Assert.NotNull(place);
         var placeId = place!.Id;
 
-        byte[] jpegBytes = [0xFF, 0xD8, 0xFF, 0xD9];
+        byte[] jpegBytes = Convert.FromBase64String(
+            "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAf/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAABgf/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCQgKADv//Z");
         using var form = new MultipartFormDataContent();
         var image = new ByteArrayContent(jpegBytes);
         image.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
@@ -616,8 +618,9 @@ public sealed class ApiIntegrationTests
         var visitId = await CreateVisitAsync(client);
         var initialCount = await CountPhotosAsync();
 
-        var truncatedPng = Convert.FromBase64String(
-            "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAE0lEQVR4nGPUCKj4zwAFTAxIAAAsaAHzuDKVEg==");
+        var completePng = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAE0lEQVR4nGPUCKj4zwAFTAxIAAAsaAHzuDKVEgAAAABJRU5ErkJggg==");
+        var truncatedPng = completePng[..45];
         using var form = new MultipartFormDataContent();
         form.Add(new ByteArrayContent(truncatedPng), "file", "truncated.png");
 

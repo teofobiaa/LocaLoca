@@ -558,6 +558,18 @@ app.MapDelete("/api/me/visits/{visitId:int}", async Task<IResult> (int visitId, 
 app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visitId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+
+    // Avoid parsing and decoding user-controlled bytes for foreign or missing visits.
+    await using (var preflightConnection = await OpenAsync(connectionString, cancellationToken))
+    await using (var preflightOwnership = new NpgsqlCommand(
+        "SELECT 1 FROM visits WHERE visit_id = @v AND user_id = @u", preflightConnection))
+    {
+        preflightOwnership.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId);
+        preflightOwnership.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
+        if (await preflightOwnership.ExecuteScalarAsync(cancellationToken) is null)
+            return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
+    }
+
     var form = await context.Request.ReadFormAsync(cancellationToken);
     var file = form.Files.GetFile("file");
     if (file is null || file.Length == 0) return Results.BadRequest(new ApiErrorResponse("Файл не выбран."));
@@ -823,6 +835,18 @@ app.MapGet("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int p
 app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int placeId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+
+    // Avoid decoding uploads when the map place is foreign or no longer exists.
+    await using (var preflightConnection = await OpenAsync(connectionString, cancellationToken))
+    await using (var preflightOwnership = new NpgsqlCommand(
+        "SELECT 1 FROM user_map_places WHERE user_map_place_id=@p AND user_id=@u", preflightConnection))
+    {
+        preflightOwnership.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
+        preflightOwnership.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
+        if (await preflightOwnership.ExecuteScalarAsync(cancellationToken) is null)
+            return Results.NotFound(new ApiErrorResponse("Место не найдено."));
+    }
+
     var form = await context.Request.ReadFormAsync(cancellationToken);
     var files = form.Files.GetFiles("photos");
     if (files.Count is < 1 or > 10) return Results.BadRequest(new ApiErrorResponse("Выберите от 1 до 10 фотографий."));
