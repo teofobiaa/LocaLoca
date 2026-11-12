@@ -68,6 +68,7 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 var app = builder.Build();
+app.UsePerformanceDiagnostics(builder.Configuration);
 
 const int DefaultPageSize = 50;
 const int MaxPageSize = 100;
