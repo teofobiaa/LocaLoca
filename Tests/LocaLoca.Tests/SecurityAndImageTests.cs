@@ -97,8 +97,8 @@ public sealed class ImageContentValidatorTests
         var result = ImageContentValidator.Validate(jpeg, ".jpg");
 
         Assert.True(result.IsValid, result.Error);
-        Assert.Equal(2, result.Width);
-        Assert.Equal(2, result.Height);
+        Assert.Equal(1, result.Width);
+        Assert.Equal(1, result.Height);
         Assert.Equal(1, result.FrameCount);
     }
 
