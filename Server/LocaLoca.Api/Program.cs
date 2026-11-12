@@ -113,9 +113,9 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
         {
             // Testcontainers uses an ephemeral loopback-mapped PostgreSQL port.
             // This exception is available only inside the isolated Testing host.
-            connectionBuilder.Pooling = true;
-            // Each desktop installation runs a local API process. Keep its
-            // pool small when connecting through Supabase Pooler.
+            // Preserve the caller's pooling setting. Npgsql enables pooling by
+            // default, while tests and diagnostics may explicitly disable it.
+            // Keep each desktop API process' pool small for Supabase Pooler.
             connectionBuilder.MaxPoolSize = Math.Min(connectionBuilder.MaxPoolSize, 5);
             connectionString = connectionBuilder.ConnectionString;
         }

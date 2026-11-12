@@ -1,5 +1,5 @@
 -- Upgrade an existing LocaLoca runtime role to the current application schema.
--- Run as the database administrator after migrations/03 and /04.
+-- Run as the database administrator after migrations/03 and /04; safe before or after migration/08.
 -- Safe to execute more than once; it does not change ownership or grant admin privileges.
 
 GRANT UPDATE (display_name) ON TABLE public.users TO localoca_app;
@@ -30,4 +30,11 @@ SELECT
     has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE') AS map_places_sequence,
     has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE') AS map_photos_sequence;
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions TO localoca_app;
+-- This script is also run before migration 08 on older installations.
+-- Grant session access only when the table has already been created.
+DO $
+BEGIN
+    IF to_regclass('public.user_sessions') IS NOT NULL THEN
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions TO localoca_app;
+    END IF;
+END $;

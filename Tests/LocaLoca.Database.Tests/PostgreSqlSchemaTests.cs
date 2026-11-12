@@ -240,14 +240,30 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "03_migrate_wishlist.sql");
         await _database.ExecuteSqlFileAsync("migrations", "04_migrate_user_map_places.sql");
         await _database.ExecuteSqlFileAsync("migrations", "04_migrate_user_map_places.sql");
+        // Migration 06 must be safe both before and after the session table exists.
         await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
         await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
         await _database.ExecuteSqlFileAsync("migrations", "07_migrate_photo_storage.sql");
         await _database.ExecuteSqlFileAsync("migrations", "07_migrate_photo_storage.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "08_server_sessions.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "08_server_sessions.sql");
+
+        await using (var revokeSessionPermissions = new NpgsqlCommand(
+            "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
+            connection))
+        {
+            await revokeSessionPermissions.ExecuteNonQueryAsync();
+        }
+        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
+        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
 
         await using var permissionCheck = new NpgsqlCommand(@"
             SELECT
                 has_column_privilege('localoca_app', 'public.users', 'display_name', 'UPDATE')
+                AND has_table_privilege('localoca_app', 'public.user_sessions', 'SELECT')
+                AND has_table_privilege('localoca_app', 'public.user_sessions', 'INSERT')
+                AND has_table_privilege('localoca_app', 'public.user_sessions', 'UPDATE')
+                AND has_table_privilege('localoca_app', 'public.user_sessions', 'DELETE')
                 AND has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE')

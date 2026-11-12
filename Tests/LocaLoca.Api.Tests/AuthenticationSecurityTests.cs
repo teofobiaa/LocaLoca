@@ -239,7 +239,7 @@ public sealed class AuthenticationSecurityTests
 
     private static string CreateSignedToken(string secret, int userId, long expiresAt)
     {
-        var payload = Encoding.UTF8.GetBytes($"{userId}:{expiresAt}");
+        var payload = Encoding.UTF8.GetBytes($"{userId}:{expiresAt}:{Guid.NewGuid():N}");
         var encodedPayload = Base64UrlEncode(payload);
         var signature = HMACSHA256.HashData(
             Encoding.UTF8.GetBytes(secret),
