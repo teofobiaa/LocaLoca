@@ -132,6 +132,14 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
 
 app.Use(async (context, next) =>
 {
+    // Liveness/readiness probes must not depend on session lookup, even when a
+    // client reuses an HttpClient carrying a Bearer header.
+    if (context.Request.Path == "/health" || context.Request.Path == "/ready")
+    {
+        await next();
+        return;
+    }
+
     var header=context.Request.Headers["Authorization"].ToString();
     if(header.StartsWith("Bearer ",StringComparison.OrdinalIgnoreCase)&&!string.IsNullOrWhiteSpace(connectionString)){
         var token=header[7..].Trim();
