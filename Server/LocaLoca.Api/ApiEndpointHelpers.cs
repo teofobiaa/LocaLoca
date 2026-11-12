@@ -4,9 +4,9 @@ using LocaLoca.Api.Security;
 
 namespace LocaLoca.Api;
 
-public static class ApiEndpointHelpers
+internal static class ApiEndpointHelpers
 {
-    static async Task<NpgsqlConnection> OpenAsync(string? connectionString, CancellationToken cancellationToken)
+    internal static async Task<NpgsqlConnection> OpenAsync(string? connectionString, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
             throw new DatabaseUnavailableException("PostgreSQL connection is not configured.");
@@ -23,7 +23,7 @@ public static class ApiEndpointHelpers
         }
     }
     
-    static async Task<IResult> SaveVisitAsync(string connectionString, VisitWriteRequest request, int userId, int? visitId, CancellationToken cancellationToken)
+    internal static async Task<IResult> SaveVisitAsync(string connectionString, VisitWriteRequest request, int userId, int? visitId, CancellationToken cancellationToken)
     {
         if (request.AttractionId <= 0) return Results.BadRequest(new ApiErrorResponse("Выберите достопримечательность."));
         if (!DateOnly.TryParse(request.VisitDate, out var date) || date > DateOnly.FromDateTime(DateTime.Today))
@@ -54,7 +54,7 @@ public static class ApiEndpointHelpers
         return Results.Ok(new VisitSavedDto(id, "Посещение сохранено."));
     }
     
-    static void AddVisitParameters(NpgsqlCommand command, int userId, VisitWriteRequest request, DateOnly date)
+    internal static void AddVisitParameters(NpgsqlCommand command, int userId, VisitWriteRequest request, DateOnly date)
     {
         command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
         command.Parameters.AddWithValue("a", NpgsqlDbType.Integer, request.AttractionId);
@@ -64,13 +64,13 @@ public static class ApiEndpointHelpers
         command.Parameters.AddWithValue("n", NpgsqlDbType.Text, request.Notes ?? string.Empty);
     }
     
-    static bool TryUser(HttpContext context, SessionStore sessions, out int userId)
+    internal static bool TryUser(HttpContext context, SessionStore sessions, out int userId)
     {
         userId = context.Items.TryGetValue("LocaLoca.UserId", out var value) && value is int id ? id : 0;
         return userId > 0;
     }
     
-    static async Task<byte[]> ReadPhotoDataAsync(IFormFile file, CancellationToken cancellationToken)
+    internal static async Task<byte[]> ReadPhotoDataAsync(IFormFile file, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         await using var source = file.OpenReadStream();
@@ -79,7 +79,7 @@ public static class ApiEndpointHelpers
         return buffer.ToArray();
     }
     
-    static string? SafePhotoPath(string dataRoot, string relativePath)
+    internal static string? SafePhotoPath(string dataRoot, string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath)) return null;
         var root = Path.GetFullPath(dataRoot + Path.DirectorySeparatorChar);
@@ -87,7 +87,7 @@ public static class ApiEndpointHelpers
         return full.StartsWith(root, StringComparison.OrdinalIgnoreCase) ? full : null;
     }
     
-    static void TryDeletePhoto(string dataRoot, string relativePath)
+    internal static void TryDeletePhoto(string dataRoot, string relativePath)
     {
         try
         {
