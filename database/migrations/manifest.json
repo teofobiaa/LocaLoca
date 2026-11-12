@@ -12,7 +12,7 @@
       9,
       10
     ],
-    "sha256": "0d7f5f1f924cd73f831fb0a46179a456c94bdb8da9c937673eacf1a3aa6c498b"
+    "sha256": "2453843be96b853be73ed0472a0a6e5a4c365abb9be6b0a51c97513c2af9a32d"
   },
   "seed": {
     "version": 2,
@@ -22,7 +22,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "14feaf864ac9d48fa19ff2612ac2347307a8a0dbd72109e4482f9d00e5bb0426"
+    "sha256": "c7f7a5690be3a27e3d576df2210cf24a6991181abd034ca41b8cb51feec8a357"
   },
   "schemaMigrations": [
     {
