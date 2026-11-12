@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Configuration;
@@ -7,6 +8,7 @@ namespace LocaLoca.Api.Security;
 public sealed class SessionStore
 {
     private readonly byte[] _secret;
+    private readonly ConcurrentDictionary<string, long> _revokedTokens = new(StringComparer.Ordinal);
     private static readonly TimeSpan Lifetime = TimeSpan.FromDays(30);
 
     public SessionStore(IConfiguration configuration)
@@ -38,9 +40,40 @@ public sealed class SessionStore
         return $"{encodedPayload}.{Base64UrlEncode(signature)}";
     }
 
+    public bool Revoke(string token)
+    {
+        if (!TryValidate(token, out _, out var expiresAt))
+            return false;
+
+        var fingerprint = GetFingerprint(token);
+        PruneExpiredRevocations(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        return _revokedTokens.TryAdd(fingerprint, expiresAt);
+    }
+
     public bool TryGet(string token, out int userId)
     {
         userId = 0;
+        if (!TryValidate(token, out var parsedUserId, out var expiresAt))
+            return false;
+
+        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var fingerprint = GetFingerprint(token);
+        if (_revokedTokens.TryGetValue(fingerprint, out var revokedUntil))
+        {
+            if (now < revokedUntil)
+                return false;
+
+            _revokedTokens.TryRemove(fingerprint, out _);
+        }
+
+        userId = parsedUserId;
+        return true;
+    }
+
+    private bool TryValidate(string token, out int userId, out long expiresAt)
+    {
+        userId = 0;
+        expiresAt = 0;
         if (string.IsNullOrWhiteSpace(token))
             return false;
 
@@ -61,13 +94,14 @@ public sealed class SessionStore
             var fields = Encoding.UTF8.GetString(Base64UrlDecode(parts[0])).Split(':');
             if (fields.Length != 2 ||
                 !int.TryParse(fields[0], out var parsedUserId) || parsedUserId <= 0 ||
-                !long.TryParse(fields[1], out var expiresAt) ||
-                DateTimeOffset.UtcNow.ToUnixTimeSeconds() >= expiresAt)
+                !long.TryParse(fields[1], out var parsedExpiresAt) ||
+                DateTimeOffset.UtcNow.ToUnixTimeSeconds() >= parsedExpiresAt)
             {
                 return false;
             }
 
             userId = parsedUserId;
+            expiresAt = parsedExpiresAt;
             return true;
         }
         catch (FormatException)
@@ -79,6 +113,18 @@ public sealed class SessionStore
             return false;
         }
     }
+
+    private void PruneExpiredRevocations(long now)
+    {
+        foreach (var revoked in _revokedTokens)
+        {
+            if (revoked.Value <= now)
+                _revokedTokens.TryRemove(revoked.Key, out _);
+        }
+    }
+
+    private static string GetFingerprint(string token) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
     private static string Base64UrlEncode(byte[] value) =>
         Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
