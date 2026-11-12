@@ -187,13 +187,45 @@ public sealed class LocaLocaApiClient : IDisposable
         return result.Items;
     }
 
-    public async Task<List<AttractionDto>> GetCatalogAsync(string? search = null, int? categoryId = null, CancellationToken cancellationToken = default)
+    public Task<PagedItemsResponse<AttractionDto>> GetCatalogPageAsync(
+        string? search = null,
+        int? categoryId = null,
+        int page = 1,
+        int pageSize = 50,
+        CancellationToken cancellationToken = default)
     {
+        if (page < 1) throw new ArgumentOutOfRangeException(nameof(page));
+        if (pageSize is < 1 or > 100) throw new ArgumentOutOfRangeException(nameof(pageSize));
+
         var parts = new List<string>();
         if (!string.IsNullOrWhiteSpace(search)) parts.Add("search=" + Uri.EscapeDataString(search.Trim()));
         if (categoryId.HasValue) parts.Add("categoryId=" + categoryId.Value.ToString(CultureInfo.InvariantCulture));
-        var path = "api/catalog" + (parts.Count == 0 ? string.Empty : "?" + string.Join("&", parts));
-        return await GetAllPagesAsync<AttractionDto>(path, cancellationToken);
+        parts.Add("page=" + page.ToString(CultureInfo.InvariantCulture));
+        parts.Add("pageSize=" + pageSize.ToString(CultureInfo.InvariantCulture));
+        var path = "api/catalog?" + string.Join("&", parts);
+        return GetJsonAsync<PagedItemsResponse<AttractionDto>>(path, cancellationToken);
+    }
+
+    public async Task<List<AttractionDto>> GetCatalogByIdsAsync(
+        IEnumerable<int> attractionIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(attractionIds);
+
+        const int batchSize = 500;
+        var ids = attractionIds.Where(id => id > 0).Distinct().ToArray();
+        var items = new List<AttractionDto>();
+
+        foreach (var batch in ids.Chunk(batchSize))
+        {
+            var query = string.Join("&", batch.Select(id =>
+                "ids=" + id.ToString(CultureInfo.InvariantCulture)));
+            var result = await GetJsonAsync<ItemsResponse<AttractionDto>>(
+                "api/catalog/by-ids?" + query, cancellationToken);
+            items.AddRange(result.Items);
+        }
+
+        return items;
     }
 
     public async Task<List<VisitDto>> GetVisitsAsync(CancellationToken cancellationToken = default)

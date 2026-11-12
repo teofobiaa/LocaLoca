@@ -11,6 +11,7 @@ public static class CatalogEndpoints
     {
         const int DefaultPageSize = 50;
         const int MaxPageSize = 100;
+        const int MaxLookupIds = 500;
         
         app.MapGet("/api/catalog/categories", async Task<IResult> (CancellationToken cancellationToken) =>
         {
@@ -23,6 +24,37 @@ public static class CatalogEndpoints
         });
         
         
+        app.MapGet("/api/catalog/by-ids", async Task<IResult> (
+            int[]? ids, CancellationToken cancellationToken) =>
+        {
+            if (ids is null || ids.Length == 0 || ids.Length > MaxLookupIds || ids.Any(id => id <= 0))
+                return Results.BadRequest(new ApiErrorResponse(
+                    $"Для поиска по ID укажи от 1 до {MaxLookupIds} положительных идентификаторов."));
+
+            var uniqueIds = ids.Distinct().ToArray();
+            const string sql = @"
+        SELECT a.attraction_id, a.name, a.description, COALESCE(a.history, ''),
+               a.latitude, a.longitude, cat.name, ci.name, co.name
+        FROM attractions a
+        JOIN categories cat ON cat.category_id = a.category_id
+        JOIN cities ci ON ci.city_id = a.city_id
+        JOIN countries co ON co.country_id = ci.country_id
+        WHERE a.attraction_id = ANY(@ids)
+        ORDER BY co.name, ci.name, a.name, a.attraction_id";
+
+            var items = new List<AttractionDto>();
+            await using var connection = await OpenAsync(connectionString, cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("ids", NpgsqlDbType.Array | NpgsqlDbType.Integer, uniqueIds);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+                items.Add(new AttractionDto(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
+                    (double)reader.GetDecimal(4), (double)reader.GetDecimal(5), reader.GetString(6), reader.GetString(7), reader.GetString(8)));
+
+            return Results.Ok(new ItemsResponse<AttractionDto>(items));
+        });
+
+
         app.MapGet("/api/catalog", async Task<IResult> (
             string? search, int? categoryId, int? page, int? pageSize, CancellationToken cancellationToken) =>
         {
