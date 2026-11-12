@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.0.1"
+  #define AppVersion "1.0.4"
 #endif
 #define BuildDir "..\Builds\Windows"
 #define SetupIcon "Assets\LocaLoca-Installer.ico"
