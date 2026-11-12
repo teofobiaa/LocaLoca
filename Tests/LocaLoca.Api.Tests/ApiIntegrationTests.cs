@@ -560,8 +560,21 @@ public sealed class ApiIntegrationTests
                 await _database.StartDatabaseAsync();
         }
 
-        using var ready = await client.GetAsync("/ready");
-        using var recovered = await client.GetAsync("/api/me/visits");
+        // Testcontainers may publish a different host-side port after a stopped
+        // container is started again. Recreate the API host with the current
+        // endpoint while keeping the same signing secret and persisted session.
+        var recoveredConnectionString = new NpgsqlConnectionStringBuilder(_database.ConnectionString)
+        {
+            Pooling = false
+        }.ConnectionString;
+        using var recoveredFactory = new ApiTestFactory(
+            recoveredConnectionString,
+            factory.SessionSecretForTests);
+        using var recoveredClient = recoveredFactory.CreateClient();
+        SetBearer(recoveredClient, account.Token);
+
+        using var ready = await recoveredClient.GetAsync("/ready");
+        using var recovered = await recoveredClient.GetAsync("/api/me/visits");
 
         var readyBody = await ready.Content.ReadAsStringAsync();
         Assert.True(
