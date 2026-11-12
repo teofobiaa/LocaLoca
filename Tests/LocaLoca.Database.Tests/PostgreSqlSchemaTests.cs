@@ -240,6 +240,8 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "03_migrate_wishlist.sql");
         await _database.ExecuteSqlFileAsync("migrations", "04_migrate_user_map_places.sql");
         await _database.ExecuteSqlFileAsync("migrations", "04_migrate_user_map_places.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "08_server_sessions.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "08_server_sessions.sql");
         await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
         await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
         await _database.ExecuteSqlFileAsync("migrations", "07_migrate_photo_storage.sql");
