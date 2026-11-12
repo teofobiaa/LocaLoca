@@ -68,7 +68,7 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
         AttractionId = Convert.ToInt32(await attractionCommand.ExecuteScalarAsync());
     }
 
-    public ApiTestFactory CreateFactory() => new(ConnectionString);
+    public ApiTestFactory CreateFactory(string? sessionSecret = null) => new(ConnectionString, sessionSecret);
 
     // Tests in this xUnit collection are serialized, so an outage test can safely
     // stop and restart the shared isolated PostgreSQL container.
@@ -89,12 +89,12 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
         "LocaLoca.Api.Tests",
         Guid.NewGuid().ToString("N"));
 
-    private readonly string _sessionSecret =
-        Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+    private readonly string _sessionSecret;
 
-    public ApiTestFactory(string connectionString)
+    public ApiTestFactory(string connectionString, string? sessionSecret = null)
     {
         ConnectionString = connectionString;
+        _sessionSecret = sessionSecret ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
     }
 
     private string ConnectionString { get; }

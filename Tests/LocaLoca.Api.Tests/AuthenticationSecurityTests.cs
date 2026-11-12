@@ -168,7 +168,7 @@ public sealed class AuthenticationSecurityTests
         using var logout = await first.PostAsync("/api/auth/logout", null);
         Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
 
-        using var secondFactory = _database.CreateFactory();
+        using var secondFactory = _database.CreateFactory(firstFactory.SessionSecretForTests);
         using var second = secondFactory.CreateClient();
         SetBearer(second, account.Token);
         using var rejected = await second.GetAsync("/api/me/visits");
