@@ -129,6 +129,16 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
 
 app.Use(async (context, next) =>
 {
+    // Liveness/readiness endpoints must remain reachable when PostgreSQL is down.
+    // /ready performs its own database check; neither endpoint requires a user session.
+    var requestPath = context.Request.Path.Value;
+    if (string.Equals(requestPath, "/health", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(requestPath, "/ready", StringComparison.OrdinalIgnoreCase))
+    {
+        await next();
+        return;
+    }
+
     var header=context.Request.Headers["Authorization"].ToString();
     if(header.StartsWith("Bearer ",StringComparison.OrdinalIgnoreCase)&&!string.IsNullOrWhiteSpace(connectionString)){
         var token=header[7..].Trim();
