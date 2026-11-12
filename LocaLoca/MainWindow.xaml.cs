@@ -22,7 +22,11 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<VisitDto> _visits = new();
     private readonly ObservableCollection<AttractionDto> _wishlistAttractions = new();
     private readonly HashSet<int> _wishlistIds = new();
-    private List<AttractionDto> _allAttractions = new();
+    private readonly Dictionary<int, AttractionDto> _attractionCache = new();
+    private const int CatalogPageSize = 50;
+    private int _catalogPage = 1;
+    private int _catalogRequestVersion;
+    private bool _catalogHasMore;
     private UserDto? _currentUser;
     private AttractionDto? _selectedAttraction;
     private VisitDto? _selectedVisit;
@@ -145,22 +149,22 @@ public sealed partial class MainWindow : Window
         try
         {
             var categoriesTask = _api.GetCategoriesAsync();
-            var catalogTask = _api.GetCatalogAsync();
+            var catalogTask = _api.GetCatalogPageAsync(page: 1, pageSize: CatalogPageSize);
             var visitsTask = _api.GetVisitsAsync();
             var wishlistTask = _api.GetWishlistAsync();
             var summaryTask = _api.GetSummaryAsync();
             await Task.WhenAll(categoriesTask, catalogTask, visitsTask, wishlistTask, summaryTask);
 
             _categories = await categoriesTask;
-            _allAttractions = await catalogTask;
-            _attractions.Clear();
-            foreach (var item in _allAttractions) _attractions.Add(item);
+            var catalogPage = await catalogTask;
+            ApplyCatalogPage(catalogPage);
 
             _visits.Clear();
             foreach (var item in await visitsTask) _visits.Add(item);
 
             _wishlistIds.Clear();
             foreach (var id in await wishlistTask) _wishlistIds.Add(id);
+            await EnsureAttractionsCachedAsync(_wishlistIds);
             RefreshWishlistCollection();
             PopulateCategories();
 
@@ -169,7 +173,7 @@ public sealed partial class MainWindow : Window
             PlacesCountText.Text = summary.DistinctAttractions.ToString();
             CitiesCountText.Text = summary.Cities.ToString();
             CountriesCountText.Text = summary.Countries.ToString();
-            DashboardAttractionsList.ItemsSource = _allAttractions.Take(4).ToList();
+            DashboardAttractionsList.ItemsSource = catalogPage.Items.Take(4).ToList();
             ConnectionStatusText.Text = "Облачная база подключена";
         }
         catch (Exception ex)
@@ -190,33 +194,94 @@ public sealed partial class MainWindow : Window
     private void RefreshWishlistCollection()
     {
         _wishlistAttractions.Clear();
-        foreach (var attraction in _allAttractions.Where(a => _wishlistIds.Contains(a.Id)))
+        foreach (var attraction in _wishlistIds
+                     .Select(id => _attractionCache.GetValueOrDefault(id))
+                     .Where(attraction => attraction is not null)
+                     .Cast<AttractionDto>()
+                     .OrderBy(attraction => attraction.Country)
+                     .ThenBy(attraction => attraction.City)
+                     .ThenBy(attraction => attraction.Name))
+        {
             _wishlistAttractions.Add(attraction);
+        }
         RemoveWishlistButton.IsEnabled = WishlistList.SelectedItem is AttractionDto;
     }
 
-    private async void Search_Click(object sender, RoutedEventArgs e) => await SearchCatalogAsync();
-
-    private async Task SearchCatalogAsync()
+    private async Task EnsureAttractionsCachedAsync(IEnumerable<int> attractionIds)
     {
+        var missingIds = attractionIds
+            .Where(id => id > 0 && !_attractionCache.ContainsKey(id))
+            .Distinct()
+            .ToArray();
+        if (missingIds.Length == 0) return;
+
+        var attractions = await _api.GetCatalogByIdsAsync(missingIds);
+        foreach (var attraction in attractions)
+            _attractionCache[attraction.Id] = attraction;
+    }
+
+    private void ApplyCatalogPage(PagedItemsResponse<AttractionDto> page)
+    {
+        var selectedId = _selectedAttraction?.Id;
+        _catalogPage = page.Page;
+        _catalogHasMore = page.HasMore;
+
+        _attractions.Clear();
+        foreach (var attraction in page.Items)
+        {
+            _attractionCache[attraction.Id] = attraction;
+            _attractions.Add(attraction);
+        }
+
+        _selectedAttraction = selectedId.HasValue
+            ? page.Items.FirstOrDefault(attraction => attraction.Id == selectedId.Value)
+            : null;
+        UpdateAttractionDetails(_selectedAttraction);
+        CatalogList.SelectedItem = _selectedAttraction;
+
+        CatalogPageStatus.Text = $"Страница {page.Page} · {page.TotalCount:N0} мест";
+        CatalogPreviousButton.IsEnabled = page.Page > 1;
+        CatalogNextButton.IsEnabled = page.HasMore;
+    }
+
+    private async void Search_Click(object sender, RoutedEventArgs e) => await SearchCatalogAsync(page: 1);
+
+    private async void CatalogPrevious_Click(object sender, RoutedEventArgs e) =>
+        await SearchCatalogAsync(Math.Max(1, _catalogPage - 1));
+
+    private async void CatalogNext_Click(object sender, RoutedEventArgs e) =>
+        await SearchCatalogAsync(_catalogPage + 1);
+
+    private async Task SearchCatalogAsync(int page)
+    {
+        var requestVersion = Interlocked.Increment(ref _catalogRequestVersion);
+        CatalogSearchButton.IsEnabled = false;
+        CatalogPreviousButton.IsEnabled = false;
+        CatalogNextButton.IsEnabled = false;
+
         try
         {
             int? categoryId = null;
             if (CategoryCombo.SelectedItem is ComboBoxItem { Tag: int id }) categoryId = id;
-            var items = await _api.GetCatalogAsync(SearchBox.Text, categoryId);
-            _attractions.Clear();
-            foreach (var item in items) _attractions.Add(item);
-            RefreshWishlistCollection();
-            DashboardAttractionsList.ItemsSource = _attractions.Take(4).ToList();
-            if (_selectedAttraction is not null)
-            {
-                _selectedAttraction = _attractions.FirstOrDefault(a => a.Id == _selectedAttraction.Id);
-                UpdateAttractionDetails(_selectedAttraction);
-            }
+            var result = await _api.GetCatalogPageAsync(
+                SearchBox.Text, categoryId, page, CatalogPageSize);
+            if (requestVersion != Volatile.Read(ref _catalogRequestVersion)) return;
+
+            ApplyCatalogPage(result);
         }
         catch (Exception ex)
         {
-            await ShowMessageAsync("Ошибка поиска", ex.Message);
+            if (requestVersion == Volatile.Read(ref _catalogRequestVersion))
+                await ShowMessageAsync("Ошибка поиска", ex.Message);
+        }
+        finally
+        {
+            if (requestVersion == Volatile.Read(ref _catalogRequestVersion))
+            {
+                CatalogSearchButton.IsEnabled = true;
+                CatalogPreviousButton.IsEnabled = _catalogPage > 1;
+                CatalogNextButton.IsEnabled = _catalogHasMore;
+            }
         }
     }
 
@@ -253,6 +318,7 @@ public sealed partial class MainWindow : Window
 
     private void SelectAttraction(AttractionDto attraction)
     {
+        _attractionCache[attraction.Id] = attraction;
         _selectedAttraction = attraction;
         UpdateAttractionDetails(attraction);
         CatalogList.SelectedItem = _attractions.FirstOrDefault(a => a.Id == attraction.Id);
@@ -363,13 +429,28 @@ public sealed partial class MainWindow : Window
             await ShowMapPlaceVisitDialogAsync(_selectedVisit);
             return;
         }
-        var attraction = _allAttractions.FirstOrDefault(a => a.Id == _selectedVisit.AttractionId);
-        if (attraction is null)
+        try
         {
-            await ShowMessageAsync("Место не найдено", "Не удалось найти достопримечательность в каталоге.");
-            return;
+            if (!_attractionCache.TryGetValue(_selectedVisit.AttractionId, out var attraction))
+            {
+                var matches = await _api.GetCatalogByIdsAsync(new[] { _selectedVisit.AttractionId });
+                attraction = matches.FirstOrDefault();
+                if (attraction is not null)
+                    _attractionCache[attraction.Id] = attraction;
+            }
+
+            if (attraction is null)
+            {
+                await ShowMessageAsync("Место не найдено", "Не удалось найти достопримечательность в каталоге.");
+                return;
+            }
+
+            await ShowVisitDialogAsync(attraction, _selectedVisit);
         }
-        await ShowVisitDialogAsync(attraction, _selectedVisit);
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось открыть посещение", ex.Message);
+        }
     }
 
     private async void DeleteVisit_Click(object sender, RoutedEventArgs e)
