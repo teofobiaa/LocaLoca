@@ -606,11 +606,20 @@ public sealed class ApiIntegrationTests
                 await _database.StartDatabaseAsync();
         }
 
+        // Testcontainers may assign a different host port after the container
+        // is restarted. Recreate the test API with its current connection string,
+        // preserving the HMAC secret so the existing session remains valid.
+        using var recoveredFactory = new ApiTestFactory(
+            _database.ConnectionString,
+            factory.SessionSecretForTests);
+        using var recoveredClient = recoveredFactory.CreateClient();
+        SetBearer(recoveredClient, account.Token);
+
         HttpResponseMessage? ready = null;
         string lastReadyBody = "(no response)";
         for (var attempt = 0; attempt < 60; attempt++)
         {
-            var response = await client.GetAsync("/ready");
+            var response = await recoveredClient.GetAsync("/ready");
             lastReadyBody = await response.Content.ReadAsStringAsync();
             if (response.StatusCode == HttpStatusCode.OK)
             {
@@ -624,7 +633,7 @@ public sealed class ApiIntegrationTests
 
         using var readyResponse = ready ?? throw new Xunit.Sdk.XunitException(
             $"PostgreSQL did not become ready within 30 seconds after the container restart. Last /ready response: {lastReadyBody}");
-        using var recovered = await client.GetAsync("/api/me/visits");
+        using var recovered = await recoveredClient.GetAsync("/api/me/visits");
 
         Assert.Equal(HttpStatusCode.OK, readyResponse.StatusCode);
         var recoveredVisits = await ReadItemsAsync(recovered);
