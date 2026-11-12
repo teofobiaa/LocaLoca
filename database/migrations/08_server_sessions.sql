@@ -11,3 +11,10 @@ CREATE TABLE IF NOT EXISTS public.user_sessions (
 CREATE INDEX IF NOT EXISTS ix_user_sessions_user_active ON public.user_sessions(user_id,created_at DESC) WHERE revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS ix_user_sessions_expiry ON public.user_sessions(expires_at);
 
+
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'localoca_app') THEN
+        GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_sessions TO localoca_app;
+    END IF;
+END $$;
