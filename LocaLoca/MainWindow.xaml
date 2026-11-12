@@ -240,13 +240,18 @@
 
                     <!-- Catalog -->
                     <Grid x:Name="CatalogPage" Visibility="Collapsed" ColumnDefinitions="1.15*,0.85*" ColumnSpacing="20">
-                        <Grid RowDefinitions="Auto,*">
+                        <Grid RowDefinitions="Auto,*,Auto">
                             <Grid ColumnDefinitions="*,180,Auto" ColumnSpacing="10" Margin="0,0,0,15">
                                 <TextBox x:Name="SearchBox" PlaceholderText="Поиск места, города или страны" Height="44" VerticalContentAlignment="Center" />
                                 <ComboBox x:Name="CategoryCombo" Grid.Column="1" PlaceholderText="Категория" Height="44" />
-                                <Button Grid.Column="2" Content="Найти" Style="{StaticResource PrimaryButtonStyle}" Click="Search_Click" />
+                                <Button x:Name="CatalogSearchButton" Grid.Column="2" Content="Найти" Style="{StaticResource PrimaryButtonStyle}" Click="Search_Click" />
                             </Grid>
                             <ListView x:Name="CatalogList" Grid.Row="1" ItemsSource="{x:Bind Attractions, Mode=OneWay}" ItemTemplate="{StaticResource AttractionTemplate}" SelectionChanged="CatalogList_SelectionChanged" Background="Transparent" BorderThickness="0" />
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Spacing="12" Margin="0,10,0,0">
+                                <Button x:Name="CatalogPreviousButton" Content="← Назад" Style="{StaticResource QuietButtonStyle}" Click="CatalogPrevious_Click" IsEnabled="False" />
+                                <TextBlock x:Name="CatalogPageStatus" Text="Страница 1" FontSize="12" Foreground="{ThemeResource Palette_74837A}" VerticalAlignment="Center" />
+                                <Button x:Name="CatalogNextButton" Content="Далее →" Style="{StaticResource QuietButtonStyle}" Click="CatalogNext_Click" IsEnabled="False" />
+                            </StackPanel>
                         </Grid>
                         <Border Grid.Column="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="20" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
