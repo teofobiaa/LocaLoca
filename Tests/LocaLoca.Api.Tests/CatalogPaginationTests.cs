@@ -11,12 +11,13 @@ public sealed class CatalogPaginationTests(PostgreSqlApiFixture database)
     [Fact]
     public async Task Catalog_returns_only_the_requested_page_with_paging_metadata()
     {
-        await InsertAttractionAsync("Second API catalog attraction");
+        await InsertAttractionAsync("PaginationCase Alpha");
+        await InsertAttractionAsync("PaginationCase Beta");
 
         using var factory = database.CreateFactory();
         using var client = factory.CreateClient();
 
-        using var firstResponse = await client.GetAsync("/api/catalog?page=1&pageSize=1");
+        using var firstResponse = await client.GetAsync("/api/catalog?search=PaginationCase&page=1&pageSize=1");
         using var firstDocument = JsonDocument.Parse(await firstResponse.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
         var first = firstDocument.RootElement;
@@ -26,7 +27,7 @@ public sealed class CatalogPaginationTests(PostgreSqlApiFixture database)
         Assert.Equal(2, first.GetProperty("totalCount").GetInt64());
         Assert.True(first.GetProperty("hasMore").GetBoolean());
 
-        using var secondResponse = await client.GetAsync("/api/catalog?page=2&pageSize=1");
+        using var secondResponse = await client.GetAsync("/api/catalog?search=PaginationCase&page=2&pageSize=1");
         using var secondDocument = JsonDocument.Parse(await secondResponse.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
         var second = secondDocument.RootElement;
