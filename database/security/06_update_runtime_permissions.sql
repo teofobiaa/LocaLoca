@@ -32,9 +32,10 @@ SELECT
 
 -- This script is also run before migration 08 on older installations.
 -- Grant session access only when the table has already been created.
-DO $
+DO $grant_session_permissions$
 BEGIN
     IF to_regclass('public.user_sessions') IS NOT NULL THEN
         EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions TO localoca_app';
     END IF;
-END $;
+END;
+$grant_session_permissions$;
