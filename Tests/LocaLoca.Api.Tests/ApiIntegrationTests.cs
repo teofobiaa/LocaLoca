@@ -257,7 +257,8 @@ public sealed class ApiIntegrationTests
         SetBearer(otherClient, other.Token);
 
         var visitId = await CreateVisitAsync(ownerClient);
-        byte[] jpegBytes = [0xFF, 0xD8, 0xFF, 0xD9];
+        byte[] jpegBytes = Convert.FromBase64String(
+            "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDyyiiivzo/ss//2Q==");
 
         using var form = new MultipartFormDataContent();
         var image = new ByteArrayContent(jpegBytes);
@@ -396,7 +397,8 @@ public sealed class ApiIntegrationTests
         Assert.NotNull(place);
         var placeId = place!.Id;
 
-        byte[] jpegBytes = [0xFF, 0xD8, 0xFF, 0xD9];
+        byte[] jpegBytes = Convert.FromBase64String(
+            "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDyyiiivzo/ss//2Q==");
         using var form = new MultipartFormDataContent();
         var image = new ByteArrayContent(jpegBytes);
         image.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
@@ -606,36 +608,27 @@ public sealed class ApiIntegrationTests
                 await _database.StartDatabaseAsync();
         }
 
-        // Testcontainers may assign a different host port after the container
-        // is restarted. Recreate the test API with its current connection string,
-        // preserving the HMAC secret so the existing session remains valid.
+        // Testcontainers may publish a different host-side port after a stopped
+        // container is started again. Recreate the API host with the current
+        // endpoint while keeping the same signing secret and persisted session.
+        var recoveredConnectionString = new NpgsqlConnectionStringBuilder(_database.ConnectionString)
+        {
+            Pooling = false
+        }.ConnectionString;
         using var recoveredFactory = new ApiTestFactory(
-            _database.ConnectionString,
+            recoveredConnectionString,
             factory.SessionSecretForTests);
         using var recoveredClient = recoveredFactory.CreateClient();
         SetBearer(recoveredClient, account.Token);
 
-        HttpResponseMessage? ready = null;
-        string lastReadyBody = "(no response)";
-        for (var attempt = 0; attempt < 60; attempt++)
-        {
-            var response = await recoveredClient.GetAsync("/ready");
-            lastReadyBody = await response.Content.ReadAsStringAsync();
-            if (response.StatusCode == HttpStatusCode.OK)
-            {
-                ready = response;
-                break;
-            }
-
-            response.Dispose();
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
-        }
-
-        using var readyResponse = ready ?? throw new Xunit.Sdk.XunitException(
-            $"PostgreSQL did not become ready within 30 seconds after the container restart. Last /ready response: {lastReadyBody}");
+        using var ready = await recoveredClient.GetAsync("/ready");
         using var recovered = await recoveredClient.GetAsync("/api/me/visits");
 
-        Assert.Equal(HttpStatusCode.OK, readyResponse.StatusCode);
+        var readyBody = await ready.Content.ReadAsStringAsync();
+        Assert.True(
+            ready.StatusCode == HttpStatusCode.OK,
+            $"API readiness did not recover after PostgreSQL restart. Status: {(int)ready.StatusCode}; body: {readyBody}");
+
         var recoveredVisits = await ReadItemsAsync(recovered);
         Assert.Contains(recoveredVisits, item => item.GetProperty("id").GetInt32() == visitId);
     }
@@ -658,6 +651,51 @@ public sealed class ApiIntegrationTests
 
         Assert.Equal(HttpStatusCode.BadRequest, upload.StatusCode);
         Assert.Equal(initialCount, await CountPhotosAsync());
+    }
+
+    [Fact]
+    public async Task Photo_Upload_Rejects_Truncated_Png_With_A_Valid_Magic_Header()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        var visitId = await CreateVisitAsync(client);
+        var initialCount = await CountPhotosAsync();
+
+        var completePng = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAE0lEQVR4nGPUCKj4zwAFTAxIAAAsaAHzuDKVEgAAAABJRU5ErkJggg==");
+        var truncatedPng = completePng[..45];
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(truncatedPng), "file", "truncated.png");
+
+        using var upload = await client.PostAsync($"/api/me/visits/{visitId}/photos", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, upload.StatusCode);
+        Assert.Equal(initialCount, await CountPhotosAsync());
+    }
+
+    [Fact]
+    public async Task Photo_Upload_Accepts_A_Valid_Animated_Gif_And_Stores_All_Frames()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        var visitId = await CreateVisitAsync(client);
+        var initialCount = await CountPhotosAsync();
+
+        var animatedGif = Convert.FromBase64String(
+            "R0lGODlhAgACAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAAAgACAAAIBgABCAQQEAAh+QQBCgABACwAAAAAAgACAIEAAAAAAAAAAAAAAAAIBgABCAQQEAA7");
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(animatedGif), "file", "two-frames.gif");
+
+        using var upload = await client.PostAsync($"/api/me/visits/{visitId}/photos", form);
+
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        Assert.Equal(initialCount + 1, await CountPhotosAsync());
     }
 
     private async Task<TestAccount> RegisterAsync(HttpClient client)
