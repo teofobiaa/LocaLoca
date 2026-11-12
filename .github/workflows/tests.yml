@@ -10,6 +10,7 @@ on:
       - 'test/**'
     paths:
       - 'Tests/**'
+      - 'Tools/PasswordHashBenchmarks/**'
       - 'Server/LocaLoca.Api/**'
       - 'database/**'
       - 'global.json'
@@ -21,6 +22,7 @@ on:
       - main
     paths:
       - 'Tests/**'
+      - 'Tools/PasswordHashBenchmarks/**'
       - 'Server/LocaLoca.Api/**'
       - 'database/**'
       - 'global.json'
@@ -49,6 +51,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+
+      - name: Build password KDF benchmark
+        run: dotnet build Tools/PasswordHashBenchmarks/PasswordHashBenchmarks.csproj --configuration Release
 
       - name: Run unit tests
         run: dotnet test Tests/LocaLoca.Tests/LocaLoca.Tests.csproj --configuration Release --verbosity minimal
