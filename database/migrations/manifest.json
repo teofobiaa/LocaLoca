@@ -1,17 +1,18 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 9,
+  "currentSchemaVersion": 10,
   "baseline": {
-    "version": 9,
+    "version": 10,
     "path": "schema/01_schema.sql",
     "includesSchemaMigrations": [
       3,
       4,
       7,
       8,
-      9
+      9,
+      10
     ],
-    "sha256": "60bff727b210ba46a771589dec8bac3e30115d08fc10ca16c9f34e87f4b1f072"
+    "sha256": "0d7f5f1f924cd73f831fb0a46179a456c94bdb8da9c937673eacf1a3aa6c498b"
   },
   "seed": {
     "version": 2,
@@ -53,6 +54,12 @@
       "name": "map_marker_viewport_indexes",
       "path": "migrations/09_map_marker_viewport_indexes.sql",
       "sha256": "c29329792f45cc18b4e8e785c0c81cc3fff1608f8ab04ba50f21bdcbcc44f22a"
+    },
+    {
+      "version": 10,
+      "name": "map_marker_visit_lookup_index",
+      "path": "migrations/10_map_marker_visit_lookup_index.sql",
+      "sha256": "9d578c4d2504db9bf764c35c3b6b11a1ba1ebcf1f59cc0daecf22c8c13d08768"
     }
   ],
   "securityScripts": [
