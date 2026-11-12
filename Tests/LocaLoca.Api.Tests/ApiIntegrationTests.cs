@@ -316,6 +316,7 @@ public sealed class ApiIntegrationTests
         Assert.Equal(HttpStatusCode.OK, createPlace.StatusCode);
         var place = await createPlace.Content.ReadFromJsonAsync<ApiTestMapPlaceResponse>();
         Assert.NotNull(place);
+        var placeId = place!.Id;
 
         byte[] jpegBytes = [0xFF, 0xD8, 0xFF, 0xD9];
         using var form = new MultipartFormDataContent();
@@ -323,10 +324,10 @@ public sealed class ApiIntegrationTests
         image.Headers.ContentType = new MediaTypeHeaderValue("image/jpeg");
         form.Add(image, "photos", "map-place-photo.jpg");
 
-        using var upload = await ownerClient.PostAsync($"/api/me/map-places/{place!.Id}/photos", form);
+        using var upload = await ownerClient.PostAsync($"/api/me/map-places/{placeId}/photos", form);
         Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
 
-        using var photosResponse = await ownerClient.GetAsync($"/api/me/map-places/{place.Id}/photos");
+        using var photosResponse = await ownerClient.GetAsync($"/api/me/map-places/{placeId}/photos");
         var photos = await ReadItemsAsync(photosResponse);
         var photo = Assert.Single(photos);
         var photoId = photo.GetProperty("id").GetInt32();
