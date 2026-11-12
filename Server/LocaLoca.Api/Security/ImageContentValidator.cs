@@ -68,7 +68,7 @@ public static class ImageContentValidator
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var decodeResult = frameCount == 1
-                    ? codec.GetPixels(bitmap.Info, bitmap.GetPixels(), bitmap.RowBytes)
+                    ? codec.GetPixels(bitmap.Info, bitmap.GetPixels())
                     : codec.GetPixels(
                         bitmap.Info,
                         bitmap.GetPixels(),
@@ -83,10 +83,8 @@ public static class ImageContentValidator
             return new ImageValidationResult(true, null, width, height, frameCount);
         }
         catch (Exception ex) when (
-            ex is ArgumentException or
-            InvalidOperationException or
-            OverflowException or
-            SKException)
+            ex is not OutOfMemoryException &&
+            ex is not OperationCanceledException)
         {
             // Malformed or truncated user-controlled data must not surface as an API 500.
             return Invalid("Изображение повреждено или не может быть полностью декодировано.");
