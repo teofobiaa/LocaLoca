@@ -309,7 +309,7 @@ public sealed class ApiNegativeScenarioTests
             notes = ""
         });
 
-        Assert.Equal(HttpStatusCode.ServiceUnavailable, invalidReference.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidReference.StatusCode);
         var errorBody = await invalidReference.Content.ReadAsStringAsync();
         using var errorDocument = JsonDocument.Parse(errorBody);
         Assert.True(errorDocument.RootElement.TryGetProperty("error", out _));
