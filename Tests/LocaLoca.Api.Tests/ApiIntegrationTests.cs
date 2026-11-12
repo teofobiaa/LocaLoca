@@ -471,7 +471,8 @@ public sealed class ApiIntegrationTests
 
         using var visitsResponse = await client.GetAsync("/api/me/visits");
         var storedVisit = Assert.Single(
-            (await ReadItemsAsync(visitsResponse)).Where(item => item.GetProperty("id").GetInt32() == visitId));
+            await ReadItemsAsync(visitsResponse),
+            item => item.GetProperty("id").GetInt32() == visitId);
 
         var finalStateMatchesOneCompleteUpdate = updates.Any(update =>
             storedVisit.GetProperty("visitDate").GetString() == update.VisitDate &&
@@ -549,7 +550,7 @@ public sealed class ApiIntegrationTests
             Assert.Equal(HttpStatusCode.ServiceUnavailable, unavailable.StatusCode);
 
             var errorBody = await unavailable.Content.ReadAsStringAsync();
-            Assert.Contains("Не удалось обратиться к Supabase PostgreSQL", errorBody);
+            Assert.Contains("Сервис временно недоступен", errorBody);
             Assert.DoesNotContain("localoca_api_tests", errorBody);
             Assert.DoesNotContain("Password=", errorBody);
         }

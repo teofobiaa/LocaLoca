@@ -87,7 +87,7 @@ public sealed class ApiExceptionMiddleware
                 : StatusCodes.Status400BadRequest;
             await WriteErrorAsync(context, statusCode, ApiErrorResponse.MessageFor(statusCode));
         }
-        catch (InvalidDataException ex)
+        catch (InvalidDataException)
         {
             var statusCode = (context.Request.ContentLength ?? 0) > MaxMultipartBodyBytes
                 ? StatusCodes.Status413PayloadTooLarge
@@ -112,6 +112,12 @@ public sealed class ApiExceptionMiddleware
 
     public static ApiErrorMapping MapPostgresError(string? sqlState, string? serverMessage = null)
     {
+        // Serialization failures, deadlocks and unavailable row locks indicate
+        // a concurrent transaction conflict; clients can retry after refreshing.
+        if (sqlState is "40001" or "40P01" or "55P03")
+            return new ApiErrorMapping(StatusCodes.Status409Conflict,
+                ApiErrorResponse.MessageFor(StatusCodes.Status409Conflict));
+
         if (sqlState is "23505" or "23P01" or "23001")
             return new ApiErrorMapping(StatusCodes.Status409Conflict,
                 ApiErrorResponse.MessageFor(StatusCodes.Status409Conflict));

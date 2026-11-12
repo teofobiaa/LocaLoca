@@ -217,10 +217,10 @@ app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, 
     var login = (request.Login ?? string.Empty).Trim().ToLowerInvariant();
     var displayName = (request.DisplayName ?? string.Empty).Trim();
     if (login.Length is < 3 or > 50 || login.Any(c => !(char.IsLetterOrDigit(c) || c is '_' or '-' or '.')))
-        return Results.BadRequest(new ErrorDto("Логин должен содержать 3–50 символов: буквы, цифры, точку, дефис или подчёркивание."));
+        return Results.BadRequest(new ApiErrorResponse("Логин должен содержать 3–50 символов: буквы, цифры, точку, дефис или подчёркивание."));
     if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
-        return Results.BadRequest(new ErrorDto("Пароль должен содержать не менее 6 символов."));
-    if (displayName.Length > 100) return Results.BadRequest(new ErrorDto("Имя слишком длинное."));
+        return Results.BadRequest(new ApiErrorResponse("Пароль должен содержать не менее 6 символов."));
+    if (displayName.Length > 100) return Results.BadRequest(new ApiErrorResponse("Имя слишком длинное."));
     if (string.IsNullOrWhiteSpace(displayName)) displayName = login;
 
     await using var connection = await OpenAsync(connectionString);
@@ -233,7 +233,7 @@ app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, 
     command.Parameters.AddWithValue("hash", NpgsqlDbType.Varchar, PasswordHasher.Hash(request.Password));
     command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
     var result = await command.ExecuteScalarAsync();
-    if (result is null) return Results.Conflict(new ErrorDto("Пользователь с таким логином уже существует."));
+    if (result is null) return Results.Conflict(new ApiErrorResponse("Пользователь с таким логином уже существует."));
     var user = new UserDto(Convert.ToInt32(result), login, displayName);
     return Results.Ok(new AuthResponse(user, sessions.Create(user.Id)));
 }).RequireRateLimiting("auth-register");
@@ -270,7 +270,7 @@ app.MapPut("/api/me/profile/display-name", async Task<IResult> (UpdateDisplayNam
 
     var displayName = (request.DisplayName ?? string.Empty).Trim();
     if (displayName.Length is < 1 or > 40)
-        return Results.BadRequest(new ErrorDto("Имя должно содержать от 1 до 40 символов."));
+        return Results.BadRequest(new ApiErrorResponse("Имя должно содержать от 1 до 40 символов."));
 
     await using var connection = await OpenAsync(connectionString);
     await using var command = new NpgsqlCommand(
@@ -278,7 +278,7 @@ app.MapPut("/api/me/profile/display-name", async Task<IResult> (UpdateDisplayNam
     command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
     command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
     var login = await command.ExecuteScalarAsync() as string;
-    if (login is null) return Results.NotFound(new ErrorDto("Аккаунт не найден."));
+    if (login is null) return Results.NotFound(new ApiErrorResponse("Аккаунт не найден."));
 
     return Results.Ok(new UserDto(userId, login, displayName));
 });
@@ -399,22 +399,22 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var form = await context.Request.ReadFormAsync();
     if (!int.TryParse(form["attractionId"], out var attractionId) || attractionId <= 0)
-        return Results.BadRequest(new ErrorDto("Выберите достопримечательность."));
+        return Results.BadRequest(new ApiErrorResponse("Выберите достопримечательность."));
     if (!int.TryParse(form["rating"], out var rating) || rating is < 1 or > 5)
-        return Results.BadRequest(new ErrorDto("Оценка должна быть от 1 до 5."));
+        return Results.BadRequest(new ApiErrorResponse("Оценка должна быть от 1 до 5."));
     if (!DateOnly.TryParse(form["visitDate"], out var visitDate) || visitDate > DateOnly.FromDateTime(DateTime.Today))
-        return Results.BadRequest(new ErrorDto("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
+        return Results.BadRequest(new ApiErrorResponse("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
     int? visitId = int.TryParse(form["visitId"], out var parsedVisitId) && parsedVisitId > 0 ? parsedVisitId : null;
     var files = form.Files.GetFiles("photos");
-    if (files.Count > 10) return Results.BadRequest(new ErrorDto("За один раз можно добавить не более 10 фотографий."));
+    if (files.Count > 10) return Results.BadRequest(new ApiErrorResponse("За один раз можно добавить не более 10 фотографий."));
     if (files.Any(f => f.Length == 0))
-        return Results.BadRequest(new ErrorDto("Пустые файлы фотографий не допускаются."));
+        return Results.BadRequest(new ApiErrorResponse("Пустые файлы фотографий не допускаются."));
     if (files.Any(f => f.Length > 20 * 1024 * 1024) || files.Sum(f => f.Length) > 20 * 1024 * 1024)
-        return Results.Json(new ErrorDto("Общий размер фотографий за одно сохранение не должен превышать 20 МБ."),
+        return Results.Json(new ApiErrorResponse("Общий размер фотографий за одно сохранение не должен превышать 20 МБ."),
             statusCode: StatusCodes.Status413PayloadTooLarge);
     var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
     if (files.Any(f => !allowedExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant())))
-        return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
+        return Results.BadRequest(new ApiErrorResponse("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
 
     // Read and validate every image before opening the transaction. A bad file
     // cannot leave a partially saved visit or a partial photo collection.
@@ -424,7 +424,7 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var data = await ReadPhotoDataAsync(file);
         if (!ImageContentValidator.HasValidImageSignature(data, extension))
-            return Results.BadRequest(new ErrorDto($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
+            return Results.BadRequest(new ApiErrorResponse($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
         var fileName = $"{Guid.NewGuid():N}{extension}";
         var relativePath = $"Photos/{fileName}";
         var caption = Path.GetFileNameWithoutExtension(file.FileName);
@@ -450,7 +450,7 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
         AddVisitParameters(update, userId, new VisitWriteRequest(attractionId, visitDate.ToString("yyyy-MM-dd"), rating,
             form["impressions"].ToString(), form["notes"].ToString()), visitDate);
         update.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId.Value);
-        if (await update.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ErrorDto("Посещение не найдено."));
+        if (await update.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
         savedVisitId = visitId.Value;
     }
 
@@ -499,7 +499,7 @@ app.MapDelete("/api/me/visits/{visitId:int}", async Task<IResult> (int visitId, 
         await using var delete = new NpgsqlCommand("DELETE FROM visits WHERE visit_id = @v AND user_id = @u", connection, transaction);
         delete.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId);
         delete.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        if (await delete.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ErrorDto("Посещение не найдено."));
+        if (await delete.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
         await transaction.CommitAsync();
     }
     foreach (var path in storedPaths) TryDeletePhoto(dataRoot, path);
@@ -511,22 +511,22 @@ app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visi
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var form = await context.Request.ReadFormAsync();
     var file = form.Files.GetFile("file");
-    if (file is null || file.Length == 0) return Results.BadRequest(new ErrorDto("Файл не выбран."));
+    if (file is null || file.Length == 0) return Results.BadRequest(new ApiErrorResponse("Файл не выбран."));
     if (file.Length > 20 * 1024 * 1024)
-        return Results.Json(new ErrorDto("Размер фотографии не должен превышать 20 МБ."),
+        return Results.Json(new ApiErrorResponse("Размер фотографии не должен превышать 20 МБ."),
             statusCode: StatusCodes.Status413PayloadTooLarge);
     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
     var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
-    if (!allowed.Contains(extension)) return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
+    if (!allowed.Contains(extension)) return Results.BadRequest(new ApiErrorResponse("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
     var data = await ReadPhotoDataAsync(file);
     if (!ImageContentValidator.HasValidImageSignature(data, extension))
-        return Results.BadRequest(new ErrorDto("Содержимое файла не соответствует формату изображения."));
+        return Results.BadRequest(new ApiErrorResponse("Содержимое файла не соответствует формату изображения."));
 
     await using var connection = await OpenAsync(connectionString);
     await using var ownership = new NpgsqlCommand("SELECT 1 FROM visits WHERE visit_id = @v AND user_id = @u", connection);
     ownership.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId);
     ownership.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    if (await ownership.ExecuteScalarAsync() is null) return Results.NotFound(new ErrorDto("Посещение не найдено."));
+    if (await ownership.ExecuteScalarAsync() is null) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
 
     var relativePath = $"Photos/{Guid.NewGuid():N}{extension}";
     var caption = Path.GetFileNameWithoutExtension(file.FileName);
@@ -664,19 +664,19 @@ app.MapPost("/api/me/map-places", async Task<IResult> (MapPlaceCreateRequest req
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var name = (request.Name ?? string.Empty).Trim();
-    if (name.Length is < 1 or > 150) return Results.BadRequest(new ErrorDto("Название должно содержать от 1 до 150 символов."));
+    if (name.Length is < 1 or > 150) return Results.BadRequest(new ApiErrorResponse("Название должно содержать от 1 до 150 символов."));
     if (!double.IsFinite(request.Latitude) || request.Latitude is < -90 or > 90 ||
         !double.IsFinite(request.Longitude) || request.Longitude is < -180 or > 180)
-        return Results.BadRequest(new ErrorDto("Укажите корректные координаты места."));
+        return Results.BadRequest(new ApiErrorResponse("Укажите корректные координаты места."));
     var status = string.IsNullOrWhiteSpace(request.Status) ? "planned" : request.Status.Trim().ToLowerInvariant();
-    if (status is not ("planned" or "visited")) return Results.BadRequest(new ErrorDto("Выберите статус места."));
+    if (status is not ("planned" or "visited")) return Results.BadRequest(new ApiErrorResponse("Выберите статус места."));
     DateOnly? visitDate = null;
     int? rating = null;
     if (status == "visited")
     {
         if (!DateOnly.TryParse(request.VisitDate, out var parsedDate) || parsedDate > DateOnly.FromDateTime(DateTime.Today))
-            return Results.BadRequest(new ErrorDto("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
-        if (request.Rating is < 1 or > 5) return Results.BadRequest(new ErrorDto("Оценка должна быть от 1 до 5."));
+            return Results.BadRequest(new ApiErrorResponse("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
+        if (request.Rating is < 1 or > 5) return Results.BadRequest(new ApiErrorResponse("Оценка должна быть от 1 до 5."));
         visitDate = parsedDate;
         rating = request.Rating;
     }
@@ -702,19 +702,19 @@ app.MapPut("/api/me/map-places/{placeId:int}", async Task<IResult> (int placeId,
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var status = (request.Status ?? string.Empty).Trim().ToLowerInvariant();
-    if (status is not ("planned" or "visited")) return Results.BadRequest(new ErrorDto("Выберите статус места."));
+    if (status is not ("planned" or "visited")) return Results.BadRequest(new ApiErrorResponse("Выберите статус места."));
     DateOnly? visitDate = null;
     int? rating = null;
     if (status == "visited")
     {
         if (!DateOnly.TryParse(request.VisitDate, out var parsedDate) || parsedDate > DateOnly.FromDateTime(DateTime.Today))
-            return Results.BadRequest(new ErrorDto("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
-        if (request.Rating is < 1 or > 5) return Results.BadRequest(new ErrorDto("Оценка должна быть от 1 до 5."));
+            return Results.BadRequest(new ApiErrorResponse("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
+        if (request.Rating is < 1 or > 5) return Results.BadRequest(new ApiErrorResponse("Оценка должна быть от 1 до 5."));
         visitDate = parsedDate;
         rating = request.Rating;
     }
     var name = (request.Name ?? string.Empty).Trim();
-    if (name.Length is < 1 or > 150) return Results.BadRequest(new ErrorDto("Название должно содержать от 1 до 150 символов."));
+    if (name.Length is < 1 or > 150) return Results.BadRequest(new ApiErrorResponse("Название должно содержать от 1 до 150 символов."));
 
     await using var connection = await OpenAsync(connectionString);
     await using var command = new NpgsqlCommand(@"UPDATE user_map_places SET name=@n, status=@s, visit_date=@d,
@@ -727,7 +727,7 @@ app.MapPut("/api/me/map-places/{placeId:int}", async Task<IResult> (int placeId,
     command.Parameters.AddWithValue("notes", NpgsqlDbType.Text, request.Notes ?? string.Empty);
     command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    if (await command.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ErrorDto("Место не найдено."));
+    if (await command.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Место не найдено."));
     return Results.Ok(new MessageDto("Место обновлено."));
 });
 
@@ -748,7 +748,7 @@ app.MapDelete("/api/me/map-places/{placeId:int}", async Task<IResult> (int place
         await using var delete = new NpgsqlCommand("DELETE FROM user_map_places WHERE user_map_place_id=@p AND user_id=@u", connection, transaction);
         delete.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
         delete.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        if (await delete.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ErrorDto("Место не найдено."));
+        if (await delete.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Место не найдено."));
         await transaction.CommitAsync();
     }
     foreach (var path in photoPaths) TryDeletePhoto(dataRoot, path);
@@ -775,15 +775,15 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var form = await context.Request.ReadFormAsync();
     var files = form.Files.GetFiles("photos");
-    if (files.Count is < 1 or > 10) return Results.BadRequest(new ErrorDto("Выберите от 1 до 10 фотографий."));
+    if (files.Count is < 1 or > 10) return Results.BadRequest(new ApiErrorResponse("Выберите от 1 до 10 фотографий."));
     if (files.Any(f => f.Length == 0))
-        return Results.BadRequest(new ErrorDto("Пустые файлы фотографий не допускаются."));
+        return Results.BadRequest(new ApiErrorResponse("Пустые файлы фотографий не допускаются."));
     if (files.Any(f => f.Length > 20 * 1024 * 1024) || files.Sum(f => f.Length) > 20 * 1024 * 1024)
-        return Results.Json(new ErrorDto("Общий размер фотографий не должен превышать 20 МБ."),
+        return Results.Json(new ApiErrorResponse("Общий размер фотографий не должен превышать 20 МБ."),
             statusCode: StatusCodes.Status413PayloadTooLarge);
     var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
     if (files.Any(f => !allowed.Contains(Path.GetExtension(f.FileName).ToLowerInvariant())))
-        return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
+        return Results.BadRequest(new ApiErrorResponse("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
 
     var uploads = new List<(string RelativePath, string Caption, byte[] Data, string ContentType)>();
     foreach (var file in files)
@@ -791,7 +791,7 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var data = await ReadPhotoDataAsync(file);
         if (!ImageContentValidator.HasValidImageSignature(data, extension))
-            return Results.BadRequest(new ErrorDto($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
+            return Results.BadRequest(new ApiErrorResponse($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
         var relativePath = $"Photos/{Guid.NewGuid():N}{extension}";
         var caption = Path.GetFileNameWithoutExtension(file.FileName);
         if (caption.Length > 200) caption = caption[..200];
@@ -803,7 +803,7 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
     await using var ownership = new NpgsqlCommand("SELECT 1 FROM user_map_places WHERE user_map_place_id=@p AND user_id=@u", connection, transaction);
     ownership.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
     ownership.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    if (await ownership.ExecuteScalarAsync() is null) return Results.NotFound(new ErrorDto("Место не найдено."));
+    if (await ownership.ExecuteScalarAsync() is null) return Results.NotFound(new ApiErrorResponse("Место не найдено."));
 
     foreach (var upload in uploads)
     {
@@ -934,10 +934,10 @@ static async Task<NpgsqlConnection> OpenAsync(string? connectionString)
 
 static async Task<IResult> SaveVisitAsync(string connectionString, VisitWriteRequest request, int userId, int? visitId)
 {
-    if (request.AttractionId <= 0) return Results.BadRequest(new ErrorDto("Выберите достопримечательность."));
+    if (request.AttractionId <= 0) return Results.BadRequest(new ApiErrorResponse("Выберите достопримечательность."));
     if (!DateOnly.TryParse(request.VisitDate, out var date) || date > DateOnly.FromDateTime(DateTime.Today))
-        return Results.BadRequest(new ErrorDto("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
-    if (request.Rating is < 1 or > 5) return Results.BadRequest(new ErrorDto("Оценка должна быть от 1 до 5."));
+        return Results.BadRequest(new ApiErrorResponse("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
+    if (request.Rating is < 1 or > 5) return Results.BadRequest(new ApiErrorResponse("Оценка должна быть от 1 до 5."));
     int id;
     await using (var connection = await OpenAsync(connectionString))
     await using (var transaction = await connection.BeginTransactionAsync())
@@ -955,7 +955,7 @@ static async Task<IResult> SaveVisitAsync(string connectionString, VisitWriteReq
                 impressions=@i, notes=@n WHERE visit_id=@v AND user_id=@u", connection, transaction);
             AddVisitParameters(update, userId, request, date);
             update.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId.Value);
-            if (await update.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ErrorDto("Посещение не найдено."));
+            if (await update.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
             id = visitId.Value;
         }
         await transaction.CommitAsync();
@@ -1059,7 +1059,6 @@ record LoginRequest(string Login, string Password);
 record UpdateDisplayNameRequest(string? DisplayName);
 record UserDto(int Id, string Login, string DisplayName);
 record AuthResponse(UserDto User, string Token);
-record ErrorDto(string Error);
 record MessageDto(string Message);
 record HealthDto(bool ApiConfigured, bool DatabaseConnected, string Message);
 record CategoryDto(int Id, string Name);
