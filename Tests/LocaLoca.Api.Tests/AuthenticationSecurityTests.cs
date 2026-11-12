@@ -106,11 +106,11 @@ public sealed class AuthenticationSecurityTests
     }
 
     [Fact]
-    public async Task Registration_Rate_Limit_Rejects_A_Burst_Without_Creating_The_Excess_Accounts()
+    public async Task Registration_Rate_Limit_Rejects_Excessive_Accounts_From_One_Ip()
     {
         using var factory = _database.CreateFactory();
         using var client = factory.CreateClient();
-        var logins = Enumerable.Range(0, 11)
+        var logins = Enumerable.Range(0, 4)
             .Select(_ => "auth-burst-" + Guid.NewGuid().ToString("N"))
             .ToArray();
         var statuses = new List<HttpStatusCode>();
@@ -124,11 +124,38 @@ public sealed class AuthenticationSecurityTests
                 displayName = "Registration rate-limit test"
             });
             statuses.Add(response.StatusCode);
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                using var errorDocument = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                Assert.True(errorDocument.RootElement.TryGetProperty("error", out _));
+            }
         }
 
-        Assert.Equal(10, statuses.Count(status => status == HttpStatusCode.OK));
+        Assert.Equal(3, statuses.Count(status => status == HttpStatusCode.OK));
         Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.TooManyRequests));
         Assert.Equal(0L, await CountUsersAsync(logins[^1]));
+    }
+
+    [Fact]
+    public async Task Logout_Rate_Limit_Rejects_Excessive_Requests_From_One_Ip()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+        var statuses = new List<HttpStatusCode>();
+
+        for (var attempt = 0; attempt < 11; attempt++)
+        {
+            using var response = await client.PostAsync("/api/auth/logout", content: null);
+            statuses.Add(response.StatusCode);
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                using var errorDocument = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                Assert.True(errorDocument.RootElement.TryGetProperty("error", out _));
+            }
+        }
+
+        Assert.Equal(10, statuses.Count(status => status == HttpStatusCode.Unauthorized));
+        Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.TooManyRequests));
     }
 
     private async Task<TestAccount> RegisterAsync(HttpClient client)

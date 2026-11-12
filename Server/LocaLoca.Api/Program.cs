@@ -49,6 +49,16 @@ builder.Services.AddRateLimiter(options =>
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
+                PermitLimit = 3,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy("auth-logout", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
                 PermitLimit = 10,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
@@ -262,7 +272,7 @@ app.MapPost("/api/auth/logout", (HttpContext context, SessionStore sessions) =>
     return sessions.Revoke(token)
         ? Results.Ok(new MessageDto("Сессия завершена."))
         : Results.Unauthorized();
-});
+}).RequireRateLimiting("auth-logout");
 
 app.MapPut("/api/me/profile/display-name", async Task<IResult> (UpdateDisplayNameRequest request, HttpContext context, SessionStore sessions) =>
 {
