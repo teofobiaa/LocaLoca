@@ -241,6 +241,16 @@ public sealed class ApiNegativeScenarioTests
         var savedPhotos = await ReadItemsAsync(photosResponse);
         Assert.Equal(2, savedPhotos.Count);
 
+        using var tenFilesForm = new MultipartFormDataContent();
+        for (var index = 0; index < 10; index++)
+            AddJpeg(tenFilesForm, "photos", $"within-count-limit-{index}.jpg", 3);
+
+        using var tenFilesUpload = await client.PostAsync(
+            $"/api/me/map-places/{placeId}/photos", tenFilesForm);
+
+        Assert.Equal(HttpStatusCode.OK, tenFilesUpload.StatusCode);
+        Assert.Equal(12L, await CountMapPlacePhotosAsync(account.UserId));
+
         using var overLimitForm = new MultipartFormDataContent();
         AddJpeg(overLimitForm, "photos", "first-10-mib.jpg", PhotoLimitBytes / 2);
         AddJpeg(overLimitForm, "photos", "over-total-by-one.jpg", PhotoLimitBytes / 2 + 1);
@@ -248,7 +258,7 @@ public sealed class ApiNegativeScenarioTests
             $"/api/me/map-places/{placeId}/photos", overLimitForm);
 
         Assert.Equal(HttpStatusCode.BadRequest, overLimitUpload.StatusCode);
-        Assert.Equal(2L, await CountMapPlacePhotosAsync(account.UserId));
+        Assert.Equal(12L, await CountMapPlacePhotosAsync(account.UserId));
 
         using var tooManyFilesForm = new MultipartFormDataContent();
         for (var index = 0; index < 11; index++)
@@ -258,7 +268,7 @@ public sealed class ApiNegativeScenarioTests
             $"/api/me/map-places/{placeId}/photos", tooManyFilesForm);
 
         Assert.Equal(HttpStatusCode.BadRequest, tooManyFilesUpload.StatusCode);
-        Assert.Equal(2L, await CountMapPlacePhotosAsync(account.UserId));
+        Assert.Equal(12L, await CountMapPlacePhotosAsync(account.UserId));
 
         var firstPhotoId = savedPhotos[0].GetProperty("id").GetInt32();
         using var delete = await client.DeleteAsync($"/api/me/map-place-photos/{firstPhotoId}");
@@ -268,7 +278,7 @@ public sealed class ApiNegativeScenarioTests
         Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, afterDelete.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, repeatedDelete.StatusCode);
-        Assert.Equal(1L, await CountMapPlacePhotosAsync(account.UserId));
+        Assert.Equal(11L, await CountMapPlacePhotosAsync(account.UserId));
     }
 
     [Fact]
@@ -301,11 +311,12 @@ public sealed class ApiNegativeScenarioTests
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, invalidReference.StatusCode);
         var errorBody = await invalidReference.Content.ReadAsStringAsync();
-        Assert.Contains("error", errorBody, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("23503", errorBody, StringComparison.Ordinal);
-        Assert.DoesNotContain("PostgresException", errorBody, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("localoca_api_tests", errorBody, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Password=", errorBody, StringComparison.OrdinalIgnoreCase);
+        using var errorDocument = JsonDocument.Parse(errorBody);
+        Assert.True(errorDocument.RootElement.TryGetProperty("error", out _));
+        Assert.False(errorBody.Contains("23503", StringComparison.Ordinal));
+        Assert.False(errorBody.Contains("PostgresException", StringComparison.OrdinalIgnoreCase));
+        Assert.False(errorBody.Contains("localoca_api_tests", StringComparison.OrdinalIgnoreCase));
+        Assert.False(errorBody.Contains("Password=", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(0L, await CountVisitsAsync(account.UserId));
     }
 
@@ -435,4 +446,3 @@ public sealed class ApiNegativeScenarioTests
     private sealed record TestAccount(int UserId, string Token);
 }
 
-public sealed record ApiNegativePhotoResponse(int Id, string FilePath, string Caption);
