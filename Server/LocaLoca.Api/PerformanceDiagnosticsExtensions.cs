@@ -115,18 +115,17 @@ public static class PerformanceDiagnosticsExtensions
             new KeyValuePair<string, object?>("db.operation", operation),
             new KeyValuePair<string, object?>("error", failed));
 
-        var statementId = GetStatementFingerprint(sql);
         if (durationMs >= slowSqlThresholdMs)
         {
             logger.LogWarning(
                 "Slow PostgreSQL command {StatementId} ({Operation}) completed in {DurationMs:F1} ms. Error: {Error}.",
-                statementId, operation, durationMs, failed);
+                GetStatementFingerprint(sql), operation, durationMs, failed);
         }
-        else
+        else if (logger.IsEnabled(LogLevel.Debug))
         {
             logger.LogDebug(
                 "PostgreSQL command {StatementId} ({Operation}) completed in {DurationMs:F1} ms. Error: {Error}.",
-                statementId, operation, durationMs, failed);
+                GetStatementFingerprint(sql), operation, durationMs, failed);
         }
     }
 
