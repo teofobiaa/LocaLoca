@@ -49,6 +49,53 @@ public sealed class PasswordHasherTests
     {
         Assert.Throws<ArgumentException>(() => PasswordHasher.Hash(string.Empty));
     }
+
+    [Fact]
+    public void Verify_Accepts_Legacy_Hashes_And_Requests_An_Upgrade()
+    {
+        const string password = "legacy-test-password";
+        var legacyHash = CreateLegacyHash(password, 100_000);
+
+        Assert.True(PasswordHasher.Verify(password, legacyHash));
+        Assert.False(PasswordHasher.Verify("wrong-password", legacyHash));
+        Assert.True(PasswordHasher.NeedsRehash(legacyHash));
+    }
+
+    [Fact]
+    public void NeedsRehash_Detects_A_Work_Factor_Below_The_Configured_Target()
+    {
+        var hash = PasswordHasher.Hash("cost-test-password", 10_000);
+
+        Assert.True(PasswordHasher.Verify("cost-test-password", hash));
+        Assert.True(PasswordHasher.NeedsRehash(hash, 600_000));
+        Assert.False(PasswordHasher.NeedsRehash(hash, 10_000));
+    }
+
+    [Fact]
+    public void UpgradeIterations_Never_Downgrades_A_Stronger_Hash()
+    {
+        var strongerHash = PasswordHasher.Hash("stronger-test-password", 200_000);
+
+        Assert.Equal(200_000, PasswordHasher.GetUpgradeIterations(strongerHash, 100_000));
+    }
+
+    [Theory]
+    [InlineData("9999")]
+    [InlineData("2000001")]
+    [InlineData("not-a-number")]
+    public void Configured_Iterations_Reject_Unsupported_Values(string value)
+    {
+        Assert.Throws<InvalidOperationException>(() => PasswordHasher.GetConfiguredIterations(value));
+    }
+
+    private static string CreateLegacyHash(string password, int iterations)
+    {
+        var salt = RandomNumberGenerator.GetBytes(16);
+        var hash = Rfc2898DeriveBytes.Pbkdf2(
+            password, salt, iterations, HashAlgorithmName.SHA256, 32);
+        return iterations.ToString(System.Globalization.CultureInfo.InvariantCulture) + "." +
+               Convert.ToBase64String(salt) + "." + Convert.ToBase64String(hash);
+    }
 }
 
 public sealed class SessionStoreTests
