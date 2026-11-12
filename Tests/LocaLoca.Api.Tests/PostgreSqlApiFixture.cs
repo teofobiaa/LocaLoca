@@ -67,6 +67,12 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
 
     public ApiTestFactory CreateFactory() => new(ConnectionString);
 
+    // Tests in this xUnit collection are serialized, so an outage test can safely
+    // stop and restart the shared isolated PostgreSQL container.
+    public Task StopDatabaseAsync() => _postgres.StopAsync();
+
+    public Task StartDatabaseAsync() => _postgres.StartAsync();
+
     public async Task DisposeAsync()
     {
         await _postgres.DisposeAsync();

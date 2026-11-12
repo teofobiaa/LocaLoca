@@ -389,6 +389,152 @@ public sealed class ApiIntegrationTests
         Assert.DoesNotContain(remainingItems, item => item.GetProperty("id").GetInt32() == visitId);
     }
 
+
+    [Fact]
+    public async Task Concurrent_Visit_Updates_Leave_One_Complete_Consistent_Record()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        var visitId = await CreateVisitAsync(client);
+
+        const int updateCount = 12;
+        var updates = Enumerable.Range(0, updateCount)
+            .Select(index => new
+            {
+                VisitDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-(index + 2))).ToString("yyyy-MM-dd"),
+                Rating = index % 5 + 1,
+                Impressions = $"concurrent-update-{index}",
+                Notes = $"concurrent-notes-{index}"
+            })
+            .ToArray();
+
+        var startGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var updateTasks = updates.Select(async update =>
+        {
+            await startGate.Task;
+            return await client.PutAsJsonAsync($"/api/me/visits/{visitId}", new
+            {
+                attractionId = _database.AttractionId,
+                visitDate = update.VisitDate,
+                rating = update.Rating,
+                impressions = update.Impressions,
+                notes = update.Notes
+            });
+        }).ToArray();
+
+        startGate.SetResult(true);
+        var responses = await Task.WhenAll(updateTasks);
+        try
+        {
+            Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+        }
+        finally
+        {
+            foreach (var response in responses)
+                response.Dispose();
+        }
+
+        using var visitsResponse = await client.GetAsync("/api/me/visits");
+        var storedVisit = Assert.Single(
+            (await ReadItemsAsync(visitsResponse)).Where(item => item.GetProperty("id").GetInt32() == visitId));
+
+        var finalStateMatchesOneCompleteUpdate = updates.Any(update =>
+            storedVisit.GetProperty("visitDate").GetString() == update.VisitDate &&
+            storedVisit.GetProperty("rating").GetInt32() == update.Rating &&
+            storedVisit.GetProperty("impressions").GetString() == update.Impressions &&
+            storedVisit.GetProperty("notes").GetString() == update.Notes);
+
+        Assert.True(
+            finalStateMatchesOneCompleteUpdate,
+            "The final visit must contain all fields from one submitted update, not a mixture of concurrent updates.");
+    }
+
+    [Fact]
+    public async Task Concurrent_Wishlist_Additions_Create_Only_One_Record()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+
+        const int requestCount = 12;
+        var startGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var addTasks = Enumerable.Range(0, requestCount)
+            .Select(async _ =>
+            {
+                await startGate.Task;
+                return await client.PostAsync($"/api/me/wishlist/{_database.AttractionId}", content: null);
+            })
+            .ToArray();
+
+        startGate.SetResult(true);
+        var responses = await Task.WhenAll(addTasks);
+        try
+        {
+            Assert.All(responses, response => Assert.Equal(HttpStatusCode.OK, response.StatusCode));
+        }
+        finally
+        {
+            foreach (var response in responses)
+                response.Dispose();
+        }
+
+        using var wishlistResponse = await client.GetAsync("/api/me/wishlist");
+        Assert.Equal(new[] { _database.AttractionId }, await ReadIntegerItemsAsync(wishlistResponse));
+    }
+
+    [Fact]
+    public async Task Api_Returns_503_During_PostgreSql_Outage_And_Recovers_After_Restart()
+    {
+        // Disable pooling so the outage is observed on a fresh TCP connection,
+        // rather than depending on whether an idle pooled connection was reused.
+        var connectionString = new NpgsqlConnectionStringBuilder(_database.ConnectionString)
+        {
+            Pooling = false
+        }.ConnectionString;
+
+        using var factory = new ApiTestFactory(connectionString);
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        var visitId = await CreateVisitAsync(client);
+
+        var databaseStopped = false;
+        try
+        {
+            await _database.StopDatabaseAsync();
+            databaseStopped = true;
+
+            using var health = await client.GetAsync("/health");
+            using var unavailable = await client.GetAsync("/api/me/visits");
+
+            Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+            Assert.Equal(HttpStatusCode.ServiceUnavailable, unavailable.StatusCode);
+
+            var errorBody = await unavailable.Content.ReadAsStringAsync();
+            Assert.Contains("Не удалось обратиться к Supabase PostgreSQL", errorBody);
+            Assert.DoesNotContain("localoca_api_tests", errorBody);
+            Assert.DoesNotContain("Password=", errorBody);
+        }
+        finally
+        {
+            if (databaseStopped)
+                await _database.StartDatabaseAsync();
+        }
+
+        using var ready = await client.GetAsync("/ready");
+        using var recovered = await client.GetAsync("/api/me/visits");
+
+        Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
+        var recoveredVisits = await ReadItemsAsync(recovered);
+        Assert.Contains(recoveredVisits, item => item.GetProperty("id").GetInt32() == visitId);
+    }
+
     [Fact]
     public async Task Photo_Upload_Rejects_Invalid_Content_Before_Writing_To_PostgreSql()
     {
