@@ -53,7 +53,7 @@ public sealed class SessionStore
     public bool TryGet(string token, out int userId)
     {
         userId = 0;
-        if (!TryValidate(token, out var parsedUserId, out var expiresAt))
+        if (!TryValidate(token, out var parsedUserId, out _))
             return false;
 
         var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
