@@ -148,6 +148,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            SearchBox.Text = string.Empty;
             var categoriesTask = _api.GetCategoriesAsync();
             var catalogTask = _api.GetCatalogPageAsync(page: 1, pageSize: CatalogPageSize);
             var visitsTask = _api.GetVisitsAsync();
