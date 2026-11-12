@@ -28,31 +28,31 @@
       "version": 3,
       "name": "migrate_wishlist",
       "path": "migrations/03_migrate_wishlist.sql",
-      "sha256": "57ec949a489cb85d6c074fb87a7bbd0be69030a2969bca502f395db99bf48850"
+      "sha256": "0f347b720db996372af9be8e43271979c2f15369b92a12e668dd5eecd833f610"
     },
     {
       "version": 4,
       "name": "migrate_user_map_places",
       "path": "migrations/04_migrate_user_map_places.sql",
-      "sha256": "4202ce438a1b6c7e1180e94eb2a5c933e80f7d95c74dec49dccc118345248291"
+      "sha256": "97ec6a1914a9c14154d6a83fcee9efabfdc9876e438cec487bec124ad2c5da40"
     },
     {
       "version": 7,
       "name": "migrate_photo_storage",
       "path": "migrations/07_migrate_photo_storage.sql",
-      "sha256": "2d36fdbe65ef34897426dad41fbc73b75d48a1fb734367774c22dbd01693f571"
+      "sha256": "79d393780ec0c1536586513c88286aaebbaf855509ebc899edeb94bae6837193"
     },
     {
       "version": 8,
       "name": "server_sessions",
       "path": "migrations/08_server_sessions.sql",
-      "sha256": "6977f852e9a88e5227697e86784a7e8d91f91710c0b0539d306daf5bbd1e1bb5"
+      "sha256": "638851582bde97f6ae38d25025861f8847e58535dab9c9b176ffc0078f591de7"
     },
     {
       "version": 9,
       "name": "map_marker_viewport_indexes",
       "path": "migrations/09_map_marker_viewport_indexes.sql",
-      "sha256": "fafecaed7798d7767a18f2c2d21fc26da32e2ad7384c7a34c858bc78f3692fbf"
+      "sha256": "c29329792f45cc18b4e8e785c0c81cc3fff1608f8ab04ba50f21bdcbcc44f22a"
     }
   ],
   "securityScripts": [
