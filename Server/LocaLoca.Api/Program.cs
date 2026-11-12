@@ -237,7 +237,7 @@ SELECT
     }
 });
 
-app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, SessionStore sessions) =>
+app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     var login = (request.Login ?? string.Empty).Trim().ToLowerInvariant();
     var displayName = (request.DisplayName ?? string.Empty).Trim();
@@ -248,7 +248,7 @@ app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, 
     if (displayName.Length > 100) return Results.BadRequest(new ApiErrorResponse("Имя слишком длинное."));
     if (string.IsNullOrWhiteSpace(displayName)) displayName = login;
 
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"
         INSERT INTO users (login, password_hash, display_name)
         VALUES (@login, @hash, @display)
@@ -257,52 +257,52 @@ app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, 
     command.Parameters.AddWithValue("login", NpgsqlDbType.Varchar, login);
     command.Parameters.AddWithValue("hash", NpgsqlDbType.Varchar, PasswordHasher.Hash(request.Password));
     command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
-    var result = await command.ExecuteScalarAsync();
+    var result = await command.ExecuteScalarAsync(cancellationToken);
     if (result is null) return Results.Conflict(new ApiErrorResponse("Пользователь с таким логином уже существует."));
     var user = new UserDto(Convert.ToInt32(result), login, displayName);
-    return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!)));
+    return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!, cancellationToken)));
 }).RequireRateLimiting("auth-register");
 
-app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, SessionStore sessions) =>
+app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     var login = (request.Login ?? string.Empty).Trim().ToLowerInvariant();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(
         "SELECT user_id, password_hash, display_name FROM users WHERE login = @login", connection);
     command.Parameters.AddWithValue("login", NpgsqlDbType.Varchar, login);
-    await using var reader = await command.ExecuteReaderAsync();
-    if (!await reader.ReadAsync() || !PasswordHasher.Verify(request.Password ?? string.Empty, reader.GetString(1)))
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    if (!await reader.ReadAsync(cancellationToken) || !PasswordHasher.Verify(request.Password ?? string.Empty, reader.GetString(1)))
         return Results.Unauthorized();
     var user = new UserDto(reader.GetInt32(0), login, reader.GetString(2));
-    return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!)));
+    return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!, cancellationToken)));
 }).RequireRateLimiting("auth-login");
 
-app.MapPost("/api/auth/logout", async (HttpContext context, SessionStore sessions) =>
+app.MapPost("/api/auth/logout", async (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     var header = context.Request.Headers["Authorization"].ToString();
     if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         return Results.Unauthorized();
 
     var token = header[7..].Trim();
-    return await sessions.RevokeAsync(token, connectionString!)
+    return await sessions.RevokeAsync(token, connectionString!, cancellationToken)
         ? Results.Ok(new MessageDto("Сессия завершена."))
         : Results.Unauthorized();
 }).RequireRateLimiting("auth-logout");
 
-app.MapGet("/api/me/sessions", async (HttpContext context, SessionStore sessions) =>
+app.MapGet("/api/me/sessions", async (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
  if(!TryUser(context,sessions,out var userId))return Results.Unauthorized();
  var token=context.Request.Headers["Authorization"].ToString()[7..].Trim();
- return Results.Ok(new ItemsResponse<SessionDto>(await sessions.GetActiveAsync(userId,token,connectionString!)));
+ return Results.Ok(new ItemsResponse<SessionDto>(await sessions.GetActiveAsync(userId,token, connectionString!, cancellationToken)));
 });
-app.MapDelete("/api/me/sessions/others", async (HttpContext context, SessionStore sessions) =>
+app.MapDelete("/api/me/sessions/others", async (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
  if(!TryUser(context,sessions,out var userId))return Results.Unauthorized();
  var token=context.Request.Headers["Authorization"].ToString()[7..].Trim();
- var count=await sessions.RevokeOthersAsync(userId,token,connectionString!);
+ var count=await sessions.RevokeOthersAsync(userId,token, connectionString!, cancellationToken);
  return Results.Ok(new MessageDto($"Отозвано других сессий: {count}."));
 });
-app.MapPut("/api/me/profile/display-name", async Task<IResult> (UpdateDisplayNameRequest request, HttpContext context, SessionStore sessions) =>
+app.MapPut("/api/me/profile/display-name", async Task<IResult> (UpdateDisplayNameRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
 
@@ -310,28 +310,28 @@ app.MapPut("/api/me/profile/display-name", async Task<IResult> (UpdateDisplayNam
     if (displayName.Length is < 1 or > 40)
         return Results.BadRequest(new ApiErrorResponse("Имя должно содержать от 1 до 40 символов."));
 
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(
         "UPDATE users SET display_name = @display WHERE user_id = @user RETURNING login", connection);
     command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
     command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
-    var login = await command.ExecuteScalarAsync() as string;
+    var login = await command.ExecuteScalarAsync(cancellationToken) as string;
     if (login is null) return Results.NotFound(new ApiErrorResponse("Аккаунт не найден."));
 
     return Results.Ok(new UserDto(userId, login, displayName));
 });
 
-app.MapGet("/api/catalog/categories", async Task<IResult> () =>
+app.MapGet("/api/catalog/categories", async Task<IResult> (CancellationToken cancellationToken) =>
 {
     var items = new List<CategoryDto>();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand("SELECT category_id, name FROM categories ORDER BY name", connection);
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync()) items.Add(new CategoryDto(reader.GetInt32(0), reader.GetString(1)));
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    while (await reader.ReadAsync(cancellationToken)) items.Add(new CategoryDto(reader.GetInt32(0), reader.GetString(1)));
     return Results.Ok(new ItemsResponse<CategoryDto>(items));
 });
 
-app.MapGet("/api/catalog", async Task<IResult> (string? search, int? categoryId) =>
+app.MapGet("/api/catalog", async Task<IResult> (string? search, int? categoryId, CancellationToken cancellationToken) =>
 {
     const string sql = @"
 SELECT a.attraction_id, a.name, a.description, COALESCE(a.history, ''),
@@ -344,22 +344,22 @@ WHERE (@q = '' OR a.name ILIKE '%' || @q || '%' OR ci.name ILIKE '%' || @q || '%
   AND (@cat IS NULL OR a.category_id = @cat)
 ORDER BY co.name, ci.name, a.name";
     var items = new List<AttractionDto>();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(sql, connection);
     command.Parameters.AddWithValue("q", NpgsqlDbType.Text, search?.Trim() ?? string.Empty);
     command.Parameters.AddWithValue("cat", NpgsqlDbType.Integer, (object?)categoryId ?? DBNull.Value);
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync())
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    while (await reader.ReadAsync(cancellationToken))
         items.Add(new AttractionDto(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
             (double)reader.GetDecimal(4), (double)reader.GetDecimal(5), reader.GetString(6), reader.GetString(7), reader.GetString(8)));
     return Results.Ok(new ItemsResponse<AttractionDto>(items));
 });
 
-app.MapGet("/api/me/visits", async Task<IResult> (HttpContext context, SessionStore sessions) =>
+app.MapGet("/api/me/visits", async Task<IResult> (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var items = new List<VisitDto>();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"
 SELECT v.visit_id, v.attraction_id, a.name, ci.name, co.name, v.visit_date,
        v.rating, v.impressions, v.notes,
@@ -370,21 +370,21 @@ JOIN cities ci ON ci.city_id = a.city_id
 JOIN countries co ON co.country_id = ci.country_id
 WHERE v.user_id = @user ORDER BY v.visit_date DESC, v.visit_id DESC", connection);
     command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
-    await using (var reader = await command.ExecuteReaderAsync())
-        while (await reader.ReadAsync())
+    await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        while (await reader.ReadAsync(cancellationToken))
             items.Add(new VisitDto(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
                 reader.GetDateTime(5).ToString("yyyy-MM-dd"), reader.GetInt16(6), reader.GetString(7), reader.GetString(8), reader.GetInt64(9)));
 
     await using (var schemaCheck = new NpgsqlCommand("SELECT to_regclass('public.user_map_places') IS NOT NULL", connection))
     {
-        if (Equals(await schemaCheck.ExecuteScalarAsync(), true))
+        if (Equals(await schemaCheck.ExecuteScalarAsync(cancellationToken), true))
         {
             await using var customCommand = new NpgsqlCommand(@"SELECT user_map_place_id, name, visit_date, rating, impressions, notes,
                 (SELECT count(*) FROM user_map_place_photos p WHERE p.user_map_place_id=m.user_map_place_id)
                 FROM user_map_places m WHERE user_id=@user AND status='visited'", connection);
             customCommand.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
-            await using var customReader = await customCommand.ExecuteReaderAsync();
-            while (await customReader.ReadAsync())
+            await using var customReader = await customCommand.ExecuteReaderAsync(cancellationToken);
+            while (await customReader.ReadAsync(cancellationToken))
             {
                 var placeId = customReader.GetInt32(0);
                 items.Add(new VisitDto(-placeId, 0, customReader.GetString(1), "Личная точка", string.Empty,
@@ -397,45 +397,45 @@ WHERE v.user_id = @user ORDER BY v.visit_date DESC, v.visit_id DESC", connection
     return Results.Ok(new ItemsResponse<VisitDto>(items));
 });
 
-app.MapGet("/api/me/wishlist", async Task<IResult> (HttpContext context, SessionStore sessions) =>
+app.MapGet("/api/me/wishlist", async Task<IResult> (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var items = new List<int>();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand("SELECT attraction_id FROM wishlist WHERE user_id = @u ORDER BY added_at DESC", connection);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync()) items.Add(reader.GetInt32(0));
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    while (await reader.ReadAsync(cancellationToken)) items.Add(reader.GetInt32(0));
     return Results.Ok(new IntItemsResponse(items));
 });
 
-app.MapPost("/api/me/wishlist/{attractionId:int}", async Task<IResult> (int attractionId, HttpContext context, SessionStore sessions) =>
+app.MapPost("/api/me/wishlist/{attractionId:int}", async Task<IResult> (int attractionId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"INSERT INTO wishlist(user_id, attraction_id) VALUES (@u, @a)
         ON CONFLICT (user_id, attraction_id) DO NOTHING", connection);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
     command.Parameters.AddWithValue("a", NpgsqlDbType.Integer, attractionId);
-    await command.ExecuteNonQueryAsync();
+    await command.ExecuteNonQueryAsync(cancellationToken);
     return Results.Ok(new MessageDto("Добавлено в список «Хочу посетить»."));
 });
 
-app.MapDelete("/api/me/wishlist/{attractionId:int}", async Task<IResult> (int attractionId, HttpContext context, SessionStore sessions) =>
+app.MapDelete("/api/me/wishlist/{attractionId:int}", async Task<IResult> (int attractionId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand("DELETE FROM wishlist WHERE user_id = @u AND attraction_id = @a", connection);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
     command.Parameters.AddWithValue("a", NpgsqlDbType.Integer, attractionId);
-    await command.ExecuteNonQueryAsync();
+    await command.ExecuteNonQueryAsync(cancellationToken);
     return Results.Ok(new MessageDto("Удалено из списка."));
 });
 
-app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, SessionStore sessions) =>
+app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    var form = await context.Request.ReadFormAsync();
+    var form = await context.Request.ReadFormAsync(cancellationToken);
     if (!int.TryParse(form["attractionId"], out var attractionId) || attractionId <= 0)
         return Results.BadRequest(new ApiErrorResponse("Выберите достопримечательность."));
     if (!int.TryParse(form["rating"], out var rating) || rating is < 1 or > 5)
@@ -460,7 +460,7 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
     foreach (var file in files)
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        var data = await ReadPhotoDataAsync(file);
+        var data = await ReadPhotoDataAsync(file, cancellationToken);
         if (!ImageContentValidator.HasValidImageSignature(data, extension))
             return Results.BadRequest(new ApiErrorResponse($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
         var fileName = $"{Guid.NewGuid():N}{extension}";
@@ -470,8 +470,8 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
         uploads.Add((relativePath, caption, data, ImageContentValidator.GetContentType(relativePath)));
     }
 
-    await using var connection = await OpenAsync(connectionString);
-    await using var transaction = await connection.BeginTransactionAsync();
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
+    await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
     int savedVisitId;
     if (visitId is null)
     {
@@ -479,7 +479,7 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
             VALUES (@u, @a, @d, @r, @i, @n) RETURNING visit_id", connection, transaction);
         AddVisitParameters(insert, userId, new VisitWriteRequest(attractionId, visitDate.ToString("yyyy-MM-dd"), rating,
             form["impressions"].ToString(), form["notes"].ToString()), visitDate);
-        savedVisitId = Convert.ToInt32(await insert.ExecuteScalarAsync());
+        savedVisitId = Convert.ToInt32(await insert.ExecuteScalarAsync(cancellationToken));
     }
     else
     {
@@ -488,7 +488,7 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
         AddVisitParameters(update, userId, new VisitWriteRequest(attractionId, visitDate.ToString("yyyy-MM-dd"), rating,
             form["impressions"].ToString(), form["notes"].ToString()), visitDate);
         update.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId.Value);
-        if (await update.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
+        if (await update.ExecuteNonQueryAsync(cancellationToken) == 0) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
         savedVisitId = visitId.Value;
     }
 
@@ -502,52 +502,52 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
         photoInsert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, upload.Caption);
         photoInsert.Parameters.AddWithValue("data", NpgsqlDbType.Bytea, upload.Data);
         photoInsert.Parameters.AddWithValue("type", NpgsqlDbType.Varchar, upload.ContentType);
-        await photoInsert.ExecuteNonQueryAsync();
+        await photoInsert.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    await transaction.CommitAsync();
+    await transaction.CommitAsync(cancellationToken);
     return Results.Ok(new VisitSavedDto(savedVisitId, "Посещение и фотографии сохранены в PostgreSQL."));
 });
 
-app.MapPost("/api/me/visits", async Task<IResult> (VisitWriteRequest request, HttpContext context, SessionStore sessions) =>
+app.MapPost("/api/me/visits", async Task<IResult> (VisitWriteRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    return await SaveVisitAsync(connectionString!, request, userId, null);
+    return await SaveVisitAsync(connectionString!, request, userId, null, cancellationToken);
 });
 
-app.MapPut("/api/me/visits/{visitId:int}", async Task<IResult> (int visitId, VisitWriteRequest request, HttpContext context, SessionStore sessions) =>
+app.MapPut("/api/me/visits/{visitId:int}", async Task<IResult> (int visitId, VisitWriteRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    return await SaveVisitAsync(connectionString!, request, userId, visitId);
+    return await SaveVisitAsync(connectionString!, request, userId, visitId, cancellationToken);
 });
 
-app.MapDelete("/api/me/visits/{visitId:int}", async Task<IResult> (int visitId, HttpContext context, SessionStore sessions) =>
+app.MapDelete("/api/me/visits/{visitId:int}", async Task<IResult> (int visitId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var storedPaths = new List<string>();
-    await using (var connection = await OpenAsync(connectionString))
-    await using (var transaction = await connection.BeginTransactionAsync())
+    await using (var connection = await OpenAsync(connectionString, cancellationToken))
+    await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
     {
         await using var photosCommand = new NpgsqlCommand(@"SELECT p.file_path FROM photos p
             JOIN visits v ON v.visit_id = p.visit_id WHERE v.visit_id = @v AND v.user_id = @u", connection, transaction);
         photosCommand.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId);
         photosCommand.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        await using (var reader = await photosCommand.ExecuteReaderAsync())
-            while (await reader.ReadAsync()) storedPaths.Add(reader.GetString(0));
+        await using (var reader = await photosCommand.ExecuteReaderAsync(cancellationToken))
+            while (await reader.ReadAsync(cancellationToken)) storedPaths.Add(reader.GetString(0));
         await using var delete = new NpgsqlCommand("DELETE FROM visits WHERE visit_id = @v AND user_id = @u", connection, transaction);
         delete.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId);
         delete.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        if (await delete.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
-        await transaction.CommitAsync();
+        if (await delete.ExecuteNonQueryAsync(cancellationToken) == 0) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
+        await transaction.CommitAsync(cancellationToken);
     }
     foreach (var path in storedPaths) TryDeletePhoto(dataRoot, path);
     return Results.Ok(new MessageDto("Посещение удалено."));
 });
 
-app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visitId, HttpContext context, SessionStore sessions) =>
+app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visitId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    var form = await context.Request.ReadFormAsync();
+    var form = await context.Request.ReadFormAsync(cancellationToken);
     var file = form.Files.GetFile("file");
     if (file is null || file.Length == 0) return Results.BadRequest(new ApiErrorResponse("Файл не выбран."));
     if (file.Length > 20 * 1024 * 1024)
@@ -556,15 +556,15 @@ app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visi
     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
     var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
     if (!allowed.Contains(extension)) return Results.BadRequest(new ApiErrorResponse("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
-    var data = await ReadPhotoDataAsync(file);
+    var data = await ReadPhotoDataAsync(file, cancellationToken);
     if (!ImageContentValidator.HasValidImageSignature(data, extension))
         return Results.BadRequest(new ApiErrorResponse("Содержимое файла не соответствует формату изображения."));
 
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var ownership = new NpgsqlCommand("SELECT 1 FROM visits WHERE visit_id = @v AND user_id = @u", connection);
     ownership.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId);
     ownership.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    if (await ownership.ExecuteScalarAsync() is null) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
+    if (await ownership.ExecuteScalarAsync(cancellationToken) is null) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
 
     var relativePath = $"Photos/{Guid.NewGuid():N}{extension}";
     var caption = Path.GetFileNameWithoutExtension(file.FileName);
@@ -577,38 +577,38 @@ app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visi
     insert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, caption);
     insert.Parameters.AddWithValue("data", NpgsqlDbType.Bytea, data);
     insert.Parameters.AddWithValue("type", NpgsqlDbType.Varchar, ImageContentValidator.GetContentType(relativePath));
-    var id = Convert.ToInt32(await insert.ExecuteScalarAsync());
+    var id = Convert.ToInt32(await insert.ExecuteScalarAsync(cancellationToken));
     return Results.Ok(new PhotoDto(id, relativePath, caption));
 });
 
-app.MapGet("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visitId, HttpContext context, SessionStore sessions) =>
+app.MapGet("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visitId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var items = new List<PhotoDto>();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"SELECT p.photo_id, p.file_path, p.caption FROM photos p
         JOIN visits v ON v.visit_id = p.visit_id WHERE v.visit_id = @v AND v.user_id = @u ORDER BY p.added_at", connection);
     command.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync()) items.Add(new PhotoDto(reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    while (await reader.ReadAsync(cancellationToken)) items.Add(new PhotoDto(reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
     return Results.Ok(new ItemsResponse<PhotoDto>(items));
 });
 
-app.MapGet("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
+app.MapGet("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     string relativePath;
     byte[]? imageData;
     string contentType;
-    await using (var connection = await OpenAsync(connectionString))
+    await using (var connection = await OpenAsync(connectionString, cancellationToken))
     await using (var command = new NpgsqlCommand(@"SELECT p.file_path, p.image_data, p.content_type FROM photos p
         JOIN visits v ON v.visit_id = p.visit_id WHERE p.photo_id = @p AND v.user_id = @u", connection))
     {
         command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
         command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        await using var reader = await command.ExecuteReaderAsync();
-        if (!await reader.ReadAsync()) return Results.NotFound();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return Results.NotFound();
         relativePath = reader.GetString(0);
         imageData = reader.IsDBNull(1) ? null : reader.GetFieldValue<byte[]>(1);
         contentType = reader.IsDBNull(2) ? ImageContentValidator.GetContentType(relativePath) : reader.GetString(2);
@@ -621,24 +621,24 @@ app.MapGet("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, Htt
     return Results.File(fullPath, ImageContentValidator.GetContentType(fullPath));
 });
 
-app.MapDelete("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
+app.MapDelete("/api/me/photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"DELETE FROM photos p USING visits v
         WHERE p.visit_id = v.visit_id AND p.photo_id = @p AND v.user_id = @u RETURNING p.file_path", connection);
     command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    var path = await command.ExecuteScalarAsync() as string;
+    var path = await command.ExecuteScalarAsync(cancellationToken) as string;
     if (path is null) return Results.NotFound();
     TryDeletePhoto(dataRoot, path);
     return Results.Ok(new MessageDto("Фотография удалена."));
 });
 
-app.MapGet("/api/me/summary", async Task<IResult> (HttpContext context, SessionStore sessions) =>
+app.MapGet("/api/me/summary", async Task<IResult> (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"
 SELECT count(DISTINCT v.visit_id), count(DISTINCT v.attraction_id),
        count(DISTINCT ci.city_id), count(DISTINCT co.country_id)
@@ -648,8 +648,8 @@ JOIN cities ci ON ci.city_id = a.city_id
 JOIN countries co ON co.country_id = ci.country_id
 WHERE v.user_id = @u", connection);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    await using var reader = await command.ExecuteReaderAsync();
-    await reader.ReadAsync();
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    await reader.ReadAsync(cancellationToken);
     var visitCount = reader.GetInt64(0);
     var distinctAttractions = reader.GetInt64(1);
     var cities = reader.GetInt64(2);
@@ -658,38 +658,38 @@ WHERE v.user_id = @u", connection);
     long customVisits = 0;
     await using (var schemaCheck = new NpgsqlCommand("SELECT to_regclass('public.user_map_places') IS NOT NULL", connection))
     {
-        if (Equals(await schemaCheck.ExecuteScalarAsync(), true))
+        if (Equals(await schemaCheck.ExecuteScalarAsync(cancellationToken), true))
         {
             await using var customCount = new NpgsqlCommand(@"SELECT count(*) FROM user_map_places
                 WHERE user_id=@u AND status='visited'", connection);
             customCount.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-            customVisits = Convert.ToInt64(await customCount.ExecuteScalarAsync());
+            customVisits = Convert.ToInt64(await customCount.ExecuteScalarAsync(cancellationToken));
         }
     }
     return Results.Ok(new SummaryDto(visitCount + customVisits, distinctAttractions + customVisits, cities, countries));
 });
 
-app.MapGet("/api/me/map-markers", async Task<IResult> (HttpContext context, SessionStore sessions) =>
+app.MapGet("/api/me/map-markers", async Task<IResult> (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var items = new List<MapMarkerDto>();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"
 SELECT a.attraction_id, a.name, a.latitude, a.longitude,
        EXISTS(SELECT 1 FROM visits v WHERE v.user_id = @u AND v.attraction_id = a.attraction_id),
        EXISTS(SELECT 1 FROM wishlist w WHERE w.user_id = @u AND w.attraction_id = a.attraction_id)
 FROM attractions a ORDER BY a.name", connection);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    await using (var reader = await command.ExecuteReaderAsync())
-        while (await reader.ReadAsync()) items.Add(new MapMarkerDto(reader.GetInt32(0), reader.GetString(1),
+    await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        while (await reader.ReadAsync(cancellationToken)) items.Add(new MapMarkerDto(reader.GetInt32(0), reader.GetString(1),
             (double)reader.GetDecimal(2), (double)reader.GetDecimal(3), reader.GetBoolean(4), reader.GetBoolean(5)));
 
     await using var customCommand = new NpgsqlCommand(@"
 SELECT user_map_place_id, name, latitude, longitude, status, visit_date, rating, impressions, notes
 FROM user_map_places WHERE user_id = @u ORDER BY created_at", connection);
     customCommand.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    await using var customReader = await customCommand.ExecuteReaderAsync();
-    while (await customReader.ReadAsync())
+    await using var customReader = await customCommand.ExecuteReaderAsync(cancellationToken);
+    while (await customReader.ReadAsync(cancellationToken))
         items.Add(new MapMarkerDto(customReader.GetInt32(0), customReader.GetString(1),
             (double)customReader.GetDecimal(2), (double)customReader.GetDecimal(3),
             customReader.GetString(4) == "visited", customReader.GetString(4) == "planned",
@@ -698,7 +698,7 @@ FROM user_map_places WHERE user_id = @u ORDER BY created_at", connection);
     return Results.Ok(new ItemsResponse<MapMarkerDto>(items));
 });
 
-app.MapPost("/api/me/map-places", async Task<IResult> (MapPlaceCreateRequest request, HttpContext context, SessionStore sessions) =>
+app.MapPost("/api/me/map-places", async Task<IResult> (MapPlaceCreateRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var name = (request.Name ?? string.Empty).Trim();
@@ -719,7 +719,7 @@ app.MapPost("/api/me/map-places", async Task<IResult> (MapPlaceCreateRequest req
         rating = request.Rating;
     }
 
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"INSERT INTO user_map_places(user_id, name, latitude, longitude, status,
         visit_date, rating, impressions, notes) VALUES (@u, @n, @lat, @lon, @s, @d, @r, @i, @notes)
         RETURNING user_map_place_id", connection);
@@ -732,11 +732,11 @@ app.MapPost("/api/me/map-places", async Task<IResult> (MapPlaceCreateRequest req
     command.Parameters.AddWithValue("r", NpgsqlDbType.Smallint, rating.HasValue ? (object)(short)rating.Value : DBNull.Value);
     command.Parameters.AddWithValue("i", NpgsqlDbType.Text, request.Impressions ?? string.Empty);
     command.Parameters.AddWithValue("notes", NpgsqlDbType.Text, request.Notes ?? string.Empty);
-    var id = Convert.ToInt32(await command.ExecuteScalarAsync());
+    var id = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
     return Results.Ok(new MapPlaceSavedDto(id, status == "visited" ? "Посещение сохранено." : "Место добавлено в планы."));
 });
 
-app.MapPut("/api/me/map-places/{placeId:int}", async Task<IResult> (int placeId, MapPlaceUpdateRequest request, HttpContext context, SessionStore sessions) =>
+app.MapPut("/api/me/map-places/{placeId:int}", async Task<IResult> (int placeId, MapPlaceUpdateRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var status = (request.Status ?? string.Empty).Trim().ToLowerInvariant();
@@ -754,7 +754,7 @@ app.MapPut("/api/me/map-places/{placeId:int}", async Task<IResult> (int placeId,
     var name = (request.Name ?? string.Empty).Trim();
     if (name.Length is < 1 or > 150) return Results.BadRequest(new ApiErrorResponse("Название должно содержать от 1 до 150 символов."));
 
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"UPDATE user_map_places SET name=@n, status=@s, visit_date=@d,
         rating=@r, impressions=@i, notes=@notes WHERE user_map_place_id=@p AND user_id=@u", connection);
     command.Parameters.AddWithValue("n", NpgsqlDbType.Varchar, name);
@@ -765,53 +765,53 @@ app.MapPut("/api/me/map-places/{placeId:int}", async Task<IResult> (int placeId,
     command.Parameters.AddWithValue("notes", NpgsqlDbType.Text, request.Notes ?? string.Empty);
     command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    if (await command.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Место не найдено."));
+    if (await command.ExecuteNonQueryAsync(cancellationToken) == 0) return Results.NotFound(new ApiErrorResponse("Место не найдено."));
     return Results.Ok(new MessageDto("Место обновлено."));
 });
 
-app.MapDelete("/api/me/map-places/{placeId:int}", async Task<IResult> (int placeId, HttpContext context, SessionStore sessions) =>
+app.MapDelete("/api/me/map-places/{placeId:int}", async Task<IResult> (int placeId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var photoPaths = new List<string>();
-    await using (var connection = await OpenAsync(connectionString))
-    await using (var transaction = await connection.BeginTransactionAsync())
+    await using (var connection = await OpenAsync(connectionString, cancellationToken))
+    await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
     {
         await using var photos = new NpgsqlCommand(@"SELECT p.file_path FROM user_map_place_photos p
             JOIN user_map_places m ON m.user_map_place_id=p.user_map_place_id
             WHERE m.user_map_place_id=@p AND m.user_id=@u", connection, transaction);
         photos.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
         photos.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        await using (var reader = await photos.ExecuteReaderAsync())
-            while (await reader.ReadAsync()) photoPaths.Add(reader.GetString(0));
+        await using (var reader = await photos.ExecuteReaderAsync(cancellationToken))
+            while (await reader.ReadAsync(cancellationToken)) photoPaths.Add(reader.GetString(0));
         await using var delete = new NpgsqlCommand("DELETE FROM user_map_places WHERE user_map_place_id=@p AND user_id=@u", connection, transaction);
         delete.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
         delete.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        if (await delete.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Место не найдено."));
-        await transaction.CommitAsync();
+        if (await delete.ExecuteNonQueryAsync(cancellationToken) == 0) return Results.NotFound(new ApiErrorResponse("Место не найдено."));
+        await transaction.CommitAsync(cancellationToken);
     }
     foreach (var path in photoPaths) TryDeletePhoto(dataRoot, path);
     return Results.Ok(new MessageDto("Место удалено."));
 });
 
-app.MapGet("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int placeId, HttpContext context, SessionStore sessions) =>
+app.MapGet("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int placeId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     var items = new List<PhotoDto>();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"SELECT p.photo_id, p.file_path, p.caption FROM user_map_place_photos p
         JOIN user_map_places m ON m.user_map_place_id=p.user_map_place_id
         WHERE m.user_map_place_id=@p AND m.user_id=@u ORDER BY p.added_at", connection);
     command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    await using var reader = await command.ExecuteReaderAsync();
-    while (await reader.ReadAsync()) items.Add(new PhotoDto(reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    while (await reader.ReadAsync(cancellationToken)) items.Add(new PhotoDto(reader.GetInt32(0), reader.GetString(1), reader.GetString(2)));
     return Results.Ok(new ItemsResponse<PhotoDto>(items));
 });
 
-app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int placeId, HttpContext context, SessionStore sessions) =>
+app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int placeId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    var form = await context.Request.ReadFormAsync();
+    var form = await context.Request.ReadFormAsync(cancellationToken);
     var files = form.Files.GetFiles("photos");
     if (files.Count is < 1 or > 10) return Results.BadRequest(new ApiErrorResponse("Выберите от 1 до 10 фотографий."));
     if (files.Any(f => f.Length == 0))
@@ -827,7 +827,7 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
     foreach (var file in files)
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-        var data = await ReadPhotoDataAsync(file);
+        var data = await ReadPhotoDataAsync(file, cancellationToken);
         if (!ImageContentValidator.HasValidImageSignature(data, extension))
             return Results.BadRequest(new ApiErrorResponse($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
         var relativePath = $"Photos/{Guid.NewGuid():N}{extension}";
@@ -836,12 +836,12 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
         uploads.Add((relativePath, caption, data, ImageContentValidator.GetContentType(relativePath)));
     }
 
-    await using var connection = await OpenAsync(connectionString);
-    await using var transaction = await connection.BeginTransactionAsync();
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
+    await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
     await using var ownership = new NpgsqlCommand("SELECT 1 FROM user_map_places WHERE user_map_place_id=@p AND user_id=@u", connection, transaction);
     ownership.Parameters.AddWithValue("p", NpgsqlDbType.Integer, placeId);
     ownership.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    if (await ownership.ExecuteScalarAsync() is null) return Results.NotFound(new ApiErrorResponse("Место не найдено."));
+    if (await ownership.ExecuteScalarAsync(cancellationToken) is null) return Results.NotFound(new ApiErrorResponse("Место не найдено."));
 
     foreach (var upload in uploads)
     {
@@ -853,27 +853,27 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
         insert.Parameters.AddWithValue("c", NpgsqlDbType.Varchar, upload.Caption);
         insert.Parameters.AddWithValue("data", NpgsqlDbType.Bytea, upload.Data);
         insert.Parameters.AddWithValue("type", NpgsqlDbType.Varchar, upload.ContentType);
-        await insert.ExecuteNonQueryAsync();
+        await insert.ExecuteNonQueryAsync(cancellationToken);
     }
-    await transaction.CommitAsync();
+    await transaction.CommitAsync(cancellationToken);
     return Results.Ok(new MessageDto("Фотографии сохранены в PostgreSQL."));
 });
 
-app.MapGet("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
+app.MapGet("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
     string relativePath;
     byte[]? imageData;
     string contentType;
-    await using (var connection = await OpenAsync(connectionString))
+    await using (var connection = await OpenAsync(connectionString, cancellationToken))
     await using (var command = new NpgsqlCommand(@"SELECT p.file_path, p.image_data, p.content_type FROM user_map_place_photos p
         JOIN user_map_places m ON m.user_map_place_id=p.user_map_place_id
         WHERE p.photo_id=@p AND m.user_id=@u", connection))
     {
         command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
         command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        await using var reader = await command.ExecuteReaderAsync();
-        if (!await reader.ReadAsync()) return Results.NotFound();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken)) return Results.NotFound();
         relativePath = reader.GetString(0);
         imageData = reader.IsDBNull(1) ? null : reader.GetFieldValue<byte[]>(1);
         contentType = reader.IsDBNull(2) ? ImageContentValidator.GetContentType(relativePath) : reader.GetString(2);
@@ -886,25 +886,27 @@ app.MapGet("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int ph
     return Results.File(fullPath, ImageContentValidator.GetContentType(fullPath));
 });
 
-app.MapDelete("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions) =>
+app.MapDelete("/api/me/map-place-photos/{photoId:int}", async Task<IResult> (int photoId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-    await using var connection = await OpenAsync(connectionString);
+    await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var command = new NpgsqlCommand(@"DELETE FROM user_map_place_photos p USING user_map_places m
         WHERE p.user_map_place_id = m.user_map_place_id AND p.photo_id = @p AND m.user_id = @u
         RETURNING p.file_path", connection);
     command.Parameters.AddWithValue("p", NpgsqlDbType.Integer, photoId);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    var path = await command.ExecuteScalarAsync() as string;
+    var path = await command.ExecuteScalarAsync(cancellationToken) as string;
     if (path is null) return Results.NotFound();
     TryDeletePhoto(dataRoot, path);
     return Results.Ok(new MessageDto("Фотография удалена."));
 });
 
-app.MapGet("/map", IResult () =>
+app.MapGet("/map", async Task<IResult> (CancellationToken cancellationToken) =>
 {
     var path = Path.Combine(app.Environment.ContentRootPath, "wwwroot", "map.html");
-    return File.Exists(path) ? Results.Content(File.ReadAllText(path), "text/html; charset=utf-8") : Results.NotFound();
+    return File.Exists(path)
+        ? Results.Content(await File.ReadAllTextAsync(path, cancellationToken), "text/html; charset=utf-8")
+        : Results.NotFound();
 });
 
 app.Run();
@@ -961,31 +963,39 @@ static string? ReadUserConnectionString(string configPath)
     }
 }
 
-static async Task<NpgsqlConnection> OpenAsync(string? connectionString)
+static async Task<NpgsqlConnection> OpenAsync(string? connectionString, CancellationToken cancellationToken)
 {
     if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
         throw new DatabaseUnavailableException("PostgreSQL connection is not configured.");
     var connection = new NpgsqlConnection(connectionString);
-    await connection.OpenAsync();
-    return connection;
+    try
+    {
+        await connection.OpenAsync(cancellationToken);
+        return connection;
+    }
+    catch
+    {
+        await connection.DisposeAsync();
+        throw;
+    }
 }
 
-static async Task<IResult> SaveVisitAsync(string connectionString, VisitWriteRequest request, int userId, int? visitId)
+static async Task<IResult> SaveVisitAsync(string connectionString, VisitWriteRequest request, int userId, int? visitId, CancellationToken cancellationToken)
 {
     if (request.AttractionId <= 0) return Results.BadRequest(new ApiErrorResponse("Выберите достопримечательность."));
     if (!DateOnly.TryParse(request.VisitDate, out var date) || date > DateOnly.FromDateTime(DateTime.Today))
         return Results.BadRequest(new ApiErrorResponse("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
     if (request.Rating is < 1 or > 5) return Results.BadRequest(new ApiErrorResponse("Оценка должна быть от 1 до 5."));
     int id;
-    await using (var connection = await OpenAsync(connectionString))
-    await using (var transaction = await connection.BeginTransactionAsync())
+    await using (var connection = await OpenAsync(connectionString, cancellationToken))
+    await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
     {
         if (visitId is null)
         {
             await using var insert = new NpgsqlCommand(@"INSERT INTO visits(user_id, attraction_id, visit_date, rating, impressions, notes)
                 VALUES (@u, @a, @d, @r, @i, @n) RETURNING visit_id", connection, transaction);
             AddVisitParameters(insert, userId, request, date);
-            id = Convert.ToInt32(await insert.ExecuteScalarAsync());
+            id = Convert.ToInt32(await insert.ExecuteScalarAsync(cancellationToken));
         }
         else
         {
@@ -993,10 +1003,10 @@ static async Task<IResult> SaveVisitAsync(string connectionString, VisitWriteReq
                 impressions=@i, notes=@n WHERE visit_id=@v AND user_id=@u", connection, transaction);
             AddVisitParameters(update, userId, request, date);
             update.Parameters.AddWithValue("v", NpgsqlDbType.Integer, visitId.Value);
-            if (await update.ExecuteNonQueryAsync() == 0) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
+            if (await update.ExecuteNonQueryAsync(cancellationToken) == 0) return Results.NotFound(new ApiErrorResponse("Посещение не найдено."));
             id = visitId.Value;
         }
-        await transaction.CommitAsync();
+        await transaction.CommitAsync(cancellationToken);
     }
     return Results.Ok(new VisitSavedDto(id, "Посещение сохранено."));
 }
@@ -1017,11 +1027,12 @@ static bool TryUser(HttpContext context, SessionStore sessions, out int userId)
     return userId > 0;
 }
 
-static async Task<byte[]> ReadPhotoDataAsync(IFormFile file)
+static async Task<byte[]> ReadPhotoDataAsync(IFormFile file, CancellationToken cancellationToken)
 {
+    cancellationToken.ThrowIfCancellationRequested();
     await using var source = file.OpenReadStream();
     using var buffer = new MemoryStream(checked((int)file.Length));
-    await source.CopyToAsync(buffer);
+    await source.CopyToAsync(buffer, cancellationToken);
     return buffer.ToArray();
 }
 
