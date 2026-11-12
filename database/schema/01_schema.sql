@@ -136,7 +136,7 @@ CREATE INDEX ix_user_map_places_user  ON user_map_places (user_id, created_at DE
 CREATE INDEX ix_user_map_places_user_coordinates ON user_map_places (user_id, latitude, longitude);
 CREATE INDEX ix_user_map_place_photos ON user_map_place_photos (user_map_place_id);
 
--- Current baseline includes schema migrations 003, 004, 007, 008 and 009.
+-- Current baseline includes schema migrations 003, 004, 007, 008, 009 and 010.
 CREATE TABLE localoca_schema_migrations (
  version integer PRIMARY KEY CHECK (version > 0),
  name varchar(120) NOT NULL,
@@ -149,7 +149,8 @@ INSERT INTO localoca_schema_migrations (version, name, source) VALUES
  (4, 'migrate_user_map_places', 'baseline'),
  (7, 'migrate_photo_storage', 'baseline'),
  (8, 'server_sessions', 'baseline'),
- (9, 'map_marker_viewport_indexes', 'baseline');
+ (9, 'map_marker_viewport_indexes', 'baseline'),
+ (10, 'map_marker_visit_lookup_index', 'baseline');
 
 -- Представление для отчётов и ручной проверки данных.
 CREATE VIEW v_visit_details AS
