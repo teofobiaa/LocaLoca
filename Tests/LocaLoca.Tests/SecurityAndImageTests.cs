@@ -114,6 +114,14 @@ public sealed class SessionStoreConfigurationTests
         Assert.Throws<InvalidOperationException>(
             () => new SessionStore(CreateConfiguration("short-test-secret")));
     }
+
+    [Fact]
+    public void Constructor_Accepts_A_Missing_Secret_For_Local_Development()
+    {
+        var store = new SessionStore(CreateConfiguration(null));
+
+        Assert.NotNull(store);
+    }
 }
 
 public sealed class ImageContentValidatorTests
