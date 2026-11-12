@@ -123,7 +123,7 @@ public sealed class AuthenticationSecurityTests
 
         Assert.Equal(10, statuses.Count(status => status == HttpStatusCode.OK));
         Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.TooManyRequests));
-        Assert.Equal(0, await CountUsersAsync(logins[^1]));
+        Assert.Equal(0L, await CountUsersAsync(logins[^1]));
     }
 
     private async Task<TestAccount> RegisterAsync(HttpClient client)
