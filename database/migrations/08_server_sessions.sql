@@ -18,8 +18,3 @@ BEGIN
         GRANT SELECT, INSERT, UPDATE, DELETE ON public.user_sessions TO localoca_app;
     END IF;
 END $$;
-
--- Record this migration after all schema changes above have succeeded.
-INSERT INTO public.localoca_schema_migrations (version, name, source)
-VALUES (8, 'server_sessions', 'migration')
-ON CONFLICT (version) DO NOTHING;

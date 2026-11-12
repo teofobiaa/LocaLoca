@@ -34,8 +34,3 @@ CREATE TABLE IF NOT EXISTS user_map_place_photos (
 
 CREATE INDEX IF NOT EXISTS ix_user_map_places_user ON user_map_places (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS ix_user_map_place_photos ON user_map_place_photos (user_map_place_id);
-
--- Record this migration after all schema changes above have succeeded.
-INSERT INTO public.localoca_schema_migrations (version, name, source)
-VALUES (4, 'migrate_user_map_places', 'migration')
-ON CONFLICT (version) DO NOTHING;

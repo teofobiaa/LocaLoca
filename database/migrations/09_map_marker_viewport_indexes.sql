@@ -5,8 +5,3 @@ CREATE INDEX IF NOT EXISTS ix_attractions_coordinates
 
 CREATE INDEX IF NOT EXISTS ix_user_map_places_user_coordinates
     ON user_map_places (user_id, latitude, longitude);
-
--- Record this migration after all schema changes above have succeeded.
-INSERT INTO public.localoca_schema_migrations (version, name, source)
-VALUES (9, 'map_marker_viewport_indexes', 'migration')
-ON CONFLICT (version) DO NOTHING;
