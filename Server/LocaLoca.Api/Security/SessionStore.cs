@@ -1,138 +1,22 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
+using Npgsql;
+using NpgsqlTypes;
 using Microsoft.Extensions.Configuration;
-
 namespace LocaLoca.Api.Security;
-
 public sealed class SessionStore
 {
-    private readonly byte[] _secret;
-    private readonly ConcurrentDictionary<string, long> _revokedTokens = new(StringComparer.Ordinal);
-    private static readonly TimeSpan Lifetime = TimeSpan.FromDays(30);
-
-    public SessionStore(IConfiguration configuration)
-    {
-        ArgumentNullException.ThrowIfNull(configuration);
-
-        var configuredSecret = configuration["LOCA_SESSION_SECRET"];
-        // Local development remains zero-configuration. In cloud hosting the
-        // API startup validates a stable secret so tokens survive restarts.
-        _secret = string.IsNullOrWhiteSpace(configuredSecret)
-            ? RandomNumberGenerator.GetBytes(32)
-            : Encoding.UTF8.GetBytes(configuredSecret);
-
-        if (_secret.Length < 32)
-            throw new InvalidOperationException("LOCA_SESSION_SECRET must contain at least 32 characters.");
-    }
-
-    public string Create(int userId)
-    {
-        if (userId <= 0)
-            throw new ArgumentOutOfRangeException(nameof(userId), "User ID must be positive.");
-
-        var payload = Encoding.UTF8.GetBytes(
-            $"{userId}:{DateTimeOffset.UtcNow.Add(Lifetime).ToUnixTimeSeconds()}");
-
-        var encodedPayload = Base64UrlEncode(payload);
-        var signature = HMACSHA256.HashData(_secret, Encoding.ASCII.GetBytes(encodedPayload));
-
-        return $"{encodedPayload}.{Base64UrlEncode(signature)}";
-    }
-
-    public bool Revoke(string token)
-    {
-        if (!TryValidate(token, out _, out var expiresAt))
-            return false;
-
-        var fingerprint = GetFingerprint(token);
-        PruneExpiredRevocations(DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        return _revokedTokens.TryAdd(fingerprint, expiresAt);
-    }
-
-    public bool TryGet(string token, out int userId)
-    {
-        userId = 0;
-        if (!TryValidate(token, out var parsedUserId, out _))
-            return false;
-
-        var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        var fingerprint = GetFingerprint(token);
-        if (_revokedTokens.TryGetValue(fingerprint, out var revokedUntil))
-        {
-            if (now < revokedUntil)
-                return false;
-
-            _revokedTokens.TryRemove(fingerprint, out _);
-        }
-
-        userId = parsedUserId;
-        return true;
-    }
-
-    private bool TryValidate(string token, out int userId, out long expiresAt)
-    {
-        userId = 0;
-        expiresAt = 0;
-        if (string.IsNullOrWhiteSpace(token))
-            return false;
-
-        try
-        {
-            var parts = token.Split('.');
-            if (parts.Length != 2)
-                return false;
-
-            var suppliedSignature = Base64UrlDecode(parts[1]);
-            var expectedSignature = HMACSHA256.HashData(
-                _secret,
-                Encoding.ASCII.GetBytes(parts[0]));
-
-            if (!CryptographicOperations.FixedTimeEquals(suppliedSignature, expectedSignature))
-                return false;
-
-            var fields = Encoding.UTF8.GetString(Base64UrlDecode(parts[0])).Split(':');
-            if (fields.Length != 2 ||
-                !int.TryParse(fields[0], out var parsedUserId) || parsedUserId <= 0 ||
-                !long.TryParse(fields[1], out var parsedExpiresAt) ||
-                DateTimeOffset.UtcNow.ToUnixTimeSeconds() >= parsedExpiresAt)
-            {
-                return false;
-            }
-
-            userId = parsedUserId;
-            expiresAt = parsedExpiresAt;
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-    }
-
-    private void PruneExpiredRevocations(long now)
-    {
-        foreach (var revoked in _revokedTokens)
-        {
-            if (revoked.Value <= now)
-                _revokedTokens.TryRemove(revoked.Key, out _);
-        }
-    }
-
-    private static string GetFingerprint(string token) =>
-        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
-
-    private static string Base64UrlEncode(byte[] value) =>
-        Convert.ToBase64String(value).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
-    private static byte[] Base64UrlDecode(string value)
-    {
-        var base64 = value.Replace('-', '+').Replace('_', '/');
-        base64 = base64.PadRight(base64.Length + (4 - base64.Length % 4) % 4, '=');
-        return Convert.FromBase64String(base64);
-    }
+ private readonly byte[] _secret;
+ private static readonly TimeSpan Lifetime=TimeSpan.FromDays(30);
+ public SessionStore(IConfiguration c){var s=c["LOCA_SESSION_SECRET"];_secret=string.IsNullOrWhiteSpace(s)?RandomNumberGenerator.GetBytes(32):Encoding.UTF8.GetBytes(s);if(_secret.Length<32)throw new InvalidOperationException("LOCA_SESSION_SECRET must contain at least 32 characters.");}
+ public async Task<string> CreateAsync(int userId,string cs,CancellationToken ct=default){var id=Guid.NewGuid();var expiry=DateTimeOffset.UtcNow.Add(Lifetime);var payload=Encoding.UTF8.GetBytes($"{userId}:{expiry.ToUnixTimeSeconds()}:{id:N}");var encoded=Encode(payload);var token=$"{encoded}.{Encode(HMACSHA256.HashData(_secret,Encoding.ASCII.GetBytes(encoded)))}";await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("INSERT INTO user_sessions(session_id,user_id,token_hash,expires_at) VALUES (@id,@user,@hash,@expiry)",db);cmd.Parameters.AddWithValue("id",NpgsqlDbType.Uuid,id);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,userId);cmd.Parameters.AddWithValue("hash",NpgsqlDbType.Char,Fingerprint(token));cmd.Parameters.AddWithValue("expiry",NpgsqlDbType.TimestampTz,expiry);await cmd.ExecuteNonQueryAsync(ct);return token;}
+ public async Task<int?> ValidateAsync(string token,string cs,CancellationToken ct=default){if(!TryParse(token,out var user,out var id))return null;await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("UPDATE user_sessions SET last_seen_at=now() WHERE session_id=@id AND user_id=@user AND token_hash=@hash AND revoked_at IS NULL AND expires_at>now() RETURNING user_id",db);cmd.Parameters.AddWithValue("id",NpgsqlDbType.Uuid,id);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,user);cmd.Parameters.AddWithValue("hash",NpgsqlDbType.Char,Fingerprint(token));var v=await cmd.ExecuteScalarAsync(ct);return v is null?null:Convert.ToInt32(v);}
+ public async Task<bool> RevokeAsync(string token,string cs,CancellationToken ct=default){if(!TryParse(token,out var user,out var id))return false;await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("UPDATE user_sessions SET revoked_at=now() WHERE session_id=@id AND user_id=@user AND token_hash=@hash AND revoked_at IS NULL AND expires_at>now()",db);cmd.Parameters.AddWithValue("id",NpgsqlDbType.Uuid,id);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,user);cmd.Parameters.AddWithValue("hash",NpgsqlDbType.Char,Fingerprint(token));return await cmd.ExecuteNonQueryAsync(ct)==1;}
+ public async Task<IReadOnlyList<SessionDto>> GetActiveAsync(int user,string token,string cs,CancellationToken ct=default){await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("SELECT session_id,created_at,last_seen_at,expires_at,token_hash FROM user_sessions WHERE user_id=@user AND revoked_at IS NULL AND expires_at>now() ORDER BY last_seen_at DESC",db);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,user);var hash=Fingerprint(token);var list=new List<SessionDto>();await using var r=await cmd.ExecuteReaderAsync(ct);while(await r.ReadAsync(ct))list.Add(new SessionDto(r.GetGuid(0),r.GetFieldValue<DateTimeOffset>(1),r.GetFieldValue<DateTimeOffset>(2),r.GetFieldValue<DateTimeOffset>(3),r.GetString(4).Trim()==hash));return list;}
+ public async Task<int> RevokeOthersAsync(int user,string token,string cs,CancellationToken ct=default){await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("UPDATE user_sessions SET revoked_at=now() WHERE user_id=@user AND revoked_at IS NULL AND expires_at>now() AND token_hash<>@hash",db);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,user);cmd.Parameters.AddWithValue("hash",NpgsqlDbType.Char,Fingerprint(token));return await cmd.ExecuteNonQueryAsync(ct);}
+ private bool TryParse(string token,out int user,out Guid id){user=0;id=Guid.Empty;if(string.IsNullOrWhiteSpace(token))return false;try{var parts=token.Split('.');if(parts.Length!=2)return false;var sig=Decode(parts[1]);var expected=HMACSHA256.HashData(_secret,Encoding.ASCII.GetBytes(parts[0]));if(!CryptographicOperations.FixedTimeEquals(sig,expected))return false;var fields=Encoding.UTF8.GetString(Decode(parts[0])).Split(':');if(fields.Length!=3||!int.TryParse(fields[0],out user)||user<=0||!long.TryParse(fields[1],out var exp)||DateTimeOffset.UtcNow.ToUnixTimeSeconds()>=exp||!Guid.TryParseExact(fields[2],"N",out id)){user=0;id=Guid.Empty;return false;}return true;}catch(FormatException){return false;}catch(ArgumentException){return false;}}
+ private static string Fingerprint(string t)=>Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(t)));
+ private static string Encode(byte[] b)=>Convert.ToBase64String(b).TrimEnd('=').Replace('+','-').Replace('/','_');
+ private static byte[] Decode(string s){var b=s.Replace('-','+').Replace('_','/');return Convert.FromBase64String(b.PadRight(b.Length+(4-b.Length%4)%4,'='));}
 }
+public sealed record SessionDto(Guid Id,DateTimeOffset CreatedAt,DateTimeOffset LastSeenAt,DateTimeOffset ExpiresAt,bool IsCurrent);

@@ -127,6 +127,17 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
     }
 }
 
+app.Use(async (context, next) =>
+{
+    var header=context.Request.Headers.Authorization.ToString();
+    if(header.StartsWith("Bearer ",StringComparison.OrdinalIgnoreCase)&&!string.IsNullOrWhiteSpace(connectionString)){
+        var token=header[7..].Trim();
+        var sessions=context.RequestServices.GetRequiredService<SessionStore>();
+        var userId=await sessions.ValidateAsync(token,connectionString,context.RequestAborted);
+        if(userId.HasValue)context.Items["LocaLoca.UserId"]=userId.Value;
+    }
+    await next();
+});
 var photosRoot = Path.Combine(dataRoot, "Photos");
 Directory.CreateDirectory(photosRoot);
 
@@ -245,7 +256,7 @@ app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, 
     var result = await command.ExecuteScalarAsync();
     if (result is null) return Results.Conflict(new ApiErrorResponse("Пользователь с таким логином уже существует."));
     var user = new UserDto(Convert.ToInt32(result), login, displayName);
-    return Results.Ok(new AuthResponse(user, sessions.Create(user.Id)));
+    return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!)));
 }).RequireRateLimiting("auth-register");
 
 app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, SessionStore sessions) =>
@@ -259,21 +270,34 @@ app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, Sessio
     if (!await reader.ReadAsync() || !PasswordHasher.Verify(request.Password ?? string.Empty, reader.GetString(1)))
         return Results.Unauthorized();
     var user = new UserDto(reader.GetInt32(0), login, reader.GetString(2));
-    return Results.Ok(new AuthResponse(user, sessions.Create(user.Id)));
+    return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!)));
 }).RequireRateLimiting("auth-login");
 
-app.MapPost("/api/auth/logout", (HttpContext context, SessionStore sessions) =>
+app.MapPost("/api/auth/logout", async (HttpContext context, SessionStore sessions) =>
 {
     var header = context.Request.Headers["Authorization"].ToString();
     if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         return Results.Unauthorized();
 
     var token = header[7..].Trim();
-    return sessions.Revoke(token)
+    return await sessions.RevokeAsync(token, connectionString!)
         ? Results.Ok(new MessageDto("Сессия завершена."))
         : Results.Unauthorized();
 }).RequireRateLimiting("auth-logout");
 
+app.MapGet("/api/me/sessions", async (HttpContext context, SessionStore sessions) =>
+{
+ if(!TryUser(context,sessions,out var userId))return Results.Unauthorized();
+ var token=context.Request.Headers.Authorization.ToString()[7..].Trim();
+ return Results.Ok(new ItemsResponse<SessionDto>(await sessions.GetActiveAsync(userId,token,connectionString!)));
+});
+app.MapDelete("/api/me/sessions/others", async (HttpContext context, SessionStore sessions) =>
+{
+ if(!TryUser(context,sessions,out var userId))return Results.Unauthorized();
+ var token=context.Request.Headers.Authorization.ToString()[7..].Trim();
+ var count=await sessions.RevokeOthersAsync(userId,token,connectionString!);
+ return Results.Ok(new MessageDto($"Отозвано других сессий: {count}."));
+});
 app.MapPut("/api/me/profile/display-name", async Task<IResult> (UpdateDisplayNameRequest request, HttpContext context, SessionStore sessions) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
@@ -985,10 +1009,8 @@ static void AddVisitParameters(NpgsqlCommand command, int userId, VisitWriteRequ
 
 static bool TryUser(HttpContext context, SessionStore sessions, out int userId)
 {
-    userId = 0;
-    var header = context.Request.Headers["Authorization"].ToString();
-    if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase)) return false;
-    return sessions.TryGet(header[7..].Trim(), out userId);
+    userId = context.Items.TryGetValue("LocaLoca.UserId", out var value) && value is int id ? id : 0;
+    return userId > 0;
 }
 
 static async Task<byte[]> ReadPhotoDataAsync(IFormFile file)
