@@ -5,6 +5,8 @@ using System.Text.Json;
 using Npgsql;
 using NpgsqlTypes;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using LocaLoca.Api.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,7 +30,32 @@ builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = 22 * 1024 * 1024;
 });
 builder.Services.AddSingleton<SessionStore>();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("auth-login", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy("auth-register", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
 var app = builder.Build();
+app.UseRateLimiter();
 
 app.Use(async (context, next) =>
 {
@@ -224,7 +251,7 @@ app.MapPost("/api/auth/register", async Task<IResult> (RegisterRequest request, 
     if (result is null) return Results.Conflict(new ErrorDto("Пользователь с таким логином уже существует."));
     var user = new UserDto(Convert.ToInt32(result), login, displayName);
     return Results.Ok(new AuthResponse(user, sessions.Create(user.Id)));
-});
+}).RequireRateLimiting("auth-register");
 
 app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, SessionStore sessions) =>
 {
@@ -238,6 +265,18 @@ app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, Sessio
         return Results.Unauthorized();
     var user = new UserDto(reader.GetInt32(0), login, reader.GetString(2));
     return Results.Ok(new AuthResponse(user, sessions.Create(user.Id)));
+}).RequireRateLimiting("auth-login");
+
+app.MapPost("/api/auth/logout", (HttpContext context, SessionStore sessions) =>
+{
+    var header = context.Request.Headers["Authorization"].ToString();
+    if (!header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        return Results.Unauthorized();
+
+    var token = header[7..].Trim();
+    return sessions.Revoke(token)
+        ? Results.Ok(new MessageDto("Сессия завершена."))
+        : Results.Unauthorized();
 });
 
 app.MapPut("/api/me/profile/display-name", async Task<IResult> (UpdateDisplayNameRequest request, HttpContext context, SessionStore sessions) =>
