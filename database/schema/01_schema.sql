@@ -112,11 +112,13 @@ CREATE TABLE user_map_place_photos (
 
 CREATE INDEX ix_attractions_city      ON attractions (city_id);
 CREATE INDEX ix_attractions_category  ON attractions (category_id);
+CREATE INDEX ix_attractions_coordinates ON attractions (latitude, longitude);
 CREATE INDEX ix_visits_user_date      ON visits (user_id, visit_date DESC);
 CREATE INDEX ix_visits_attraction     ON visits (attraction_id);
 CREATE INDEX ix_photos_visit          ON photos (visit_id);
 CREATE INDEX ix_wishlist_attraction   ON wishlist (attraction_id);
 CREATE INDEX ix_user_map_places_user  ON user_map_places (user_id, created_at DESC);
+CREATE INDEX ix_user_map_places_user_coordinates ON user_map_places (user_id, latitude, longitude);
 CREATE INDEX ix_user_map_place_photos ON user_map_place_photos (user_map_place_id);
 
 -- Представление для отчётов и ручной проверки данных.

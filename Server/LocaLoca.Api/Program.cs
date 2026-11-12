@@ -67,6 +67,11 @@ builder.Services.AddRateLimiter(options =>
 });
 var app = builder.Build();
 
+const int DefaultPageSize = 50;
+const int MaxPageSize = 100;
+const int DefaultMapPageSize = 500;
+const int MaxMapPageSize = 1000;
+
 // Empty framework responses (401/403/404/429, etc.) use the same JSON
 // error contract as explicit validation failures and exception responses.
 app.UseStatusCodePages(async statusCodeContext =>
@@ -341,82 +346,145 @@ app.MapGet("/api/catalog/categories", async Task<IResult> (CancellationToken can
     return Results.Ok(new ItemsResponse<CategoryDto>(items));
 });
 
-app.MapGet("/api/catalog", async Task<IResult> (string? search, int? categoryId, CancellationToken cancellationToken) =>
+
+app.MapGet("/api/catalog", async Task<IResult> (
+    string? search, int? categoryId, int? page, int? pageSize, CancellationToken cancellationToken) =>
 {
-    const string sql = @"
-SELECT a.attraction_id, a.name, a.description, COALESCE(a.history, ''),
-       a.latitude, a.longitude, cat.name, ci.name, co.name
+    var currentPage = page ?? 1;
+    var currentPageSize = pageSize ?? DefaultPageSize;
+    if (currentPage < 1 || currentPageSize is < 1 or > MaxPageSize)
+        return Results.BadRequest(new ApiErrorResponse($"Параметры пагинации должны задавать страницу от 1 и размер от 1 до {MaxPageSize}."));
+
+    var offset = ((long)currentPage - 1) * currentPageSize;
+    var normalizedSearch = search?.Trim() ?? string.Empty;
+    const string filters = @"
 FROM attractions a
 JOIN categories cat ON cat.category_id = a.category_id
 JOIN cities ci ON ci.city_id = a.city_id
 JOIN countries co ON co.country_id = ci.country_id
 WHERE (@q = '' OR a.name ILIKE '%' || @q || '%' OR ci.name ILIKE '%' || @q || '%' OR co.name ILIKE '%' || @q || '%')
-  AND (@cat IS NULL OR a.category_id = @cat)
-ORDER BY co.name, ci.name, a.name";
-    var items = new List<AttractionDto>();
+  AND (@cat IS NULL OR a.category_id = @cat)";
+
     await using var connection = await OpenAsync(connectionString, cancellationToken);
+    await using var countCommand = new NpgsqlCommand("SELECT count(*) " + filters, connection);
+    countCommand.Parameters.AddWithValue("q", NpgsqlDbType.Text, normalizedSearch);
+    countCommand.Parameters.AddWithValue("cat", NpgsqlDbType.Integer, (object?)categoryId ?? DBNull.Value);
+    var totalCount = Convert.ToInt64(await countCommand.ExecuteScalarAsync(cancellationToken));
+
+    var sql = @"
+SELECT a.attraction_id, a.name, a.description, COALESCE(a.history, ''),
+       a.latitude, a.longitude, cat.name, ci.name, co.name
+" + filters + @"
+ORDER BY co.name, ci.name, a.name, a.attraction_id
+LIMIT @limit OFFSET @offset";
+    var items = new List<AttractionDto>();
     await using var command = new NpgsqlCommand(sql, connection);
-    command.Parameters.AddWithValue("q", NpgsqlDbType.Text, search?.Trim() ?? string.Empty);
+    command.Parameters.AddWithValue("q", NpgsqlDbType.Text, normalizedSearch);
     command.Parameters.AddWithValue("cat", NpgsqlDbType.Integer, (object?)categoryId ?? DBNull.Value);
+    command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, currentPageSize);
+    command.Parameters.AddWithValue("offset", NpgsqlDbType.Bigint, offset);
     await using var reader = await command.ExecuteReaderAsync(cancellationToken);
     while (await reader.ReadAsync(cancellationToken))
         items.Add(new AttractionDto(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetString(3),
             (double)reader.GetDecimal(4), (double)reader.GetDecimal(5), reader.GetString(6), reader.GetString(7), reader.GetString(8)));
-    return Results.Ok(new ItemsResponse<AttractionDto>(items));
+
+    return Results.Ok(new PagedItemsResponse<AttractionDto>(
+        items, currentPage, currentPageSize, totalCount, (long)currentPage * currentPageSize < totalCount));
 });
 
-app.MapGet("/api/me/visits", async Task<IResult> (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
+
+app.MapGet("/api/me/visits", async Task<IResult> (
+    HttpContext context, SessionStore sessions, int? page, int? pageSize, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+
+    var currentPage = page ?? 1;
+    var currentPageSize = pageSize ?? DefaultPageSize;
+    if (currentPage < 1 || currentPageSize is < 1 or > MaxPageSize)
+        return Results.BadRequest(new ApiErrorResponse($"Параметры пагинации должны задавать страницу от 1 и размер от 1 до {MaxPageSize}."));
+
+    var offset = ((long)currentPage - 1) * currentPageSize;
     var items = new List<VisitDto>();
     await using var connection = await OpenAsync(connectionString, cancellationToken);
-    await using var command = new NpgsqlCommand(@"
-SELECT v.visit_id, v.attraction_id, a.name, ci.name, co.name, v.visit_date,
-       v.rating, v.impressions, v.notes,
-       (SELECT count(*) FROM photos p WHERE p.visit_id = v.visit_id)
-FROM visits v
-JOIN attractions a ON a.attraction_id = v.attraction_id
-JOIN cities ci ON ci.city_id = a.city_id
-JOIN countries co ON co.country_id = ci.country_id
-WHERE v.user_id = @user ORDER BY v.visit_date DESC, v.visit_id DESC", connection);
-    command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
-    await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
-        while (await reader.ReadAsync(cancellationToken))
-            items.Add(new VisitDto(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
-                reader.GetDateTime(5).ToString("yyyy-MM-dd"), reader.GetInt16(6), reader.GetString(7), reader.GetString(8), reader.GetInt64(9)));
 
-    await using (var schemaCheck = new NpgsqlCommand("SELECT to_regclass('public.user_map_places') IS NOT NULL", connection))
-    {
-        if (Equals(await schemaCheck.ExecuteScalarAsync(cancellationToken), true))
-        {
-            await using var customCommand = new NpgsqlCommand(@"SELECT user_map_place_id, name, visit_date, rating, impressions, notes,
-                (SELECT count(*) FROM user_map_place_photos p WHERE p.user_map_place_id=m.user_map_place_id)
-                FROM user_map_places m WHERE user_id=@user AND status='visited'", connection);
-            customCommand.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
-            await using var customReader = await customCommand.ExecuteReaderAsync(cancellationToken);
-            while (await customReader.ReadAsync(cancellationToken))
-            {
-                var placeId = customReader.GetInt32(0);
-                items.Add(new VisitDto(-placeId, 0, customReader.GetString(1), "Личная точка", string.Empty,
-                    customReader.GetDateTime(2).ToString("yyyy-MM-dd"), customReader.GetInt16(3), customReader.GetString(4),
-                    customReader.GetString(5), customReader.GetInt64(6), placeId));
-            }
-        }
-    }
-    items.Sort((left, right) => StringComparer.Ordinal.Compare(right.VisitDate, left.VisitDate));
-    return Results.Ok(new ItemsResponse<VisitDto>(items));
+    await using var countCommand = new NpgsqlCommand(@"
+SELECT
+    (SELECT count(*) FROM visits WHERE user_id = @user) +
+    (SELECT count(*) FROM user_map_places WHERE user_id = @user AND status = 'visited')", connection);
+    countCommand.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
+    var totalCount = Convert.ToInt64(await countCommand.ExecuteScalarAsync(cancellationToken));
+
+    await using var command = new NpgsqlCommand(@"
+SELECT visit_id, attraction_id, attraction_name, city, country, visit_date,
+       rating, impressions, notes, photo_count, user_map_place_id
+FROM (
+    SELECT v.visit_id, v.attraction_id, a.name AS attraction_name, ci.name AS city, co.name AS country,
+           v.visit_date, v.rating, v.impressions, v.notes,
+           (SELECT count(*) FROM photos p WHERE p.visit_id = v.visit_id) AS photo_count,
+           NULL::integer AS user_map_place_id
+    FROM visits v
+    JOIN attractions a ON a.attraction_id = v.attraction_id
+    JOIN cities ci ON ci.city_id = a.city_id
+    JOIN countries co ON co.country_id = ci.country_id
+    WHERE v.user_id = @user
+
+    UNION ALL
+
+    SELECT -m.user_map_place_id AS visit_id, 0 AS attraction_id, m.name AS attraction_name,
+           'Личная точка' AS city, '' AS country, m.visit_date, m.rating, m.impressions, m.notes,
+           (SELECT count(*) FROM user_map_place_photos p WHERE p.user_map_place_id = m.user_map_place_id) AS photo_count,
+           m.user_map_place_id
+    FROM user_map_places m
+    WHERE m.user_id = @user AND m.status = 'visited'
+) AS combined_visits
+ORDER BY visit_date DESC, visit_id DESC
+LIMIT @limit OFFSET @offset", connection);
+    command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
+    command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, currentPageSize);
+    command.Parameters.AddWithValue("offset", NpgsqlDbType.Bigint, offset);
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    while (await reader.ReadAsync(cancellationToken))
+        items.Add(new VisitDto(reader.GetInt32(0), reader.GetInt32(1), reader.GetString(2), reader.GetString(3), reader.GetString(4),
+            reader.GetDateTime(5).ToString("yyyy-MM-dd"), reader.GetInt16(6), reader.GetString(7), reader.GetString(8),
+            reader.GetInt64(9), reader.IsDBNull(10) ? null : reader.GetInt32(10)));
+
+    return Results.Ok(new PagedItemsResponse<VisitDto>(
+        items, currentPage, currentPageSize, totalCount, (long)currentPage * currentPageSize < totalCount));
 });
 
-app.MapGet("/api/me/wishlist", async Task<IResult> (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
+
+app.MapGet("/api/me/wishlist", async Task<IResult> (
+    HttpContext context, SessionStore sessions, int? page, int? pageSize, CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+
+    var currentPage = page ?? 1;
+    var currentPageSize = pageSize ?? DefaultPageSize;
+    if (currentPage < 1 || currentPageSize is < 1 or > MaxPageSize)
+        return Results.BadRequest(new ApiErrorResponse($"Параметры пагинации должны задавать страницу от 1 и размер от 1 до {MaxPageSize}."));
+
+    var offset = ((long)currentPage - 1) * currentPageSize;
     var items = new List<int>();
     await using var connection = await OpenAsync(connectionString, cancellationToken);
-    await using var command = new NpgsqlCommand("SELECT attraction_id FROM wishlist WHERE user_id = @u ORDER BY added_at DESC", connection);
+
+    await using var countCommand = new NpgsqlCommand("SELECT count(*) FROM wishlist WHERE user_id = @u", connection);
+    countCommand.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
+    var totalCount = Convert.ToInt64(await countCommand.ExecuteScalarAsync(cancellationToken));
+
+    await using var command = new NpgsqlCommand(@"
+SELECT attraction_id
+FROM wishlist
+WHERE user_id = @u
+ORDER BY added_at DESC, attraction_id DESC
+LIMIT @limit OFFSET @offset", connection);
     command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
+    command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, currentPageSize);
+    command.Parameters.AddWithValue("offset", NpgsqlDbType.Bigint, offset);
     await using var reader = await command.ExecuteReaderAsync(cancellationToken);
     while (await reader.ReadAsync(cancellationToken)) items.Add(reader.GetInt32(0));
-    return Results.Ok(new IntItemsResponse(items));
+
+    return Results.Ok(new PagedItemsResponse<int>(
+        items, currentPage, currentPageSize, totalCount, (long)currentPage * currentPageSize < totalCount));
 });
 
 app.MapPost("/api/me/wishlist/{attractionId:int}", async Task<IResult> (int attractionId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
@@ -693,33 +761,118 @@ WHERE v.user_id = @u", connection);
     return Results.Ok(new SummaryDto(visitCount + customVisits, distinctAttractions + customVisits, cities, countries));
 });
 
-app.MapGet("/api/me/map-markers", async Task<IResult> (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
+
+app.MapGet("/api/me/map-markers", async Task<IResult> (
+    HttpContext context, SessionStore sessions,
+    int? page, int? pageSize,
+    double? south, double? west, double? north, double? east,
+    CancellationToken cancellationToken) =>
 {
     if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+
+    var currentPage = page ?? 1;
+    var currentPageSize = pageSize ?? DefaultMapPageSize;
+    if (currentPage < 1 || currentPageSize is < 1 or > MaxMapPageSize)
+        return Results.BadRequest(new ApiErrorResponse($"Параметры пагинации карты должны задавать страницу от 1 и размер от 1 до {MaxMapPageSize}."));
+
+    var hasAnyBounds = south.HasValue || west.HasValue || north.HasValue || east.HasValue;
+    var hasAllBounds = south.HasValue && west.HasValue && north.HasValue && east.HasValue;
+    if (hasAnyBounds && !hasAllBounds)
+        return Results.BadRequest(new ApiErrorResponse("Для области карты необходимо передать south, west, north и east."));
+
+    var hasBounds = hasAllBounds;
+    if (hasBounds &&
+        (!double.IsFinite(south!.Value) || !double.IsFinite(west!.Value) ||
+         !double.IsFinite(north!.Value) || !double.IsFinite(east!.Value) ||
+         south.Value < -90 || north.Value > 90 || south.Value > north.Value ||
+         west.Value < -180 || west.Value > 180 || east.Value < -180 || east.Value > 180))
+        return Results.BadRequest(new ApiErrorResponse("Границы видимой области карты содержат некорректные координаты."));
+
+    var offset = ((long)currentPage - 1) * currentPageSize;
     var items = new List<MapMarkerDto>();
     await using var connection = await OpenAsync(connectionString, cancellationToken);
-    await using var command = new NpgsqlCommand(@"
-SELECT a.attraction_id, a.name, a.latitude, a.longitude,
-       EXISTS(SELECT 1 FROM visits v WHERE v.user_id = @u AND v.attraction_id = a.attraction_id),
-       EXISTS(SELECT 1 FROM wishlist w WHERE w.user_id = @u AND w.attraction_id = a.attraction_id)
-FROM attractions a ORDER BY a.name", connection);
-    command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
-        while (await reader.ReadAsync(cancellationToken)) items.Add(new MapMarkerDto(reader.GetInt32(0), reader.GetString(1),
-            (double)reader.GetDecimal(2), (double)reader.GetDecimal(3), reader.GetBoolean(4), reader.GetBoolean(5)));
 
-    await using var customCommand = new NpgsqlCommand(@"
-SELECT user_map_place_id, name, latitude, longitude, status, visit_date, rating, impressions, notes
-FROM user_map_places WHERE user_id = @u ORDER BY created_at", connection);
-    customCommand.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-    await using var customReader = await customCommand.ExecuteReaderAsync(cancellationToken);
-    while (await customReader.ReadAsync(cancellationToken))
-        items.Add(new MapMarkerDto(customReader.GetInt32(0), customReader.GetString(1),
-            (double)customReader.GetDecimal(2), (double)customReader.GetDecimal(3),
-            customReader.GetString(4) == "visited", customReader.GetString(4) == "planned",
-            customReader.GetInt32(0), customReader.IsDBNull(5) ? null : customReader.GetDateTime(5).ToString("yyyy-MM-dd"),
-            customReader.IsDBNull(6) ? null : customReader.GetInt16(6), customReader.GetString(7), customReader.GetString(8)));
-    return Results.Ok(new ItemsResponse<MapMarkerDto>(items));
+    const string markerSourceSql = @"
+SELECT a.attraction_id AS id, a.name, a.latitude, a.longitude,
+       EXISTS(SELECT 1 FROM visits v WHERE v.user_id = @u AND v.attraction_id = a.attraction_id) AS visited,
+       EXISTS(SELECT 1 FROM wishlist w WHERE w.user_id = @u AND w.attraction_id = a.attraction_id) AS wished,
+       NULL::integer AS user_place_id,
+       NULL::date AS visit_date,
+       NULL::smallint AS rating,
+       ''::text AS impressions,
+       ''::text AS notes
+FROM attractions a
+
+UNION ALL
+
+SELECT m.user_map_place_id AS id, m.name, m.latitude, m.longitude,
+       m.status = 'visited' AS visited,
+       m.status = 'planned' AS wished,
+       m.user_map_place_id AS user_place_id,
+       m.visit_date,
+       m.rating,
+       m.impressions,
+       m.notes
+FROM user_map_places m
+WHERE m.user_id = @u";
+    const string markerFilterSql = @"
+WHERE (@hasBounds = FALSE OR (
+    latitude BETWEEN @south AND @north
+    AND (
+        (@west <= @east AND longitude BETWEEN @west AND @east)
+        OR
+        (@west > @east AND (longitude >= @west OR longitude <= @east))
+    )
+))";
+
+    void AddMarkerParameters(NpgsqlCommand command)
+    {
+        command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
+        command.Parameters.AddWithValue("hasBounds", NpgsqlDbType.Boolean, hasBounds);
+        command.Parameters.AddWithValue("south", NpgsqlDbType.Numeric,
+            hasBounds ? (object)Convert.ToDecimal(south!.Value) : DBNull.Value);
+        command.Parameters.AddWithValue("north", NpgsqlDbType.Numeric,
+            hasBounds ? (object)Convert.ToDecimal(north!.Value) : DBNull.Value);
+        command.Parameters.AddWithValue("west", NpgsqlDbType.Numeric,
+            hasBounds ? (object)Convert.ToDecimal(west!.Value) : DBNull.Value);
+        command.Parameters.AddWithValue("east", NpgsqlDbType.Numeric,
+            hasBounds ? (object)Convert.ToDecimal(east!.Value) : DBNull.Value);
+    }
+
+    var countSql = $@"
+WITH markers AS (
+{markerSourceSql}
+)
+SELECT count(*) FROM markers
+{markerFilterSql}";
+    await using var countCommand = new NpgsqlCommand(countSql, connection);
+    AddMarkerParameters(countCommand);
+    var totalCount = Convert.ToInt64(await countCommand.ExecuteScalarAsync(cancellationToken));
+
+    var sql = $@"
+WITH markers AS (
+{markerSourceSql}
+)
+SELECT id, name, latitude, longitude, visited, wished, user_place_id,
+       visit_date, rating, impressions, notes
+FROM markers
+{markerFilterSql}
+ORDER BY name, id
+LIMIT @limit OFFSET @offset";
+    await using var command = new NpgsqlCommand(sql, connection);
+    AddMarkerParameters(command);
+    command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, currentPageSize);
+    command.Parameters.AddWithValue("offset", NpgsqlDbType.Bigint, offset);
+    await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+    while (await reader.ReadAsync(cancellationToken))
+        items.Add(new MapMarkerDto(reader.GetInt32(0), reader.GetString(1),
+            (double)reader.GetDecimal(2), (double)reader.GetDecimal(3), reader.GetBoolean(4), reader.GetBoolean(5),
+            reader.IsDBNull(6) ? null : reader.GetInt32(6),
+            reader.IsDBNull(7) ? null : reader.GetDateTime(7).ToString("yyyy-MM-dd"),
+            reader.IsDBNull(8) ? null : reader.GetInt16(8), reader.GetString(9), reader.GetString(10)));
+
+    return Results.Ok(new PagedItemsResponse<MapMarkerDto>(
+        items, currentPage, currentPageSize, totalCount, (long)currentPage * currentPageSize < totalCount));
 });
 
 app.MapPost("/api/me/map-places", async Task<IResult> (MapPlaceCreateRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
@@ -1162,6 +1315,7 @@ record MapPlaceCreateRequest(string? Name, double Latitude, double Longitude, st
 record MapPlaceUpdateRequest(string? Name, string? Status, string? VisitDate, int? Rating, string? Impressions, string? Notes);
 record MapPlaceSavedDto(int Id, string Message);
 record ItemsResponse<T>(IReadOnlyList<T> Items);
+record PagedItemsResponse<T>(IReadOnlyList<T> Items, int Page, int PageSize, long TotalCount, bool HasMore);
 record IntItemsResponse(IReadOnlyList<int> Items);
 
 public partial class Program { }

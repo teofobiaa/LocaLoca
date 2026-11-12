@@ -34,5 +34,8 @@
     <Content Include="../../database/migrations/08_server_sessions.sql"
              Link="Database/migrations/08_server_sessions.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/09_map_marker_viewport_indexes.sql"
+             Link="Database/migrations/09_map_marker_viewport_indexes.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

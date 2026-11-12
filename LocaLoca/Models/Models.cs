@@ -54,6 +54,7 @@ public sealed record MapPlaceUpdateRequest(string Name, string Status, string Vi
 public sealed record SummaryDto(long VisitCount, long DistinctAttractions, long Cities, long Countries);
 public sealed record MapMarkerDto(int Id, string Name, double Latitude, double Longitude, bool Visited, bool Wished);
 public sealed record ItemsResponse<T>(List<T> Items);
+public sealed record PagedItemsResponse<T>(List<T> Items, int Page, int PageSize, long TotalCount, bool HasMore);
 public sealed record IntItemsResponse(List<int> Items);
 
 public sealed record CategoryChoice(int? Id, string Name)

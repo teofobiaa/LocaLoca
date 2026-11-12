@@ -652,6 +652,134 @@ public sealed class ApiIntegrationTests
         Assert.Equal(initialCount + 1, await CountPhotosAsync());
     }
 
+    [Fact]
+    public async Task Catalog_Uses_Bounded_Pages_And_Rejects_Invalid_Pagination()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var search = "pagination-" + Guid.NewGuid().ToString("N");
+        await InsertAttractionAsync(search + "-a", -30, -30);
+        await InsertAttractionAsync(search + "-b", -31, -31);
+
+        using var first = await client.GetAsync($"/api/catalog?search={Uri.EscapeDataString(search)}&page=1&pageSize=1");
+        using var second = await client.GetAsync($"/api/catalog?search={Uri.EscapeDataString(search)}&page=2&pageSize=1");
+        using var invalidPage = await client.GetAsync($"/api/catalog?search={Uri.EscapeDataString(search)}&page=0&pageSize=1");
+        using var excessiveSize = await client.GetAsync($"/api/catalog?search={Uri.EscapeDataString(search)}&page=1&pageSize=101");
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidPage.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, excessiveSize.StatusCode);
+
+        using var firstDocument = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+        using var secondDocument = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
+        Assert.Equal(2, firstDocument.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.True(firstDocument.RootElement.GetProperty("hasMore").GetBoolean());
+        Assert.False(secondDocument.RootElement.GetProperty("hasMore").GetBoolean());
+        Assert.Single(await ReadItemsAsync(first));
+        Assert.Single(await ReadItemsAsync(second));
+        Assert.Equal(1, firstDocument.RootElement.GetProperty("pageSize").GetInt32());
+        Assert.Equal(2, secondDocument.RootElement.GetProperty("page").GetInt32());
+    }
+
+    [Fact]
+    public async Task Visits_Pagination_Includes_Visited_Personal_Map_Places()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        await CreateVisitAsync(client);
+        await CreateMapPlaceAsync(client, "Visited pagination point", 44.1, 21.2, "visited");
+
+        using var first = await client.GetAsync("/api/me/visits?page=1&pageSize=1");
+        using var second = await client.GetAsync("/api/me/visits?page=2&pageSize=1");
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        using var firstDocument = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+        using var secondDocument = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
+        Assert.Equal(2, firstDocument.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.True(firstDocument.RootElement.GetProperty("hasMore").GetBoolean());
+        Assert.False(secondDocument.RootElement.GetProperty("hasMore").GetBoolean());
+
+        var allItems = (await ReadItemsAsync(first)).Concat(await ReadItemsAsync(second)).ToList();
+        Assert.Equal(2, allItems.Count);
+        Assert.Equal(2, allItems.Select(item => item.GetProperty("id").GetInt32()).Distinct().Count());
+        Assert.Contains(allItems, item =>
+            item.GetProperty("userMapPlaceId").ValueKind != JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Wishlist_Uses_Bounded_Pages()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        var firstId = await InsertAttractionAsync("wishlist-page-a-" + Guid.NewGuid().ToString("N"), -40, -40);
+        var secondId = await InsertAttractionAsync("wishlist-page-b-" + Guid.NewGuid().ToString("N"), -41, -41);
+
+        using var addFirst = await client.PostAsync($"/api/me/wishlist/{firstId}", null);
+        using var addSecond = await client.PostAsync($"/api/me/wishlist/{secondId}", null);
+        Assert.Equal(HttpStatusCode.OK, addFirst.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, addSecond.StatusCode);
+
+        using var first = await client.GetAsync("/api/me/wishlist?page=1&pageSize=1");
+        using var second = await client.GetAsync("/api/me/wishlist?page=2&pageSize=1");
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        using var firstDocument = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+        Assert.Equal(2, firstDocument.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.True(firstDocument.RootElement.GetProperty("hasMore").GetBoolean());
+        var ids = (await ReadIntegerItemsAsync(first)).Concat(await ReadIntegerItemsAsync(second)).ToArray();
+        Assert.Equal(2, ids.Length);
+        Assert.Equal(2, ids.Distinct().Count());
+    }
+
+    [Fact]
+    public async Task Map_Markers_Are_Filtered_By_Viewport_And_Paginated_Including_Antimeridian()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        await CreateMapPlaceAsync(client, "Viewport point A", 70.2, 80.3);
+        await CreateMapPlaceAsync(client, "Viewport point B", 71.2, 81.3);
+        await CreateMapPlaceAsync(client, "Outside viewport point", 40, 40);
+        await CreateMapPlaceAsync(client, "Dateline point east", 0, 179.5);
+        await CreateMapPlaceAsync(client, "Dateline point west", 0, -179.5);
+
+        using var first = await client.GetAsync("/api/me/map-markers?south=70&west=80&north=72&east=82&page=1&pageSize=1");
+        using var second = await client.GetAsync("/api/me/map-markers?south=70&west=80&north=72&east=82&page=2&pageSize=1");
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+
+        using var firstDocument = JsonDocument.Parse(await first.Content.ReadAsStringAsync());
+        using var secondDocument = JsonDocument.Parse(await second.Content.ReadAsStringAsync());
+        Assert.Equal(2, firstDocument.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.True(firstDocument.RootElement.GetProperty("hasMore").GetBoolean());
+        Assert.False(secondDocument.RootElement.GetProperty("hasMore").GetBoolean());
+        Assert.Single(await ReadItemsAsync(first));
+        Assert.Single(await ReadItemsAsync(second));
+
+        using var antimeridian = await client.GetAsync("/api/me/map-markers?south=-1&west=170&north=1&east=-170&pageSize=10");
+        Assert.Equal(HttpStatusCode.OK, antimeridian.StatusCode);
+        using var antimeridianDocument = JsonDocument.Parse(await antimeridian.Content.ReadAsStringAsync());
+        Assert.Equal(2, antimeridianDocument.RootElement.GetProperty("totalCount").GetInt64());
+        Assert.Equal(2, (await ReadItemsAsync(antimeridian)).Count);
+
+        using var incompleteBounds = await client.GetAsync("/api/me/map-markers?south=0&west=0&north=10");
+        using var excessiveMapSize = await client.GetAsync("/api/me/map-markers?south=0&west=0&north=10&east=10&pageSize=1001");
+        Assert.Equal(HttpStatusCode.BadRequest, incompleteBounds.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, excessiveMapSize.StatusCode);
+    }
+
     private async Task<TestAccount> RegisterAsync(HttpClient client)
     {
         var login = "api-test-" + Guid.NewGuid().ToString("N");
@@ -691,6 +819,46 @@ public sealed class ApiIntegrationTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<ApiTestVisitResponse>();
+        Assert.NotNull(result);
+        return result!.Id;
+    }
+
+    private async Task<int> InsertAttractionAsync(string name, double latitude, double longitude)
+    {
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(@"
+            INSERT INTO attractions(name, description, history, latitude, longitude, category_id, city_id)
+            SELECT @name, 'Synthetic pagination test', '', @latitude, @longitude, category_id, city_id
+            FROM attractions
+            WHERE attraction_id = @template
+            RETURNING attraction_id", connection);
+        command.Parameters.AddWithValue("name", name);
+        command.Parameters.AddWithValue("latitude", NpgsqlTypes.NpgsqlDbType.Numeric, Convert.ToDecimal(latitude));
+        command.Parameters.AddWithValue("longitude", NpgsqlTypes.NpgsqlDbType.Numeric, Convert.ToDecimal(longitude));
+        command.Parameters.AddWithValue("template", _database.AttractionId);
+        var result = await command.ExecuteScalarAsync();
+        Assert.NotNull(result);
+        return Convert.ToInt32(result);
+    }
+
+    private static async Task<int> CreateMapPlaceAsync(
+        HttpClient client, string name, double latitude, double longitude, string status = "planned")
+    {
+        var visited = string.Equals(status, "visited", StringComparison.OrdinalIgnoreCase);
+        using var response = await client.PostAsJsonAsync("/api/me/map-places", new
+        {
+            name,
+            latitude,
+            longitude,
+            status,
+            visitDate = visited ? DateOnly.FromDateTime(DateTime.Today.AddDays(-2)).ToString("yyyy-MM-dd") : null,
+            rating = visited ? 4 : (int?)null,
+            impressions = "Synthetic map marker test",
+            notes = ""
+        });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<ApiTestMapPlaceResponse>();
         Assert.NotNull(result);
         return result!.Id;
     }
