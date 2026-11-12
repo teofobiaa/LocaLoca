@@ -265,9 +265,9 @@ WHERE (@hasBounds = FALSE OR (
         bool includeHasBounds)
     {
         command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-        if (!includeHasBounds) return;
+        if (includeHasBounds)
+            command.Parameters.AddWithValue("hasBounds", NpgsqlDbType.Boolean, true);
 
-        command.Parameters.AddWithValue("hasBounds", NpgsqlDbType.Boolean, true);
         command.Parameters.AddWithValue("south", NpgsqlDbType.Numeric, south);
         command.Parameters.AddWithValue("north", NpgsqlDbType.Numeric, north);
         command.Parameters.AddWithValue("west", NpgsqlDbType.Numeric, west);
