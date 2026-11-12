@@ -44,6 +44,27 @@ app.Use(async (context, next) =>
             await context.Response.WriteAsJsonAsync(new { error = "Для новых точек карты требуется миграция базы. Выполните database/migrations/04_migrate_user_map_places.sql от имени администратора PostgreSQL." });
         }
     }
+    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
+    {
+        app.Logger.LogWarning(ex, "A PostgreSQL unique constraint rejected an API request.");
+        if (!context.Response.HasStarted)
+        {
+            context.Response.StatusCode = StatusCodes.Status409Conflict;
+            await context.Response.WriteAsJsonAsync(new { error = "Запись конфликтует с уже существующими данными." });
+        }
+    }
+    catch (PostgresException ex) when (
+        ex.SqlState == PostgresErrorCodes.ForeignKeyViolation ||
+        ex.SqlState == PostgresErrorCodes.CheckViolation ||
+        ex.SqlState == PostgresErrorCodes.NotNullViolation)
+    {
+        app.Logger.LogWarning(ex, "A PostgreSQL data constraint rejected an API request.");
+        if (!context.Response.HasStarted)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new { error = "Операция нарушает ограничения целостности данных." });
+        }
+    }
     catch (Exception ex) when (ex is NpgsqlException || ex is InvalidOperationException)
     {
         app.Logger.LogError(ex, "PostgreSQL is unavailable or a database operation failed.");
