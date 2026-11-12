@@ -5,7 +5,7 @@ using System.Text;
 using Org.BouncyCastle.Crypto.Generators;
 using Org.BouncyCastle.Crypto.Parameters;
 
-const byte[] password = "LocaLoca-password-hash-benchmark-only"u8.ToArray();
+var password = "LocaLoca-password-hash-benchmark-only"u8.ToArray();
 var samples = args.Length > 0 && int.TryParse(args[0], out var parsedSamples)
     ? Math.Clamp(parsedSamples, 5, 100)
     : 15;
