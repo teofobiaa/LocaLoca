@@ -73,7 +73,8 @@ public sealed class ApiIntegrationTests
             string.Equals(account.Password, storedHash, StringComparison.Ordinal),
             "The stored password representation must differ from the supplied password.");
         Assert.True(PasswordHasher.Verify(account.Password, storedHash));
-        Assert.Equal(3, storedHash.Split('.').Length);
+        Assert.StartsWith("pbkdf2-sha256$", storedHash, StringComparison.Ordinal);
+        Assert.Equal(4, storedHash.Split((char)36).Length);
     }
 
     [Fact]
@@ -115,6 +116,51 @@ public sealed class ApiIntegrationTests
 
         Assert.Equal(HttpStatusCode.OK, validLogin.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, invalidLogin.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_Upgrades_A_Legacy_Password_Hash_After_Successful_Authentication()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        var legacyHash = CreateLegacyPasswordHash(account.Password, 10_000);
+        await StorePasswordHashAsync(account.Login, legacyHash);
+
+        using var login = await client.PostAsJsonAsync("/api/auth/login", new
+        {
+            login = account.Login,
+            password = account.Password
+        });
+
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+
+        var upgradedHash = await ReadStoredPasswordHashAsync(account.Login);
+        Assert.NotEqual(legacyHash, upgradedHash);
+        Assert.StartsWith("pbkdf2-sha256$", upgradedHash, StringComparison.Ordinal);
+        Assert.True(PasswordHasher.Verify(account.Password, upgradedHash));
+        Assert.False(PasswordHasher.NeedsRehash(upgradedHash));
+    }
+
+    [Fact]
+    public async Task Failed_Login_Does_Not_Upgrade_A_Legacy_Password_Hash()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        var legacyHash = CreateLegacyPasswordHash(account.Password, 10_000);
+        await StorePasswordHashAsync(account.Login, legacyHash);
+
+        using var login = await client.PostAsJsonAsync("/api/auth/login", new
+        {
+            login = account.Login,
+            password = CreateTestPassword()
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
+        Assert.Equal(legacyHash, await ReadStoredPasswordHashAsync(account.Login));
     }
 
     [Fact]
@@ -641,6 +687,27 @@ public sealed class ApiIntegrationTests
         command.Parameters.AddWithValue("login", login);
         return (string)(await command.ExecuteScalarAsync()
             ?? throw new InvalidOperationException("Expected test user was not stored."));
+    }
+
+    private async Task StorePasswordHashAsync(string login, string passwordHash)
+    {
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "UPDATE users SET password_hash = @hash WHERE login = @login",
+            connection);
+        command.Parameters.AddWithValue("hash", passwordHash);
+        command.Parameters.AddWithValue("login", login);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
+    private static string CreateLegacyPasswordHash(string password, int iterations)
+    {
+        var salt = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
+        var hash = System.Security.Cryptography.Rfc2898DeriveBytes.Pbkdf2(
+            password, salt, iterations, System.Security.Cryptography.HashAlgorithmName.SHA256, 32);
+        return iterations.ToString(System.Globalization.CultureInfo.InvariantCulture) + "." +
+               Convert.ToBase64String(salt) + "." + Convert.ToBase64String(hash);
     }
 
     private async Task<int> CountUsersAsync(string login)
