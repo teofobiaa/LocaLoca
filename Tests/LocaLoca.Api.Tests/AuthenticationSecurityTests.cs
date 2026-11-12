@@ -94,6 +94,11 @@ public sealed class AuthenticationSecurityTests
                 password = "Definitely-the-wrong-password!"
             });
             statuses.Add(response.StatusCode);
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                using var errorDocument = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                Assert.True(errorDocument.RootElement.TryGetProperty("error", out _));
+            }
         }
 
         Assert.Equal(5, statuses.Count(status => status == HttpStatusCode.Unauthorized));

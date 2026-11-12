@@ -216,7 +216,7 @@ public sealed class ApiNegativeScenarioTests
         using var oversizedUpload = await client.PostAsync(
             $"/api/me/visits/{visitId}/photos", oversizedForm);
 
-        Assert.Equal(HttpStatusCode.BadRequest, oversizedUpload.StatusCode);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedUpload.StatusCode);
         Assert.Equal(0L, await CountVisitPhotosAsync(account.UserId));
     }
 
@@ -257,7 +257,7 @@ public sealed class ApiNegativeScenarioTests
         using var overLimitUpload = await client.PostAsync(
             $"/api/me/map-places/{placeId}/photos", overLimitForm);
 
-        Assert.Equal(HttpStatusCode.BadRequest, overLimitUpload.StatusCode);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, overLimitUpload.StatusCode);
         Assert.Equal(12L, await CountMapPlacePhotosAsync(account.UserId));
 
         using var tooManyFilesForm = new MultipartFormDataContent();

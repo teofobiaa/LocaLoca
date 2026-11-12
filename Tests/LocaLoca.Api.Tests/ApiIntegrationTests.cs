@@ -32,6 +32,35 @@ public sealed class ApiIntegrationTests
     }
 
     [Fact]
+    public async Task Unknown_Route_Returns_404_With_The_Standard_Error_Contract()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/api/route-that-does-not-exist");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal("application/json", response.Content.Headers.ContentType?.MediaType);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.True(document.RootElement.TryGetProperty("error", out _));
+    }
+
+    [Fact]
+    public async Task Malformed_Json_Request_Returns_400()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+
+        using var content = new StringContent("{ invalid json", System.Text.Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync("/api/me/visits", content);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Registration_Stores_A_Password_Hash_Not_The_Original_Password()
     {
         using var factory = _database.CreateFactory();
@@ -101,6 +130,9 @@ public sealed class ApiIntegrationTests
         Assert.Equal(HttpStatusCode.Unauthorized, visits.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, wishlist.StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, map.StatusCode);
+
+        using var errorDocument = JsonDocument.Parse(await visits.Content.ReadAsStringAsync());
+        Assert.True(errorDocument.RootElement.TryGetProperty("error", out _));
     }
 
     [Fact]

@@ -7,6 +7,7 @@ using NpgsqlTypes;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using LocaLoca.Api;
 using LocaLoca.Api.Security;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,62 +56,17 @@ builder.Services.AddRateLimiter(options =>
             }));
 });
 var app = builder.Build();
-app.UseRateLimiter();
 
-app.Use(async (context, next) =>
+// Empty framework responses (401/403/404/429, etc.) use the same JSON
+// error contract as explicit validation failures and exception responses.
+app.UseStatusCodePages(async statusCodeContext =>
 {
-    try { await next(); }
-    catch (NpgsqlException ex) when (ex.SqlState == "42P01" &&
-        (ex.Message.Contains("user_map_places", StringComparison.OrdinalIgnoreCase) ||
-         ex.Message.Contains("user_map_place_photos", StringComparison.OrdinalIgnoreCase)))
-    {
-        app.Logger.LogError(ex, "The user map places migration has not been applied.");
-        if (!context.Response.HasStarted)
-        {
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new { error = "Для новых точек карты требуется миграция базы. Выполните database/migrations/04_migrate_user_map_places.sql от имени администратора PostgreSQL." });
-        }
-    }
-    catch (PostgresException ex) when (ex.SqlState == PostgresErrorCodes.UniqueViolation)
-    {
-        app.Logger.LogWarning(ex, "A PostgreSQL unique constraint rejected an API request.");
-        if (!context.Response.HasStarted)
-        {
-            context.Response.StatusCode = StatusCodes.Status409Conflict;
-            await context.Response.WriteAsJsonAsync(new { error = "Запись конфликтует с уже существующими данными." });
-        }
-    }
-    catch (PostgresException ex) when (
-        ex.SqlState == PostgresErrorCodes.ForeignKeyViolation ||
-        ex.SqlState == PostgresErrorCodes.CheckViolation ||
-        ex.SqlState == PostgresErrorCodes.NotNullViolation)
-    {
-        app.Logger.LogWarning(ex, "A PostgreSQL data constraint rejected an API request.");
-        if (!context.Response.HasStarted)
-        {
-            context.Response.StatusCode = StatusCodes.Status400BadRequest;
-            await context.Response.WriteAsJsonAsync(new { error = "Операция нарушает ограничения целостности данных." });
-        }
-    }
-    catch (Exception ex) when (ex is NpgsqlException || ex is InvalidOperationException)
-    {
-        app.Logger.LogError(ex, "PostgreSQL is unavailable or a database operation failed.");
-        if (!context.Response.HasStarted)
-        {
-            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
-            await context.Response.WriteAsJsonAsync(new { error = "Не удалось обратиться к Supabase PostgreSQL. Проверь интернет и параметры подключения." });
-        }
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Unhandled local API error.");
-        if (!context.Response.HasStarted)
-        {
-            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-            await context.Response.WriteAsJsonAsync(new { error = "Внутренняя ошибка локального API." });
-        }
-    }
+    var response = statusCodeContext.HttpContext.Response;
+    await response.WriteAsJsonAsync(
+        new ApiErrorResponse(ApiErrorResponse.MessageFor(response.StatusCode)));
 });
+app.UseMiddleware<ApiExceptionMiddleware>();
+app.UseRateLimiter();
 
 var dataRoot = builder.Configuration["LOCA_DATA_ROOT"]
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocaLoca");
@@ -241,10 +197,18 @@ SELECT
                 statusCode: 503);
         return Results.Ok(new HealthDto(true, true, "Supabase PostgreSQL подключена; права роли LocaLoca проверены."));
     }
-    catch (Exception ex)
+    catch (PostgresException ex)
     {
-        app.Logger.LogWarning(ex, "Readiness check failed.");
-        return Results.Json(new HealthDto(true, false, "Supabase PostgreSQL недоступна. Проверь интернет и параметры подключения."), statusCode: 503);
+        var mapping = ApiExceptionMiddleware.MapPostgresError(ex.SqlState, ex.Message);
+        app.Logger.LogWarning(ex, "Readiness check failed with PostgreSQL SQLSTATE {SqlState}.", ex.SqlState);
+        return Results.Json(new HealthDto(true, false, mapping.Message), statusCode: mapping.StatusCode);
+    }
+    catch (Exception ex) when (ex is NpgsqlException or DatabaseUnavailableException or TimeoutException)
+    {
+        app.Logger.LogWarning(ex, "PostgreSQL is unavailable during readiness check.");
+        return Results.Json(new HealthDto(true, false,
+            ApiErrorResponse.MessageFor(StatusCodes.Status503ServiceUnavailable)),
+            statusCode: StatusCodes.Status503ServiceUnavailable);
     }
 });
 
@@ -443,8 +407,11 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
     int? visitId = int.TryParse(form["visitId"], out var parsedVisitId) && parsedVisitId > 0 ? parsedVisitId : null;
     var files = form.Files.GetFiles("photos");
     if (files.Count > 10) return Results.BadRequest(new ErrorDto("За один раз можно добавить не более 10 фотографий."));
-    if (files.Any(f => f.Length == 0 || f.Length > 20 * 1024 * 1024) || files.Sum(f => f.Length) > 20 * 1024 * 1024)
-        return Results.BadRequest(new ErrorDto("Общий размер фотографий за одно сохранение не должен превышать 20 МБ."));
+    if (files.Any(f => f.Length == 0))
+        return Results.BadRequest(new ErrorDto("Пустые файлы фотографий не допускаются."));
+    if (files.Any(f => f.Length > 20 * 1024 * 1024) || files.Sum(f => f.Length) > 20 * 1024 * 1024)
+        return Results.Json(new ErrorDto("Общий размер фотографий за одно сохранение не должен превышать 20 МБ."),
+            statusCode: StatusCodes.Status413PayloadTooLarge);
     var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
     if (files.Any(f => !allowedExtensions.Contains(Path.GetExtension(f.FileName).ToLowerInvariant())))
         return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
@@ -545,7 +512,9 @@ app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visi
     var form = await context.Request.ReadFormAsync();
     var file = form.Files.GetFile("file");
     if (file is null || file.Length == 0) return Results.BadRequest(new ErrorDto("Файл не выбран."));
-    if (file.Length > 20 * 1024 * 1024) return Results.BadRequest(new ErrorDto("Размер фотографии не должен превышать 20 МБ."));
+    if (file.Length > 20 * 1024 * 1024)
+        return Results.Json(new ErrorDto("Размер фотографии не должен превышать 20 МБ."),
+            statusCode: StatusCodes.Status413PayloadTooLarge);
     var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
     var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
     if (!allowed.Contains(extension)) return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
@@ -807,8 +776,11 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
     var form = await context.Request.ReadFormAsync();
     var files = form.Files.GetFiles("photos");
     if (files.Count is < 1 or > 10) return Results.BadRequest(new ErrorDto("Выберите от 1 до 10 фотографий."));
-    if (files.Any(f => f.Length == 0 || f.Length > 20 * 1024 * 1024) || files.Sum(f => f.Length) > 20 * 1024 * 1024)
-        return Results.BadRequest(new ErrorDto("Общий размер фотографий не должен превышать 20 МБ."));
+    if (files.Any(f => f.Length == 0))
+        return Results.BadRequest(new ErrorDto("Пустые файлы фотографий не допускаются."));
+    if (files.Any(f => f.Length > 20 * 1024 * 1024) || files.Sum(f => f.Length) > 20 * 1024 * 1024)
+        return Results.Json(new ErrorDto("Общий размер фотографий не должен превышать 20 МБ."),
+            statusCode: StatusCodes.Status413PayloadTooLarge);
     var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
     if (files.Any(f => !allowed.Contains(Path.GetExtension(f.FileName).ToLowerInvariant())))
         return Results.BadRequest(new ErrorDto("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
@@ -954,7 +926,7 @@ static string? ReadUserConnectionString(string configPath)
 static async Task<NpgsqlConnection> OpenAsync(string? connectionString)
 {
     if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
-        throw new InvalidOperationException("Connection string not configured.");
+        throw new DatabaseUnavailableException("PostgreSQL connection is not configured.");
     var connection = new NpgsqlConnection(connectionString);
     await connection.OpenAsync();
     return connection;
