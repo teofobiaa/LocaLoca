@@ -35,6 +35,6 @@ SELECT
 DO $
 BEGIN
     IF to_regclass('public.user_sessions') IS NOT NULL THEN
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions TO localoca_app;
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions TO localoca_app';
     END IF;
 END $;
