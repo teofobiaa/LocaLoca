@@ -663,7 +663,7 @@ public sealed partial class MainWindow : Window
     private async void CatalogNav_Click(object sender, RoutedEventArgs e)
     {
         ShowPage("catalog");
-        if (_attractions.Count == 0) await SearchCatalogAsync();
+        if (_attractions.Count == 0) await SearchCatalogAsync(page: 1);
     }
     private async void VisitsNav_Click(object sender, RoutedEventArgs e)
     {
