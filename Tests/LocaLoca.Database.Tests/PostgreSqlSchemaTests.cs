@@ -234,7 +234,16 @@ public sealed class PostgreSqlSchemaTests
     {
         await using var connection = await _database.OpenConnectionAsync();
 
+        await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
         await _database.ExecuteSqlFileAsync("security", "05_create_app_role.sql");
+
+        await using (var baselineSessionGrant = new NpgsqlCommand(
+            "SELECT has_table_privilege('localoca_app', 'public.user_sessions', 'SELECT')",
+            connection))
+        {
+            Assert.True((bool)(await baselineSessionGrant.ExecuteScalarAsync() ?? false));
+        }
 
         await _database.ExecuteSqlFileAsync("migrations", "03_migrate_wishlist.sql");
         await _database.ExecuteSqlFileAsync("migrations", "03_migrate_wishlist.sql");
@@ -247,6 +256,8 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "07_migrate_photo_storage.sql");
         await _database.ExecuteSqlFileAsync("migrations", "08_server_sessions.sql");
         await _database.ExecuteSqlFileAsync("migrations", "08_server_sessions.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "09_map_marker_viewport_indexes.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "09_map_marker_viewport_indexes.sql");
 
         await using (var revokeSessionPermissions = new NpgsqlCommand(
             "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
@@ -281,6 +292,15 @@ public sealed class PostgreSqlSchemaTests
             connection);
 
         Assert.True((bool)(await permissionCheck.ExecuteScalarAsync() ?? false));
+
+        await using var versionCheck = new NpgsqlCommand(@"
+            SELECT count(*) = 5
+               AND count(*) FILTER (WHERE name IN (
+                   'migrate_wishlist', 'migrate_user_map_places', 'migrate_photo_storage',
+                   'server_sessions', 'map_marker_viewport_indexes')) = 5
+            FROM public.localoca_schema_migrations
+            WHERE version IN (3, 4, 7, 8, 9)", connection);
+        Assert.True((bool)(await versionCheck.ExecuteScalarAsync() ?? false));
     }
 
     [Fact]

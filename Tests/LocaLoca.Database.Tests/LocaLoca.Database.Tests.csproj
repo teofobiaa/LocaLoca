@@ -22,5 +22,8 @@
     <Content Include="../../database/**/*.sql"
              Link="Database/%(RecursiveDir)%(Filename)%(Extension)"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/manifest.json"
+             Link="Database/migrations/manifest.json"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

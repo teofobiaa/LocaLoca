@@ -20,12 +20,15 @@ public sealed class SqlSafetyTests
 
         Assert.Contains("schema/01_schema.sql", relativePaths);
         Assert.Contains("seed/02_seed.sql", relativePaths);
+        Assert.Contains("migrations/00_migration_history.sql", relativePaths);
         Assert.Contains("migrations/03_migrate_wishlist.sql", relativePaths);
         Assert.Contains("migrations/04_migrate_user_map_places.sql", relativePaths);
         Assert.Contains("migrations/07_migrate_photo_storage.sql", relativePaths);
+        Assert.Contains("migrations/08_server_sessions.sql", relativePaths);
         Assert.Contains("migrations/09_map_marker_viewport_indexes.sql", relativePaths);
         Assert.Contains("security/05_create_app_role.sql", relativePaths);
         Assert.Contains("security/06_update_runtime_permissions.sql", relativePaths);
+        Assert.True(File.Exists(Path.Combine(databaseDirectory, "migrations", "manifest.json")));
     }
 
     [Fact]
