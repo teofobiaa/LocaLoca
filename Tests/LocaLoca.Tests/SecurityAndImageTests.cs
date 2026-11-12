@@ -79,47 +79,93 @@ public sealed class SessionStoreConfigurationTests
 
 public sealed class ImageContentValidatorTests
 {
-    [Fact]
-    public void Accepts_Valid_Jpeg_Signature()
-    {
-        byte[] jpeg = [0xFF, 0xD8, 0xFF, 0xD9];
+    private const string ValidPngBase64 =
+        "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAE0lEQVR4nGPUCKj4zwAFTAxIAAAsaAHzuDKVEgAAAABJRU5ErkJggg==";
 
-        Assert.True(ImageContentValidator.HasValidImageSignature(jpeg, ".jpg"));
-        Assert.True(ImageContentValidator.HasValidImageSignature(jpeg, ".jpeg"));
+    private const string OversizedPngBase64 =
+        "iVBORw0KGgoAAAANSUhEUgAALuEAAAABCAIAAABzf/p+AAAAOklEQVR4nO3BMQEAAADCoPVPbQ0PoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAJwOMpAABE8uH8AAAAABJRU5ErkJggg==";
+
+    private const string TwoFrameGifBase64 =
+        "R0lGODlhAgACAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAAAgACAAAIBgABCAQQEAAh+QQBCgABACwAAAAAAgACAIEAAAAAAAAAAAAAAAAIBgABCAQQEAA7";
+
+    [Fact]
+    public void Fully_Decodes_A_Valid_Png_And_Reports_Pixel_Dimensions()
+    {
+        var result = ImageContentValidator.Validate(Convert.FromBase64String(ValidPngBase64), ".png");
+
+        Assert.True(result.IsValid, result.Error);
+        Assert.Equal(3, result.Width);
+        Assert.Equal(2, result.Height);
+        Assert.Equal(1, result.FrameCount);
     }
 
     [Fact]
-    public void Accepts_Valid_Png_Signature()
+    public void Rejects_A_Truncated_Png_That_Has_A_Valid_Header()
     {
-        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        var complete = Convert.FromBase64String(ValidPngBase64);
+        var truncated = complete[..50];
 
-        Assert.True(ImageContentValidator.HasValidImageSignature(png, ".png"));
+        var result = ImageContentValidator.Validate(truncated, ".png");
+
+        Assert.False(result.IsValid);
     }
 
     [Fact]
-    public void Accepts_Valid_Webp_Gif_And_Bmp_Signatures()
+    public void Rejects_An_Image_Whose_Actual_Format_Does_Not_Match_Its_Extension()
     {
-        byte[] webp = [0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50];
-        byte[] gif = [0x47, 0x49, 0x46, 0x38, 0x39, 0x61];
-        byte[] bmp = [0x42, 0x4D, 0x00, 0x00];
+        var png = Convert.FromBase64String(ValidPngBase64);
 
-        Assert.True(ImageContentValidator.HasValidImageSignature(webp, ".webp"));
-        Assert.True(ImageContentValidator.HasValidImageSignature(gif, ".gif"));
-        Assert.True(ImageContentValidator.HasValidImageSignature(bmp, ".bmp"));
+        var result = ImageContentValidator.Validate(png, ".jpg");
+
+        Assert.False(result.IsValid);
+        Assert.Contains("Расширение", result.Error);
+    }
+
+    [Fact]
+    public void Rejects_An_Image_That_Exceeds_The_Pixel_Dimension_Limit_Before_Decoding()
+    {
+        var oversizedPng = Convert.FromBase64String(OversizedPngBase64);
+
+        var result = ImageContentValidator.Validate(oversizedPng, ".png");
+
+        Assert.False(result.IsValid);
+        Assert.Contains("Размер изображения", result.Error);
+    }
+
+    [Fact]
+    public void Counts_And_Fully_Decodes_Every_Frame_Of_An_Animated_Gif()
+    {
+        var gif = Convert.FromBase64String(TwoFrameGifBase64);
+
+        var result = ImageContentValidator.Validate(gif, ".gif");
+
+        Assert.True(result.IsValid, result.Error);
+        Assert.Equal(2, result.FrameCount);
+        Assert.Equal(2, result.Width);
+        Assert.Equal(2, result.Height);
     }
 
     [Theory]
-    [InlineData(".jpg")]
-    [InlineData(".png")]
-    [InlineData(".webp")]
-    [InlineData(".gif")]
-    [InlineData(".bmp")]
+    [InlineData("")]
     [InlineData(".txt")]
-    public void Rejects_Bytes_That_Do_Not_Match_The_Extension(string extension)
+    [InlineData(".svg")]
+    public void Rejects_Unsupported_Or_Empty_Extensions(string extension)
     {
-        byte[] invalid = [0x00, 0x01, 0x02, 0x03];
+        var png = Convert.FromBase64String(ValidPngBase64);
 
-        Assert.False(ImageContentValidator.HasValidImageSignature(invalid, extension));
+        var result = ImageContentValidator.Validate(png, extension);
+
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Cancellation_Is_Propagated_Before_Decoding()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() =>
+            ImageContentValidator.Validate(Convert.FromBase64String(ValidPngBase64), ".png", cancellation.Token));
     }
 
     [Fact]

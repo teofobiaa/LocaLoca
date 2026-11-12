@@ -605,6 +605,50 @@ public sealed class ApiIntegrationTests
         Assert.Equal(initialCount, await CountPhotosAsync());
     }
 
+    [Fact]
+    public async Task Photo_Upload_Rejects_Truncated_Png_With_A_Valid_Magic_Header()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        var visitId = await CreateVisitAsync(client);
+        var initialCount = await CountPhotosAsync();
+
+        var truncatedPng = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAMAAAACCAYAAACddGYaAAAAE0lEQVR4nGPUCKj4zwAFTAxIAAAsaAHzuDKVEg==");
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(truncatedPng), "file", "truncated.png");
+
+        using var upload = await client.PostAsync($"/api/me/visits/{visitId}/photos", form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, upload.StatusCode);
+        Assert.Equal(initialCount, await CountPhotosAsync());
+    }
+
+    [Fact]
+    public async Task Photo_Upload_Accepts_A_Valid_Animated_Gif_And_Stores_All_Frames()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        var visitId = await CreateVisitAsync(client);
+        var initialCount = await CountPhotosAsync();
+
+        var animatedGif = Convert.FromBase64String(
+            "R0lGODlhAgACAIEAAP8AAAAAAAAAAAAAACH/C05FVFNDQVBFMi4wAwEAAAAh+QQACgAAACwAAAAAAgACAAAIBgABCAQQEAAh+QQBCgABACwAAAAAAgACAIEAAAAAAAAAAAAAAAAIBgABCAQQEAA7");
+        using var form = new MultipartFormDataContent();
+        form.Add(new ByteArrayContent(animatedGif), "file", "two-frames.gif");
+
+        using var upload = await client.PostAsync($"/api/me/visits/{visitId}/photos", form);
+
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        Assert.Equal(initialCount + 1, await CountPhotosAsync());
+    }
+
     private async Task<TestAccount> RegisterAsync(HttpClient client)
     {
         var login = "api-test-" + Guid.NewGuid().ToString("N");

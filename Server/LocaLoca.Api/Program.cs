@@ -471,8 +471,9 @@ app.MapPost("/api/me/visits/save", async Task<IResult> (HttpContext context, Ses
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var data = await ReadPhotoDataAsync(file, cancellationToken);
-        if (!ImageContentValidator.HasValidImageSignature(data, extension))
-            return Results.BadRequest(new ApiErrorResponse($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
+        var imageValidation = ImageContentValidator.Validate(data, extension, cancellationToken);
+        if (!imageValidation.IsValid)
+            return Results.BadRequest(new ApiErrorResponse(imageValidation.Error ?? "Изображение не прошло проверку."));
         var fileName = $"{Guid.NewGuid():N}{extension}";
         var relativePath = $"Photos/{fileName}";
         var caption = Path.GetFileNameWithoutExtension(file.FileName);
@@ -567,8 +568,9 @@ app.MapPost("/api/me/visits/{visitId:int}/photos", async Task<IResult> (int visi
     var allowed = new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" };
     if (!allowed.Contains(extension)) return Results.BadRequest(new ApiErrorResponse("Поддерживаются JPG, PNG, WEBP, BMP и GIF."));
     var data = await ReadPhotoDataAsync(file, cancellationToken);
-    if (!ImageContentValidator.HasValidImageSignature(data, extension))
-        return Results.BadRequest(new ApiErrorResponse("Содержимое файла не соответствует формату изображения."));
+    var imageValidation = ImageContentValidator.Validate(data, extension, cancellationToken);
+    if (!imageValidation.IsValid)
+        return Results.BadRequest(new ApiErrorResponse(imageValidation.Error ?? "Изображение не прошло проверку."));
 
     await using var connection = await OpenAsync(connectionString, cancellationToken);
     await using var ownership = new NpgsqlCommand("SELECT 1 FROM visits WHERE visit_id = @v AND user_id = @u", connection);
@@ -838,8 +840,9 @@ app.MapPost("/api/me/map-places/{placeId:int}/photos", async Task<IResult> (int 
     {
         var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
         var data = await ReadPhotoDataAsync(file, cancellationToken);
-        if (!ImageContentValidator.HasValidImageSignature(data, extension))
-            return Results.BadRequest(new ApiErrorResponse($"Файл «{Path.GetFileName(file.FileName)}» не соответствует формату {extension}."));
+        var imageValidation = ImageContentValidator.Validate(data, extension, cancellationToken);
+        if (!imageValidation.IsValid)
+            return Results.BadRequest(new ApiErrorResponse(imageValidation.Error ?? "Изображение не прошло проверку."));
         var relativePath = $"Photos/{Guid.NewGuid():N}{extension}";
         var caption = Path.GetFileNameWithoutExtension(file.FileName);
         if (caption.Length > 200) caption = caption[..200];
