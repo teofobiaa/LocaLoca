@@ -780,11 +780,25 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private void Logout_Click(object sender, RoutedEventArgs e) => Logout();
+    private async void Logout_Click(object sender, RoutedEventArgs e) => await LogoutAsync();
 
-    private void Logout()
+    private async Task LogoutAsync()
     {
-        _api.Logout();
+        try { await _api.LogoutAsync(); }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Server logout failed: {ex.Message}");
+            _api.ClearLocalSession();
+        }
+        if (_mapInitialized && MapWebView.CoreWebView2 is not null)
+        {
+            try
+            {
+                await MapWebView.CoreWebView2.Profile.ClearBrowsingDataAsync();
+                MapWebView.NavigateToString("<!doctype html><html><body></body></html>");
+            }
+            catch (Exception ex) { Debug.WriteLine($"WebView2 cleanup failed: {ex.Message}"); }
+        }
         _currentUser = null;
         _selectedAttraction = null;
         _selectedVisit = null;

@@ -336,7 +336,22 @@ public sealed class LocaLocaApiClient : IDisposable
         return new Uri(_http.BaseAddress!, $"map?theme={theme}#token={Uri.EscapeDataString(_token)}{mode}");
     }
 
-    public void Logout() => _token = null;
+    public async Task LogoutAsync(CancellationToken cancellationToken = default)
+    {
+        var token = _token;
+        if (string.IsNullOrWhiteSpace(token)) return;
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "api/auth/logout");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            using var response = await _http.SendAsync(request, cancellationToken);
+            if (response.StatusCode != HttpStatusCode.OK && response.StatusCode != HttpStatusCode.Unauthorized)
+                await EnsureSuccessAsync(response, cancellationToken);
+        }
+        finally { _token = null; }
+    }
+
+    public void ClearLocalSession() => _token = null;
 
     private async Task<bool> TryLivenessAsync(CancellationToken cancellationToken)
     {

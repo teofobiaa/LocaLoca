@@ -29,3 +29,5 @@ SELECT
     has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE') AS map_photos_delete,
     has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE') AS map_places_sequence,
     has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE') AS map_photos_sequence;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions TO localoca_app;

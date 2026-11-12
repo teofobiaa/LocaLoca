@@ -31,5 +31,8 @@
     <Content Include="../../database/schema/01_schema.sql"
              Link="Database/schema/01_schema.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/08_server_sessions.sql"
+             Link="Database/migrations/08_server_sessions.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
