@@ -235,7 +235,6 @@ public sealed class PostgreSqlSchemaTests
         await using var connection = await _database.OpenConnectionAsync();
 
         await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
-        await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
         await _database.ExecuteSqlFileAsync("security", "05_create_app_role.sql");
 
         await using (var baselineSessionGrant = new NpgsqlCommand(
@@ -258,6 +257,8 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "08_server_sessions.sql");
         await _database.ExecuteSqlFileAsync("migrations", "09_map_marker_viewport_indexes.sql");
         await _database.ExecuteSqlFileAsync("migrations", "09_map_marker_viewport_indexes.sql");
+        // Reconcile the journal after the unchanged historical scripts have run.
+        await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
 
         await using (var revokeSessionPermissions = new NpgsqlCommand(
             "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
