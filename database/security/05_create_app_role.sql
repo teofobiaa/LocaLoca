@@ -37,6 +37,16 @@ GRANT SELECT, INSERT, DELETE ON TABLE public.wishlist TO localoca_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_map_places TO localoca_app;
 GRANT SELECT, INSERT, DELETE ON TABLE public.user_map_place_photos TO localoca_app;
 
+-- Sessions are part of the current baseline. Keep this grant conditional
+-- for older databases where migration 008 has not yet been applied.
+DO $grant_session_permissions$
+BEGIN
+ IF to_regclass('public.user_sessions') IS NOT NULL THEN
+  EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions TO localoca_app';
+ END IF;
+END;
+$grant_session_permissions$;
+
 -- Only identity sequences used by INSERT ... RETURNING.
 GRANT USAGE ON SEQUENCE
     public.users_user_id_seq,

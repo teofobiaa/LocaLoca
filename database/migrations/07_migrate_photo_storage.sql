@@ -44,3 +44,8 @@ SELECT
     has_column_privilege('localoca_app', 'public.photos', 'image_data', 'INSERT') AS visit_photo_insert,
     has_column_privilege('localoca_app', 'public.user_map_place_photos', 'image_data', 'SELECT') AS map_photo_read,
     has_column_privilege('localoca_app', 'public.user_map_place_photos', 'image_data', 'INSERT') AS map_photo_insert;
+
+-- Record this migration after all schema changes above have succeeded.
+INSERT INTO public.localoca_schema_migrations (version, name, source)
+VALUES (7, 'migrate_photo_storage', 'migration')
+ON CONFLICT (version) DO NOTHING;

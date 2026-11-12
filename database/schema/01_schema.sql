@@ -110,6 +110,20 @@ CREATE TABLE user_map_place_photos (
     )
 );
 
+-- Persistent server-side sessions (schema migration 008).
+CREATE TABLE user_sessions (
+ session_id uuid PRIMARY KEY,
+ user_id integer NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+ token_hash varchar(64) NOT NULL UNIQUE,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ expires_at timestamptz NOT NULL,
+ revoked_at timestamptz NULL,
+ last_seen_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT user_sessions_expiry_after_creation CHECK (expires_at > created_at)
+);
+CREATE INDEX ix_user_sessions_user_active ON user_sessions(user_id, created_at DESC) WHERE revoked_at IS NULL;
+CREATE INDEX ix_user_sessions_expiry ON user_sessions(expires_at);
+
 CREATE INDEX ix_attractions_city      ON attractions (city_id);
 CREATE INDEX ix_attractions_category  ON attractions (category_id);
 CREATE INDEX ix_attractions_coordinates ON attractions (latitude, longitude);
@@ -120,6 +134,21 @@ CREATE INDEX ix_wishlist_attraction   ON wishlist (attraction_id);
 CREATE INDEX ix_user_map_places_user  ON user_map_places (user_id, created_at DESC);
 CREATE INDEX ix_user_map_places_user_coordinates ON user_map_places (user_id, latitude, longitude);
 CREATE INDEX ix_user_map_place_photos ON user_map_place_photos (user_map_place_id);
+
+-- Current baseline includes schema migrations 003, 004, 007, 008 and 009.
+CREATE TABLE localoca_schema_migrations (
+ version integer PRIMARY KEY CHECK (version > 0),
+ name varchar(120) NOT NULL,
+ applied_at timestamptz NOT NULL DEFAULT now(),
+ source varchar(16) NOT NULL CHECK (source IN ('baseline', 'migration', 'adopted'))
+);
+INSERT INTO localoca_schema_migrations (version, name, source) VALUES
+ (1, 'initial_schema', 'baseline'),
+ (3, 'migrate_wishlist', 'baseline'),
+ (4, 'migrate_user_map_places', 'baseline'),
+ (7, 'migrate_photo_storage', 'baseline'),
+ (8, 'server_sessions', 'baseline'),
+ (9, 'map_marker_viewport_indexes', 'baseline');
 
 -- Представление для отчётов и ручной проверки данных.
 CREATE VIEW v_visit_details AS
