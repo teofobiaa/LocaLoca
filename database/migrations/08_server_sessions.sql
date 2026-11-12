@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS public.user_sessions (
  session_id UUID PRIMARY KEY,
  user_id INTEGER NOT NULL REFERENCES public.users(user_id) ON DELETE CASCADE,
- token_hash CHAR(64) NOT NULL UNIQUE,
+ token_hash VARCHAR(64) NOT NULL UNIQUE,
  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
  expires_at TIMESTAMPTZ NOT NULL,
  revoked_at TIMESTAMPTZ NULL,
@@ -10,4 +10,4 @@ CREATE TABLE IF NOT EXISTS public.user_sessions (
 );
 CREATE INDEX IF NOT EXISTS ix_user_sessions_user_active ON public.user_sessions(user_id,created_at DESC) WHERE revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS ix_user_sessions_expiry ON public.user_sessions(expires_at);
-GRANT SELECT,INSERT,UPDATE,DELETE ON public.user_sessions TO localoca_app;
+

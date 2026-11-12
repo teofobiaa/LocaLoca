@@ -158,6 +158,47 @@ public sealed class AuthenticationSecurityTests
         Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.TooManyRequests));
     }
 
+    [Fact]
+    public async Task Revoked_Session_Is_Rejected_By_Another_Api_Instance()
+    {
+        using var firstFactory = _database.CreateFactory();
+        using var first = firstFactory.CreateClient();
+        var account = await RegisterAsync(first);
+        SetBearer(first, account.Token);
+        using var logout = await first.PostAsync("/api/auth/logout", null);
+        Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
+
+        using var secondFactory = _database.CreateFactory();
+        using var second = secondFactory.CreateClient();
+        SetBearer(second, account.Token);
+        using var rejected = await second.GetAsync("/api/me/visits");
+        Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+    }
+
+    [Fact]
+    public async Task Session_Management_Lists_And_Revokes_Other_Sessions()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+        var account = await RegisterAsync(client);
+        using var login = await client.PostAsJsonAsync("/api/auth/login", new { login = account.Login, password = account.Password });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        using var loginJson = JsonDocument.Parse(await login.Content.ReadAsStringAsync());
+        var secondToken = loginJson.RootElement.GetProperty("token").GetString()!;
+
+        SetBearer(client, account.Token);
+        using var list = await client.GetAsync("/api/me/sessions");
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        using var listJson = JsonDocument.Parse(await list.Content.ReadAsStringAsync());
+        Assert.Equal(2, listJson.RootElement.GetProperty("items").GetArrayLength());
+
+        using var revoke = await client.DeleteAsync("/api/me/sessions/others");
+        Assert.Equal(HttpStatusCode.OK, revoke.StatusCode);
+        SetBearer(client, secondToken);
+        using var rejected = await client.GetAsync("/api/me/visits");
+        Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
+    }
+
     private async Task<TestAccount> RegisterAsync(HttpClient client)
     {
         var login = "auth-security-" + Guid.NewGuid().ToString("N");

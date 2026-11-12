@@ -129,7 +129,7 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
 
 app.Use(async (context, next) =>
 {
-    var header=context.Request.Headers.Authorization.ToString();
+    var header=context.Request.Headers["Authorization"].ToString();
     if(header.StartsWith("Bearer ",StringComparison.OrdinalIgnoreCase)&&!string.IsNullOrWhiteSpace(connectionString)){
         var token=header[7..].Trim();
         var sessions=context.RequestServices.GetRequiredService<SessionStore>();
@@ -288,13 +288,13 @@ app.MapPost("/api/auth/logout", async (HttpContext context, SessionStore session
 app.MapGet("/api/me/sessions", async (HttpContext context, SessionStore sessions) =>
 {
  if(!TryUser(context,sessions,out var userId))return Results.Unauthorized();
- var token=context.Request.Headers.Authorization.ToString()[7..].Trim();
+ var token=context.Request.Headers["Authorization"].ToString()[7..].Trim();
  return Results.Ok(new ItemsResponse<SessionDto>(await sessions.GetActiveAsync(userId,token,connectionString!)));
 });
 app.MapDelete("/api/me/sessions/others", async (HttpContext context, SessionStore sessions) =>
 {
  if(!TryUser(context,sessions,out var userId))return Results.Unauthorized();
- var token=context.Request.Headers.Authorization.ToString()[7..].Trim();
+ var token=context.Request.Headers["Authorization"].ToString()[7..].Trim();
  var count=await sessions.RevokeOthersAsync(userId,token,connectionString!);
  return Results.Ok(new MessageDto($"Отозвано других сессий: {count}."));
 });
