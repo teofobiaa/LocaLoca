@@ -606,10 +606,25 @@ public sealed class ApiIntegrationTests
                 await _database.StartDatabaseAsync();
         }
 
-        using var ready = await client.GetAsync("/ready");
+        HttpResponseMessage? ready = null;
+        for (var attempt = 0; attempt < 30; attempt++)
+        {
+            var response = await client.GetAsync("/ready");
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                ready = response;
+                break;
+            }
+
+            response.Dispose();
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+        }
+
+        using var readyResponse = ready ?? throw new Xunit.Sdk.XunitException(
+            "PostgreSQL did not become ready within 15 seconds after the container restart.");
         using var recovered = await client.GetAsync("/api/me/visits");
 
-        Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, readyResponse.StatusCode);
         var recoveredVisits = await ReadItemsAsync(recovered);
         Assert.Contains(recoveredVisits, item => item.GetProperty("id").GetInt32() == visitId);
     }
