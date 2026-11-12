@@ -414,13 +414,53 @@ public sealed class ApiNegativeScenarioTests
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
     private const string ValidJpegBase64 =
-        "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDyyiiivzo/ss//2Q==";
+        "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/wAARCAACAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqcG1qc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPkP09fb3+Pn6/9oADAMBAAIRAxEAPwDkaKKK/Wz6I//Z";
 
     private static byte[] CreateJpeg(int size)
     {
         var validJpeg = Convert.FromBase64String(ValidJpegBase64);
-        var bytes = new byte[Math.Max(size, validJpeg.Length)];
-        Buffer.BlockCopy(validJpeg, 0, bytes, 0, validJpeg.Length);
+        if (size <= validJpeg.Length)
+            return validJpeg;
+
+        // Insert legal JPEG COM segments after the JFIF header so the test payload
+        // has the requested byte length without trailing junk after the EOI marker.
+        var insertionOffset = 2;
+        if (validJpeg.Length >= 6 && validJpeg[2] == 0xFF && validJpeg[3] == 0xE0)
+        {
+            var app0Length = (validJpeg[4] << 8) | validJpeg[5];
+            insertionOffset = 4 + app0Length;
+        }
+
+        var paddingBytes = size - validJpeg.Length;
+        var segmentCount = (int)Math.Ceiling(paddingBytes / 65_537d);
+        var bytes = new byte[size];
+        Buffer.BlockCopy(validJpeg, 0, bytes, 0, insertionOffset);
+
+        var outputOffset = insertionOffset;
+        var remainingPadding = paddingBytes;
+        for (var index = 0; index < segmentCount; index++)
+        {
+            var remainingSegments = segmentCount - index - 1;
+            var segmentSize = Math.Min(65_537, remainingPadding - (remainingSegments * 4));
+            if (segmentSize < 4)
+                throw new InvalidOperationException("Unable to encode the requested JPEG padding.");
+
+            bytes[outputOffset] = 0xFF;
+            bytes[outputOffset + 1] = 0xFE;
+            var markerLength = segmentSize - 2;
+            bytes[outputOffset + 2] = (byte)(markerLength >> 8);
+            bytes[outputOffset + 3] = (byte)markerLength;
+
+            outputOffset += segmentSize;
+            remainingPadding -= segmentSize;
+        }
+
+        Buffer.BlockCopy(
+            validJpeg,
+            insertionOffset,
+            bytes,
+            outputOffset,
+            validJpeg.Length - insertionOffset);
         return bytes;
     }
 
