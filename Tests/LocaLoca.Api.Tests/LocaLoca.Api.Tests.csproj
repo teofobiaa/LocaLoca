@@ -37,5 +37,8 @@
     <Content Include="../../database/migrations/09_map_marker_viewport_indexes.sql"
              Link="Database/migrations/09_map_marker_viewport_indexes.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/10_map_marker_visit_lookup_index.sql"
+             Link="Database/migrations/10_map_marker_visit_lookup_index.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
