@@ -607,9 +607,11 @@ public sealed class ApiIntegrationTests
         }
 
         HttpResponseMessage? ready = null;
-        for (var attempt = 0; attempt < 30; attempt++)
+        string lastReadyBody = "(no response)";
+        for (var attempt = 0; attempt < 60; attempt++)
         {
             var response = await client.GetAsync("/ready");
+            lastReadyBody = await response.Content.ReadAsStringAsync();
             if (response.StatusCode == HttpStatusCode.OK)
             {
                 ready = response;
@@ -621,7 +623,7 @@ public sealed class ApiIntegrationTests
         }
 
         using var readyResponse = ready ?? throw new Xunit.Sdk.XunitException(
-            "PostgreSQL did not become ready within 15 seconds after the container restart.");
+            $"PostgreSQL did not become ready within 30 seconds after the container restart. Last /ready response: {lastReadyBody}");
         using var recovered = await client.GetAsync("/api/me/visits");
 
         Assert.Equal(HttpStatusCode.OK, readyResponse.StatusCode);
