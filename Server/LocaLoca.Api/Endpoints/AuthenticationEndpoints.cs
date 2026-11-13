@@ -31,7 +31,7 @@ public static class AuthenticationEndpoints
             command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
             var result = await command.ExecuteScalarAsync(cancellationToken);
             if (result is null) return Results.Conflict(new ApiErrorResponse("Пользователь с таким логином уже существует."));
-            var user = new UserDto(Convert.ToInt32(result), login, displayName);
+            var user = new UserDto(Convert.ToInt32(result), login, displayName, null, null);
             return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!, cancellationToken)));
         }).RequireRateLimiting("auth-register");
         
@@ -41,12 +41,14 @@ public static class AuthenticationEndpoints
             var password = request.Password ?? string.Empty;
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(
-                "SELECT user_id, password_hash, display_name FROM users WHERE login = @login", connection);
+                "SELECT user_id, password_hash, display_name, residence_country, residence_city FROM users WHERE login = @login", connection);
             command.Parameters.AddWithValue("login", NpgsqlDbType.Varchar, login);
         
             int userId;
             string storedHash;
             string displayName;
+            string? residenceCountry;
+            string? residenceCity;
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 if (!await reader.ReadAsync(cancellationToken))
@@ -55,6 +57,8 @@ public static class AuthenticationEndpoints
                 userId = reader.GetInt32(0);
                 storedHash = reader.GetString(1);
                 displayName = reader.GetString(2);
+                residenceCountry = reader.IsDBNull(3) ? null : reader.GetString(3);
+                residenceCity = reader.IsDBNull(4) ? null : reader.GetString(4);
             }
         
             if (!PasswordHasher.Verify(password, storedHash))
@@ -89,7 +93,7 @@ public static class AuthenticationEndpoints
                 }
             }
         
-            var user = new UserDto(userId, login, displayName);
+            var user = new UserDto(userId, login, displayName, residenceCountry, residenceCity);
             return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!, cancellationToken)));
         }).RequireRateLimiting("auth-login");
         
@@ -128,13 +132,49 @@ public static class AuthenticationEndpoints
         
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(
-                "UPDATE users SET display_name = @display WHERE user_id = @user RETURNING login", connection);
+                "UPDATE users SET display_name = @display WHERE user_id = @user RETURNING login, residence_country, residence_city", connection);
             command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
-            var login = await command.ExecuteScalarAsync(cancellationToken) as string;
-            if (login is null) return Results.NotFound(new ApiErrorResponse("Аккаунт не найден."));
-        
-            return Results.Ok(new UserDto(userId, login, displayName));
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+                return Results.NotFound(new ApiErrorResponse("Аккаунт не найден."));
+
+            var login = reader.GetString(0);
+            var residenceCountry = reader.IsDBNull(1) ? null : reader.GetString(1);
+            var residenceCity = reader.IsDBNull(2) ? null : reader.GetString(2);
+            return Results.Ok(new UserDto(userId, login, displayName, residenceCountry, residenceCity));
+        });
+
+        app.MapPut("/api/me/profile/residence", async Task<IResult> (UpdateResidenceRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
+        {
+            if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+
+            var country = string.IsNullOrWhiteSpace(request.ResidenceCountry) ? null : request.ResidenceCountry.Trim();
+            var city = string.IsNullOrWhiteSpace(request.ResidenceCity) ? null : request.ResidenceCity.Trim();
+
+            if (country is { Length: > 100 } || city is { Length: > 100 })
+                return Results.BadRequest(new ApiErrorResponse("Страна и город должны содержать не более 100 символов."));
+            if (city is not null && country is null)
+                return Results.BadRequest(new ApiErrorResponse("Укажи страну, чтобы сохранить город проживания."));
+            if (country?.Any(char.IsControl) == true || city?.Any(char.IsControl) == true)
+                return Results.BadRequest(new ApiErrorResponse("Страна и город содержат недопустимые символы."));
+
+            await using var connection = await OpenAsync(connectionString, cancellationToken);
+            await using var command = new NpgsqlCommand(@"
+                UPDATE users
+                SET residence_country = @country, residence_city = @city
+                WHERE user_id = @user
+                RETURNING login, display_name", connection);
+            command.Parameters.Add("country", NpgsqlDbType.Varchar).Value = (object?)country ?? DBNull.Value;
+            command.Parameters.Add("city", NpgsqlDbType.Varchar).Value = (object?)city ?? DBNull.Value;
+            command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+                return Results.NotFound(new ApiErrorResponse("Аккаунт не найден."));
+
+            return Results.Ok(new UserDto(userId, reader.GetString(0), reader.GetString(1), country, city));
         });
     }
 }
