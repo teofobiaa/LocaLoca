@@ -67,3 +67,14 @@ INSERT INTO public.localoca_schema_migrations (version,name,source)
 SELECT 10,'map_marker_visit_lookup_index','adopted'
 WHERE to_regclass('public.ix_visits_user_attraction') IS NOT NULL
 ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 11,'user_residence_location','adopted'
+WHERE (SELECT count(DISTINCT column_name)=2 FROM information_schema.columns
+ WHERE table_schema='public' AND table_name='users'
+ AND column_name IN ('residence_country','residence_city'))
+ AND EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid=to_regclass('public.users')
+               AND conname='ck_users_residence_city_requires_country')
+ON CONFLICT (version) DO NOTHING;
+
