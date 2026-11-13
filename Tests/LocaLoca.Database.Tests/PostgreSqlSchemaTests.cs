@@ -257,6 +257,12 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "08_server_sessions.sql");
         await _database.ExecuteSqlFileAsync("migrations", "09_map_marker_viewport_indexes.sql");
         await _database.ExecuteSqlFileAsync("migrations", "09_map_marker_viewport_indexes.sql");
+        // Simulate an existing v009 database before applying the new v010 index.
+        await using (var dropMapVisitIndex = new NpgsqlCommand(
+            "DROP INDEX IF EXISTS public.ix_visits_user_attraction", connection))
+        {
+            await dropMapVisitIndex.ExecuteNonQueryAsync();
+        }
         await _database.ExecuteSqlFileAsync("migrations", "10_map_marker_visit_lookup_index.sql");
         await _database.ExecuteSqlFileAsync("migrations", "10_map_marker_visit_lookup_index.sql");
         // Reconcile the journal after the unchanged historical scripts have run.
