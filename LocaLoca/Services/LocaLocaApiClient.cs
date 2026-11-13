@@ -53,6 +53,8 @@ public sealed class LocaLocaApiClient : IDisposable
                 Timeout = TimeSpan.FromSeconds(60)
             };
         }
+
+        _token = WindowsProtectedSessionTokenStore.Load(_http.BaseAddress!);
     }
 
     private static string? ReadConfiguredApiBaseUrl()
@@ -80,6 +82,24 @@ public sealed class LocaLocaApiClient : IDisposable
     }
 
     public string? Token => _token;
+
+    public async Task<UserDto?> TryRestoreSessionAsync(CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(_token)) return null;
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/me/profile");
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            ClearLocalSession();
+            return null;
+        }
+
+        await EnsureSuccessAsync(response, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<UserDto>(JsonOptions, cancellationToken))
+            ?? throw new InvalidOperationException("Сервер вернул пустой профиль при восстановлении сессии.");
+    }
 
     public async Task<HealthDto> EnsureApiAndDatabaseAsync(CancellationToken cancellationToken = default)
     {
@@ -156,7 +176,7 @@ public sealed class LocaLocaApiClient : IDisposable
     {
         var result = await PostJsonAsync<LoginRequest, AuthResponse>("api/auth/login",
             new LoginRequest(login, password), authenticated: false, cancellationToken);
-        _token = result.Token;
+        await StoreSessionTokenAsync(result.Token);
         return result;
     }
 
@@ -164,7 +184,7 @@ public sealed class LocaLocaApiClient : IDisposable
     {
         var result = await PostJsonAsync<RegisterRequest, AuthResponse>("api/auth/register",
             new RegisterRequest(login, password, displayName), authenticated: false, cancellationToken);
-        _token = result.Token;
+        await StoreSessionTokenAsync(result.Token);
         return result;
     }
 
@@ -381,24 +401,34 @@ public sealed class LocaLocaApiClient : IDisposable
     public async Task LogoutAsync(CancellationToken cancellationToken = default)
     {
         var token = _token;
-        if (string.IsNullOrWhiteSpace(token)) return;
-        using var request = new HttpRequestMessage(HttpMethod.Post, "api/auth/logout");
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        using var response = await _http.SendAsync(request, cancellationToken);
-
-        if (response.StatusCode == HttpStatusCode.OK ||
-            response.StatusCode == HttpStatusCode.Unauthorized)
+        if (string.IsNullOrWhiteSpace(token))
         {
-            // The server confirmed that the session was revoked or was already invalid.
-            _token = null;
+            ClearLocalSession();
             return;
         }
 
-        // Keep the credential when revocation could not be confirmed so the user can retry.
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/auth/logout");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.OK ||
+            response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            // Remove the local credential only after the server confirms logout
+            // or confirms that the session is already invalid.
+            ClearLocalSession();
+            return;
+        }
+
+        // Keep the saved token when the server cannot confirm revocation. This
+        // lets the user retry instead of silently leaving a live server session.
         await EnsureSuccessAsync(response, cancellationToken);
     }
 
-    public void ClearLocalSession() => _token = null;
+    public void ClearLocalSession()
+    {
+        _token = null;
+        WindowsProtectedSessionTokenStore.Delete();
+    }
 
     private async Task<bool> TryLivenessAsync(CancellationToken cancellationToken)
     {
@@ -479,6 +509,38 @@ public sealed class LocaLocaApiClient : IDisposable
         AddAuthorization(request);
         using var response = await _http.SendAsync(request, cancellationToken);
         await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    private async Task StoreSessionTokenAsync(string token)
+    {
+        try
+        {
+            WindowsProtectedSessionTokenStore.Save(_http.BaseAddress!, token);
+            _token = token;
+        }
+        catch (Exception storageException)
+        {
+            // Do not leave a live server session behind when the Windows
+            // credential cannot be safely persisted for the next launch.
+            try
+            {
+                using var revoke = new HttpRequestMessage(HttpMethod.Post, "api/auth/logout");
+                revoke.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+                using var response = await _http.SendAsync(revoke, CancellationToken.None);
+                if (response.StatusCode != HttpStatusCode.OK &&
+                    response.StatusCode != HttpStatusCode.Unauthorized)
+                    Debug.WriteLine($"Could not revoke a session after local credential storage failed: {(int)response.StatusCode}.");
+            }
+            catch (Exception revokeException)
+            {
+                Debug.WriteLine($"Could not revoke a session after local credential storage failed: {revokeException.Message}");
+            }
+
+            _token = null;
+            throw new InvalidOperationException(
+                "Не удалось безопасно сохранить сессию Windows. Проверь доступ к папке профиля пользователя и повтори вход.",
+                storageException);
+        }
     }
 
     private void AddAuthorization(HttpRequestMessage request)

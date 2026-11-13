@@ -33,7 +33,7 @@ public static class AuthenticationEndpoints
             if (result is null) return Results.Conflict(new ApiErrorResponse("Пользователь с таким логином уже существует."));
             var user = new UserDto(Convert.ToInt32(result), login, displayName, null, null);
             return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!, cancellationToken)));
-        }).RequireRateLimiting("auth-register");
+        });
         
         app.MapPost("/api/auth/login", async Task<IResult> (LoginRequest request, SessionStore sessions, CancellationToken cancellationToken) =>
         {
@@ -95,7 +95,7 @@ public static class AuthenticationEndpoints
         
             var user = new UserDto(userId, login, displayName, residenceCountry, residenceCity);
             return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!, cancellationToken)));
-        }).RequireRateLimiting("auth-login");
+        });
         
         app.MapPost("/api/auth/logout", async (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
         {
@@ -107,8 +107,32 @@ public static class AuthenticationEndpoints
             return await sessions.RevokeAsync(token, connectionString!, cancellationToken)
                 ? Results.Ok(new MessageDto("Сессия завершена."))
                 : Results.Unauthorized();
-        }).RequireRateLimiting("auth-logout");
+        });
         
+        app.MapGet("/api/me/profile", async Task<IResult> (
+            HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
+        {
+            if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+
+            await using var connection = await OpenAsync(connectionString, cancellationToken);
+            await using var command = new NpgsqlCommand(@"
+                SELECT login, display_name, residence_country, residence_city
+                FROM users
+                WHERE user_id = @user", connection);
+            command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
+
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+                return Results.NotFound(new ApiErrorResponse("Аккаунт не найден."));
+
+            return Results.Ok(new UserDto(
+                userId,
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3)));
+        });
+
         app.MapGet("/api/me/sessions", async (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
         {
          if(!TryUser(context,sessions,out var userId))return Results.Unauthorized();

@@ -1,7 +1,6 @@
 using Npgsql;
+using System.Net;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.RateLimiting;
 using LocaLoca.Api;
 using LocaLoca.Api.Security;
 using LocaLoca.Api.Endpoints;
@@ -12,6 +11,7 @@ var passwordHashIterations = PasswordHasher.GetConfiguredIterations(
 // Local development keeps the loopback endpoint. Render supplies PORT; in the
 // container the API must listen on all interfaces so the platform can reach it.
 var renderPort = builder.Configuration["PORT"];
+var trustCloudflareClientIp = !string.IsNullOrWhiteSpace(renderPort);
 if (!string.IsNullOrWhiteSpace(renderPort))
 {
     var sessionSecret = builder.Configuration["LOCA_SESSION_SECRET"];
@@ -29,40 +29,7 @@ builder.Services.Configure<FormOptions>(options =>
     options.MultipartBodyLengthLimit = 22 * 1024 * 1024;
 });
 builder.Services.AddSingleton<SessionStore>();
-builder.Services.AddRateLimiter(options =>
-{
-    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy("auth-login", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
-    options.AddPolicy("auth-register", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 3,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
-    options.AddPolicy("auth-logout", context =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-            _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
-});
+builder.Services.AddSingleton<DistributedAuthRateLimitStore>();
 var app = builder.Build();
 app.UsePerformanceDiagnostics(builder.Configuration);
 
@@ -75,11 +42,26 @@ app.UseStatusCodePages(async statusCodeContext =>
         new ApiErrorResponse(ApiErrorResponse.MessageFor(response.StatusCode)));
 });
 app.UseMiddleware<ApiExceptionMiddleware>();
-app.UseRateLimiter();
 
 var dataRoot = builder.Configuration["LOCA_DATA_ROOT"]
     ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocaLoca");
 var userConfigPath = Path.Combine(dataRoot, "server-config.json");
+
+// Cloud hosting requires the stable Render secret configured in the environment.
+// Local Windows development uses a DPAPI-protected per-user key instead of a
+// new random signing key each time the desktop app starts its child API process.
+if (string.IsNullOrWhiteSpace(renderPort) &&
+    !builder.Environment.IsEnvironment("Testing") &&
+    OperatingSystem.IsWindows() &&
+    string.IsNullOrWhiteSpace(builder.Configuration["LOCA_SESSION_SECRET"]))
+{
+    builder.Configuration["LOCA_SESSION_SECRET"] =
+        ConnectionStringConfiguration.ReadOrCreateLocalSessionSecret(
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "LocaLoca",
+                "session-secret.dpapi"));
+}
 // Prefer server environment variables. Do not attempt to decrypt a Windows
 // DPAPI config in Linux containers when the cloud connection string is set.
 var connectionString = builder.Configuration["LOCA_DB_CONNECTION"]
@@ -125,6 +107,77 @@ if (!string.IsNullOrWhiteSpace(connectionString) &&
         connectionConfigurationError = "Строка подключения Supabase PostgreSQL имеет неверный формат.";
     }
 }
+
+app.Use(async (context, next) =>
+{
+    // Render routes public traffic through Cloudflare and supplies the canonical
+    // client address in CF-Connecting-IP. Do not trust arbitrary X-Forwarded-For.
+    var path = context.Request.Path.Value;
+    string? policyKey = null;
+    var permitLimit = 0;
+
+    if (HttpMethods.IsPost(context.Request.Method))
+    {
+        if (string.Equals(path, "/api/auth/login", StringComparison.OrdinalIgnoreCase))
+        {
+            policyKey = "auth-login";
+            permitLimit = 5;
+        }
+        else if (string.Equals(path, "/api/auth/register", StringComparison.OrdinalIgnoreCase))
+        {
+            policyKey = "auth-register";
+            permitLimit = 3;
+        }
+        else if (string.Equals(path, "/api/auth/logout", StringComparison.OrdinalIgnoreCase))
+        {
+            policyKey = "auth-logout";
+            permitLimit = 10;
+        }
+    }
+
+    if (policyKey is null)
+    {
+        await next();
+        return;
+    }
+
+    if (string.IsNullOrWhiteSpace(connectionString) ||
+        connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        await context.Response.WriteAsJsonAsync(
+            new ApiErrorResponse("Не настроено подключение к PostgreSQL для проверки лимита запросов."),
+            context.RequestAborted);
+        return;
+    }
+
+    var clientIp = context.Connection.RemoteIpAddress ?? IPAddress.Any;
+    if (trustCloudflareClientIp &&
+        IPAddress.TryParse(context.Request.Headers["CF-Connecting-IP"].ToString().Trim(), out var cloudflareIp))
+    {
+        clientIp = cloudflareIp;
+    }
+
+    var limiter = context.RequestServices.GetRequiredService<DistributedAuthRateLimitStore>();
+    var allowed = await limiter.TryAcquireAsync(
+        connectionString,
+        policyKey,
+        clientIp,
+        permitLimit,
+        windowSeconds: 60,
+        cancellationToken: context.RequestAborted);
+
+    if (!allowed)
+    {
+        context.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.Response.WriteAsJsonAsync(
+            new ApiErrorResponse("Слишком много запросов. Повторите попытку позже."),
+            context.RequestAborted);
+        return;
+    }
+
+    await next();
+});
 
 app.Use(async (context, next) =>
 {

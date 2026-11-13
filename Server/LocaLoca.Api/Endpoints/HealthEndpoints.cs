@@ -53,12 +53,31 @@ public static class HealthEndpoints
                             statusCode: 503);
                 }
 
+
+                const string rateLimitSchemaCheck = @"
+        SELECT EXISTS (
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema='public' AND table_name='auth_rate_limit_counters'
+        )";
+                await using (var rateLimitSchemaCommand = new NpgsqlCommand(rateLimitSchemaCheck, connection))
+                {
+                    var rateLimitSchemaReady = Equals(await rateLimitSchemaCommand.ExecuteScalarAsync(cancellationToken), true);
+                    if (!rateLimitSchemaReady)
+                        return Results.Json(new HealthDto(true, false,
+                            "Не применена миграция распределённого ограничения авторизации. Выполните database/migrations/12_distributed_auth_rate_limits.sql в Supabase SQL Editor."),
+                            statusCode: 503);
+                }
+
                 const string permissionCheck = @"
         SELECT
             has_table_privilege(current_user, 'public.user_sessions', 'SELECT')
             AND has_table_privilege(current_user, 'public.user_sessions', 'INSERT')
             AND has_table_privilege(current_user, 'public.user_sessions', 'UPDATE')
             AND has_table_privilege(current_user, 'public.user_sessions', 'DELETE')
+            AND has_table_privilege(current_user, 'public.auth_rate_limit_counters', 'SELECT')
+            AND has_table_privilege(current_user, 'public.auth_rate_limit_counters', 'INSERT')
+            AND has_table_privilege(current_user, 'public.auth_rate_limit_counters', 'UPDATE')
+            AND has_table_privilege(current_user, 'public.auth_rate_limit_counters', 'DELETE')
             AND has_table_privilege(current_user, 'public.users', 'SELECT')
             AND has_table_privilege(current_user, 'public.users', 'INSERT')
             AND has_column_privilege(current_user, 'public.users', 'display_name', 'UPDATE')
@@ -102,7 +121,7 @@ public static class HealthEndpoints
                 var hasPermissions = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
                 if (!hasPermissions)
                     return Results.Json(new HealthDto(true, false,
-                        "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграции 11_user_residence_location.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql."),
+                        "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграций 11_user_residence_location.sql и 12_distributed_auth_rate_limits.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql."),
                         statusCode: 503);
                 return Results.Ok(new HealthDto(true, true, "Supabase PostgreSQL подключена; права роли LocaLoca проверены."));
             }

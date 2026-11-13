@@ -78,3 +78,17 @@ WHERE (SELECT count(DISTINCT column_name)=2 FROM information_schema.columns
                AND conname='ck_users_residence_city_requires_country')
 ON CONFLICT (version) DO NOTHING;
 
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 12,'distributed_auth_rate_limits','adopted'
+WHERE (SELECT count(DISTINCT column_name)=5 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='auth_rate_limit_counters'
+         AND column_name IN ('policy_key','client_ip','window_started_at','request_count','expires_at'))
+ AND EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid=to_regclass('public.auth_rate_limit_counters')
+               AND conname='pk_auth_rate_limit_counters')
+ AND EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid=to_regclass('public.auth_rate_limit_counters')
+               AND conname='ck_auth_rate_limit_counters_expiry_after_window')
+ AND to_regclass('public.ix_auth_rate_limit_counters_expires_at') IS NOT NULL
+ON CONFLICT (version) DO NOTHING;

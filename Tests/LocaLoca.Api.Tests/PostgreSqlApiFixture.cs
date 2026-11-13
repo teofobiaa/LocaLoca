@@ -1,4 +1,8 @@
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using System.Net;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Npgsql;
@@ -54,6 +58,10 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
         await using (var residenceCommand = new NpgsqlCommand(residenceSql, connection))
             await residenceCommand.ExecuteNonQueryAsync();
 
+        var rateLimitSql = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Database", "migrations", "12_distributed_auth_rate_limits.sql"));
+        await using (var rateLimitCommand = new NpgsqlCommand(rateLimitSql, connection))
+            await rateLimitCommand.ExecuteNonQueryAsync();
+
         await using var categoryCommand = new NpgsqlCommand(
             "INSERT INTO categories(name) VALUES ('API test category') RETURNING category_id",
             connection);
@@ -80,7 +88,7 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
         AttractionId = Convert.ToInt32(await attractionCommand.ExecuteScalarAsync());
     }
 
-    public ApiTestFactory CreateFactory(string? sessionSecret = null) => new(ConnectionString, sessionSecret);
+    public ApiTestFactory CreateFactory(string? sessionSecret = null, IPAddress? rateLimitClientIp = null) => new(ConnectionString, sessionSecret, rateLimitClientIp);
 
     // Tests in this xUnit collection are serialized, so an outage test can safely
     // stop and restart the shared isolated PostgreSQL container.
@@ -133,15 +141,27 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
 
     private readonly string _sessionSecret;
 
-    public ApiTestFactory(string connectionString, string? sessionSecret = null)
+    public ApiTestFactory(string connectionString, string? sessionSecret = null, IPAddress? rateLimitClientIp = null)
     {
         ConnectionString = connectionString;
         _sessionSecret = sessionSecret ?? Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        RateLimitClientIpForTests = rateLimitClientIp ?? CreateUniqueTestAddress();
     }
 
     private string ConnectionString { get; }
 
     public string SessionSecretForTests => _sessionSecret;
+    public IPAddress RateLimitClientIpForTests { get; }
+
+    private static IPAddress CreateUniqueTestAddress()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(16);
+        bytes[0] = 0x20;
+        bytes[1] = 0x01;
+        bytes[2] = 0x0d;
+        bytes[3] = 0xb8;
+        return new IPAddress(bytes);
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -156,6 +176,8 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
                 ["LOCA_DATA_ROOT"] = _dataRoot
             });
         });
+        builder.ConfigureTestServices(services =>
+            services.AddSingleton<IStartupFilter>(new TestClientIpStartupFilter(RateLimitClientIpForTests)));
     }
 
     protected override void Dispose(bool disposing)
@@ -178,4 +200,18 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
             // Test cleanup must not conceal the result of the test itself.
         }
     }
+}
+
+internal sealed class TestClientIpStartupFilter(IPAddress remoteIpAddress) : IStartupFilter
+{
+    public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) =>
+        application =>
+        {
+            application.Use(async (context, nextRequest) =>
+            {
+                context.Connection.RemoteIpAddress = remoteIpAddress;
+                await nextRequest();
+            });
+            next(application);
+        };
 }
