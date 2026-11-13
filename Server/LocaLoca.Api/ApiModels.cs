@@ -4,7 +4,7 @@ record RegisterRequest(string Login, string Password, string DisplayName);
 record LoginRequest(string Login, string Password);
 record UpdateDisplayNameRequest(string? DisplayName);
 record UpdateResidenceRequest(string? ResidenceCountry, string? ResidenceCity);
-record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null);
+record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
 record AuthResponse(UserDto User, string Token);
 record MessageDto(string Message);
 record HealthDto(bool ApiConfigured, bool DatabaseConnected, string Message);
