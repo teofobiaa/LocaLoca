@@ -32,8 +32,8 @@ SELECT
     has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE') AS map_places_sequence,
     has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE') AS map_photos_sequence;
 
--- This script is also run before migration 08 on older installations.
--- Grant session access only when the table has already been created.
+-- Residence columns are introduced by migration 011, so run this script after 011.
+-- Session access remains conditional for installations where user_sessions is absent.
 DO $grant_session_permissions$
 BEGIN
     IF to_regclass('public.user_sessions') IS NOT NULL THEN
