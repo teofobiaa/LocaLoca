@@ -15,7 +15,7 @@
       12,
       13
     ],
-    "sha256": "96fad3683bca6098dc7b3694c2968c2dcd1b2667b6b74f9ed108dce2be8e75b1"
+    "sha256": "b3cd7e6f00ff8d60e069ece970ec4970a93f1bcb0d58d42803ef929fa390b084"
   },
   "seed": {
     "version": 2,
@@ -25,7 +25,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "7d7c90d48d8e486a7338a081013923f7f3b17e7a11774854debfe99f92254f22"
+    "sha256": "438f63a837280e73d92db83718cc50d997d2f08519318ea33674ac88dbc91118"
   },
   "schemaMigrations": [
     {
@@ -80,7 +80,7 @@
       "version": 13,
       "name": "user_avatars",
       "path": "migrations/13_user_avatars.sql",
-      "sha256": "19896c735258a0fb0a6292f583549e741be7bbca805599b495c5eec00d1e389a"
+      "sha256": "ed05f0afbbf76d7c518404a02ca9e69cab5f13bd60ab70fb6da9e36bb6600c24"
     }
   ],
   "securityScripts": [
