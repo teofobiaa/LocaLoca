@@ -67,7 +67,11 @@ public static class PerformanceDiagnosticsExtensions
                 var durationMs = Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds;
                 var route = (context.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText
                     ?? "unmatched";
-                var method = context.Request.Method;
+
+                // The method comes from the HTTP request. Keep only known
+                // standard verbs in telemetry and logs; map extension verbs
+                // to a constant to prevent user-controlled log content.
+                var method = NormalizeHttpMethod(context.Request.Method);
                 var statusCode = context.Response.StatusCode;
 
                 HttpRequestDuration.Record(
@@ -128,6 +132,21 @@ public static class PerformanceDiagnosticsExtensions
                 GetStatementFingerprint(sql), operation, durationMs, failed);
         }
     }
+
+    private static string NormalizeHttpMethod(string? method) =>
+        method?.ToUpperInvariant() switch
+        {
+            "GET" => "GET",
+            "POST" => "POST",
+            "PUT" => "PUT",
+            "PATCH" => "PATCH",
+            "DELETE" => "DELETE",
+            "HEAD" => "HEAD",
+            "OPTIONS" => "OPTIONS",
+            "CONNECT" => "CONNECT",
+            "TRACE" => "TRACE",
+            _ => "OTHER"
+        };
 
     private static double GetThreshold(
         IConfiguration configuration,
