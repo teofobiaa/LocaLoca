@@ -1,8 +1,8 @@
 -- Upgrade an existing LocaLoca runtime role to the current application schema.
--- Run as the database administrator after migrations/03 and /04; safe before or after migration/08.
+-- Run as the database administrator after migrations/03, /04 and /11; safe to rerun.
 -- Safe to execute more than once; it does not change ownership or grant admin privileges.
 
-GRANT UPDATE (display_name) ON TABLE public.users TO localoca_app;
+GRANT UPDATE (display_name, residence_country, residence_city) ON TABLE public.users TO localoca_app;
 
 GRANT SELECT, INSERT, UPDATE, DELETE
     ON TABLE public.user_map_places
@@ -20,6 +20,8 @@ GRANT USAGE ON SEQUENCE
 -- Every result must be true.
 SELECT
     has_column_privilege('localoca_app', 'public.users', 'display_name', 'UPDATE') AS can_update_display_name,
+    has_column_privilege('localoca_app', 'public.users', 'residence_country', 'UPDATE') AS can_update_residence_country,
+    has_column_privilege('localoca_app', 'public.users', 'residence_city', 'UPDATE') AS can_update_residence_city,
     has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT') AS map_places_select,
     has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT') AS map_places_insert,
     has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE') AS map_places_update,
@@ -30,8 +32,8 @@ SELECT
     has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE') AS map_places_sequence,
     has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE') AS map_photos_sequence;
 
--- This script is also run before migration 08 on older installations.
--- Grant session access only when the table has already been created.
+-- Residence columns are introduced by migration 011, so run this script after 011.
+-- Session access remains conditional for installations where user_sessions is absent.
 DO $grant_session_permissions$
 BEGIN
     IF to_regclass('public.user_sessions') IS NOT NULL THEN

@@ -95,6 +95,79 @@ public sealed class ApiIntegrationTests
         Assert.Equal(1, await CountUsersAsync(account.Login));
     }
 
+
+    [Fact]
+    public async Task Residence_Profile_Is_Optional_And_Separate_From_Visit_History()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        await CreateVisitAsync(client);
+
+        using var update = await client.PutAsJsonAsync("/api/me/profile/residence", new
+        {
+            residenceCountry = " Sweden ",
+            residenceCity = " Stockholm "
+        });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        var updatedUser = await update.Content.ReadFromJsonAsync<ApiTestUserResponse>();
+        Assert.NotNull(updatedUser);
+        Assert.Equal("Sweden", updatedUser!.ResidenceCountry);
+        Assert.Equal("Stockholm", updatedUser.ResidenceCity);
+
+        using var visitsResponse = await client.GetAsync("/api/me/visits");
+        var visits = await ReadItemsAsync(visitsResponse);
+        Assert.NotEmpty(visits);
+        Assert.Equal("API test city", visits[0].GetProperty("city").GetString());
+        Assert.Equal("API test country", visits[0].GetProperty("country").GetString());
+
+        using var login = await client.PostAsJsonAsync("/api/auth/login", new { login = account.Login, password = account.Password });
+        Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        var auth = await login.Content.ReadFromJsonAsync<ApiTestAuthResponse>();
+        Assert.NotNull(auth);
+        Assert.Equal("Sweden", auth!.User.ResidenceCountry);
+        Assert.Equal("Stockholm", auth.User.ResidenceCity);
+
+        using var renamed = await client.PutAsJsonAsync("/api/me/profile/display-name", new { displayName = "Updated profile name" });
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+        var renamedUser = await renamed.Content.ReadFromJsonAsync<ApiTestUserResponse>();
+        Assert.NotNull(renamedUser);
+        Assert.Equal("Sweden", renamedUser!.ResidenceCountry);
+        Assert.Equal("Stockholm", renamedUser.ResidenceCity);
+    }
+
+    [Fact]
+    public async Task Residence_Profile_Validates_City_And_Can_Be_Cleared()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+        using var unauthenticated = await client.PutAsJsonAsync("/api/me/profile/residence", new { residenceCountry = "Norway", residenceCity = "Oslo" });
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+        using var cityWithoutCountry = await client.PutAsJsonAsync("/api/me/profile/residence", new { residenceCountry = " ", residenceCity = "Oslo" });
+        Assert.Equal(HttpStatusCode.BadRequest, cityWithoutCountry.StatusCode);
+        using var tooLong = await client.PutAsJsonAsync("/api/me/profile/residence", new { residenceCountry = new string('C', 101), residenceCity = (string?)null });
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+
+        using var countryOnly = await client.PutAsJsonAsync("/api/me/profile/residence", new { residenceCountry = "Norway", residenceCity = (string?)null });
+        Assert.Equal(HttpStatusCode.OK, countryOnly.StatusCode);
+        var countryOnlyUser = await countryOnly.Content.ReadFromJsonAsync<ApiTestUserResponse>();
+        Assert.NotNull(countryOnlyUser);
+        Assert.Equal("Norway", countryOnlyUser!.ResidenceCountry);
+        Assert.Null(countryOnlyUser.ResidenceCity);
+
+        using var clear = await client.PutAsJsonAsync("/api/me/profile/residence", new { residenceCountry = " ", residenceCity = " " });
+        Assert.Equal(HttpStatusCode.OK, clear.StatusCode);
+        var clearedUser = await clear.Content.ReadFromJsonAsync<ApiTestUserResponse>();
+        Assert.NotNull(clearedUser);
+        Assert.Null(clearedUser!.ResidenceCountry);
+        Assert.Null(clearedUser.ResidenceCity);
+    }
+
     [Fact]
     public async Task Login_Accepts_The_Correct_Password_And_Rejects_A_Wrong_One()
     {
@@ -840,6 +913,8 @@ public sealed class ApiIntegrationTests
         var auth = await response.Content.ReadFromJsonAsync<ApiTestAuthResponse>();
         Assert.NotNull(auth);
         Assert.False(string.IsNullOrWhiteSpace(auth!.Token));
+        Assert.Null(auth.User.ResidenceCountry);
+        Assert.Null(auth.User.ResidenceCity);
 
         return new TestAccount(login, password, auth.Token, auth.User.Id);
     }
@@ -977,7 +1052,7 @@ public sealed class ApiIntegrationTests
 }
 
 public sealed record ApiTestAuthResponse(ApiTestUserResponse User, string Token);
-public sealed record ApiTestUserResponse(int Id, string Login, string DisplayName);
+public sealed record ApiTestUserResponse(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null);
 public sealed record ApiTestVisitResponse(int Id, string Message);
 public sealed record ApiTestPhotoResponse(int Id, string FilePath, string Caption);
 public sealed record ApiTestMapPlaceResponse(int Id, string Message);

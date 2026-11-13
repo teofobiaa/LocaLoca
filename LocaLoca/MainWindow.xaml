@@ -370,6 +370,25 @@
                                         </StackPanel>
                                     </Border>
                                 </Grid>
+
+                                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                    <StackPanel Spacing="12">
+                                        <TextBlock Text="Место проживания" FontSize="17" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
+                                        <TextBlock Text="Страна и город указываются отдельно от истории посещений. Они нужны для локальных рекомендаций и подборок. Поля необязательные; точный адрес не требуется." FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="Страна" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                                <TextBox x:Name="ProfileResidenceCountryBox" PlaceholderText="Например, Швеция" MaxLength="100" Height="44" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="6">
+                                                <TextBlock Text="Город" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                                <TextBox x:Name="ProfileResidenceCityBox" PlaceholderText="Например, Стокгольм" MaxLength="100" Height="44" />
+                                            </StackPanel>
+                                        </Grid>
+                                        <Button x:Name="ProfileResidenceSaveButton" Content="Сохранить место проживания" Style="{StaticResource PrimaryButtonStyle}" Click="SaveResidence_Click" HorizontalAlignment="Left" />
+                                        <TextBlock x:Name="ProfileResidenceStatusText" Text="" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource MutedBrush}" />
+                                    </StackPanel>
+                                </Border>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
