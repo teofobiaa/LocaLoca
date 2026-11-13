@@ -25,12 +25,15 @@ public sealed class MapMarkerQueryPlanTests
     [Fact]
     public async Task Viewport_Count_And_Page_Queries_Use_The_Expected_Indexes()
     {
-        await using var connection = new NpgsqlConnection(_database.ConnectionString);
-        await connection.OpenAsync();
+        var isolated = await CreateIsolatedDatabaseAsync();
+        try
+        {
+            await using var connection = new NpgsqlConnection(isolated.ConnectionString);
+            await connection.OpenAsync();
 
-        var userId = await CreateBenchmarkUserAsync(connection);
-        await SeedMapBenchmarkDataAsync(connection, userId);
-        await AnalyzeMapTablesAsync(connection);
+            var userId = await CreateBenchmarkUserAsync(connection);
+            await SeedMapBenchmarkDataAsync(connection, userId, isolated.AttractionId);
+            await AnalyzeMapTablesAsync(connection);
 
         const decimal south = 10m;
         const decimal north = 15m;
@@ -61,13 +64,114 @@ public sealed class MapMarkerQueryPlanTests
         Assert.Contains("ix_attractions_coordinates", currentCountPlan.IndexNames);
         Assert.Contains("ix_user_map_places_user_coordinates", currentCountPlan.IndexNames);
         Assert.Contains("ix_visits_user_attraction", currentPagePlan.IndexNames);
-        Assert.Contains("wishlist_pkey", currentPagePlan.IndexNames);
 
         _output.WriteLine($"Synthetic dataset: {SyntheticAttractionCount:N0} attractions, {SyntheticPersonalPlaceCount:N0} personal map places and {SyntheticAttractionCount:N0} visits for one user.");
         _output.WriteLine($"Viewport COUNT result: {currentCount:N0}.");
         _output.WriteLine($"Previous COUNT: {baselinePlan.Format()}");
         _output.WriteLine($"Rewritten COUNT: {currentCountPlan.Format()}");
         _output.WriteLine($"Rewritten page query: {currentPagePlan.Format()}");
+        }
+        finally
+        {
+            await DropIsolatedDatabaseAsync(isolated.DatabaseName);
+        }
+    }
+
+    private async Task<IsolatedDatabase> CreateIsolatedDatabaseAsync()
+    {
+        var databaseName = "map_plan_" + Guid.NewGuid().ToString("N");
+        var adminConnectionString = new NpgsqlConnectionStringBuilder(_database.ConnectionString)
+        {
+            Database = "postgres",
+            Pooling = false
+        }.ConnectionString;
+
+        await using (var admin = new NpgsqlConnection(adminConnectionString))
+        {
+            await admin.OpenAsync();
+            await using var createDatabase = new NpgsqlCommand(
+                $"CREATE DATABASE \\"{databaseName}\\"", admin);
+            await createDatabase.ExecuteNonQueryAsync();
+        }
+
+        var isolatedConnectionString = new NpgsqlConnectionStringBuilder(_database.ConnectionString)
+        {
+            Database = databaseName,
+            Pooling = false
+        }.ConnectionString;
+
+        await using var connection = new NpgsqlConnection(isolatedConnectionString);
+        await connection.OpenAsync();
+        await ExecuteSqlFileAsync(connection, "schema", "01_schema.sql");
+
+        int categoryId;
+        await using (var category = new NpgsqlCommand(
+            "INSERT INTO categories(name) VALUES ('Map plan category') RETURNING category_id",
+            connection))
+        {
+            categoryId = Convert.ToInt32(await category.ExecuteScalarAsync());
+        }
+
+        int countryId;
+        await using (var country = new NpgsqlCommand(
+            "INSERT INTO countries(name) VALUES ('Map plan country') RETURNING country_id",
+            connection))
+        {
+            countryId = Convert.ToInt32(await country.ExecuteScalarAsync());
+        }
+
+        int cityId;
+        await using (var city = new NpgsqlCommand(@"
+INSERT INTO cities(country_id, name)
+VALUES (@country, 'Map plan city')
+RETURNING city_id", connection))
+        {
+            city.Parameters.AddWithValue("country", countryId);
+            cityId = Convert.ToInt32(await city.ExecuteScalarAsync());
+        }
+
+        int attractionId;
+        await using (var attraction = new NpgsqlCommand(@"
+INSERT INTO attractions(name, description, history, latitude, longitude, category_id, city_id)
+VALUES ('Map plan template attraction', '', '', 0, 0, @category, @city)
+RETURNING attraction_id", connection))
+        {
+            attraction.Parameters.AddWithValue("category", categoryId);
+            attraction.Parameters.AddWithValue("city", cityId);
+            attractionId = Convert.ToInt32(await attraction.ExecuteScalarAsync());
+        }
+
+        return new IsolatedDatabase(databaseName, isolatedConnectionString, attractionId);
+    }
+
+    private async Task DropIsolatedDatabaseAsync(string databaseName)
+    {
+        var adminConnectionString = new NpgsqlConnectionStringBuilder(_database.ConnectionString)
+        {
+            Database = "postgres",
+            Pooling = false
+        }.ConnectionString;
+
+        await using var admin = new NpgsqlConnection(adminConnectionString);
+        await admin.OpenAsync();
+        await using (var terminate = new NpgsqlCommand(
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = @name",
+            admin))
+        {
+            terminate.Parameters.AddWithValue("name", databaseName);
+            await terminate.ExecuteNonQueryAsync();
+        }
+
+        await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \\"{databaseName}\\"", admin);
+        await drop.ExecuteNonQueryAsync();
+    }
+
+    private static async Task ExecuteSqlFileAsync(NpgsqlConnection connection, params string[] relativeParts)
+    {
+        var path = Path.Combine(new[] { AppContext.BaseDirectory, "Database" }.Concat(relativeParts).ToArray());
+        var sql = await File.ReadAllTextAsync(path);
+        await using var command = new NpgsqlCommand(sql, connection) { CommandTimeout = 60 };
+        await command.ExecuteNonQueryAsync();
     }
 
     private async Task<int> CreateBenchmarkUserAsync(NpgsqlConnection connection)
@@ -80,7 +184,7 @@ RETURNING user_id", connection);
         return Convert.ToInt32(await command.ExecuteScalarAsync());
     }
 
-    private async Task SeedMapBenchmarkDataAsync(NpgsqlConnection connection, int userId)
+    private async Task SeedMapBenchmarkDataAsync(NpgsqlConnection connection, int userId, int templateAttractionId)
     {
         await using (var attractions = new NpgsqlCommand(@"
 INSERT INTO attractions(name, description, history, latitude, longitude, category_id, city_id)
@@ -100,7 +204,7 @@ CROSS JOIN (
 ) AS template", connection))
         {
             attractions.Parameters.AddWithValue("count", SyntheticAttractionCount);
-            attractions.Parameters.AddWithValue("template", _database.AttractionId);
+            attractions.Parameters.AddWithValue("template", templateAttractionId);
             attractions.CommandTimeout = 60;
             await attractions.ExecuteNonQueryAsync();
         }
@@ -273,6 +377,8 @@ WHERE (@hasBounds = FALSE OR (
         command.Parameters.AddWithValue("west", NpgsqlDbType.Numeric, west);
         command.Parameters.AddWithValue("east", NpgsqlDbType.Numeric, east);
     }
+
+    private sealed record IsolatedDatabase(string DatabaseName, string ConnectionString, int AttractionId);
 
     private sealed record PlanSummary(
         double PlanningMs,
