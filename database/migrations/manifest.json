@@ -1,8 +1,8 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 12,
+  "currentSchemaVersion": 13,
   "baseline": {
-    "version": 12,
+    "version": 13,
     "path": "schema/01_schema.sql",
     "includesSchemaMigrations": [
       3,
@@ -12,9 +12,10 @@
       9,
       10,
       11,
-      12
+      12,
+      13
     ],
-    "sha256": "d6f250e789cc8fd0f87bca158c49aa83c0354bb2530b0c27e8aa6b356ab8b18d"
+    "sha256": "96fad3683bca6098dc7b3694c2968c2dcd1b2667b6b74f9ed108dce2be8e75b1"
   },
   "seed": {
     "version": 2,
@@ -74,6 +75,12 @@
       "name": "distributed_auth_rate_limits",
       "path": "migrations/12_distributed_auth_rate_limits.sql",
       "sha256": "4aea7e73e0203f213d2d42e697bdf6ca6e209969be180946e5065ecdbe9c279c"
+    },
+    {
+      "version": 13,
+      "name": "user_avatars",
+      "path": "migrations/13_user_avatars.sql",
+      "sha256": "19896c735258a0fb0a6292f583549e741be7bbca805599b495c5eec00d1e389a"
     }
   ],
   "securityScripts": [
