@@ -8,7 +8,16 @@ CREATE TABLE users (
     login          varchar(50)  NOT NULL UNIQUE,
     password_hash  varchar(200) NOT NULL,
     display_name   varchar(100) NOT NULL,
-    created_at     timestamptz  NOT NULL DEFAULT now()
+    residence_country varchar(100),
+    residence_city    varchar(100),
+    created_at     timestamptz  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_users_residence_city_requires_country CHECK (
+        residence_city IS NULL OR (
+            residence_country IS NOT NULL
+            AND btrim(residence_country) <> ''
+            AND btrim(residence_city) <> ''
+        )
+    )
 );
 
 CREATE TABLE categories (
@@ -136,7 +145,7 @@ CREATE INDEX ix_user_map_places_user  ON user_map_places (user_id, created_at DE
 CREATE INDEX ix_user_map_places_user_coordinates ON user_map_places (user_id, latitude, longitude);
 CREATE INDEX ix_user_map_place_photos ON user_map_place_photos (user_map_place_id);
 
--- Current baseline includes schema migrations 003, 004, 007, 008, 009 and 010.
+-- Current baseline includes schema migrations 003, 004, 007, 008, 009, 010 and 011.
 CREATE TABLE localoca_schema_migrations (
  version integer PRIMARY KEY CHECK (version > 0),
  name varchar(120) NOT NULL,
@@ -150,7 +159,8 @@ INSERT INTO localoca_schema_migrations (version, name, source) VALUES
  (7, 'migrate_photo_storage', 'baseline'),
  (8, 'server_sessions', 'baseline'),
  (9, 'map_marker_viewport_indexes', 'baseline'),
- (10, 'map_marker_visit_lookup_index', 'baseline');
+ (10, 'map_marker_visit_lookup_index', 'baseline'),
+ (11, 'user_residence_location', 'baseline');
 
 -- Представление для отчётов и ручной проверки данных.
 CREATE VIEW v_visit_details AS
