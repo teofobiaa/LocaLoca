@@ -34,6 +34,25 @@ public static class HealthEndpoints
                             statusCode: 503);
                 }
         
+                const string residenceSchemaCheck = @"
+        SELECT
+            EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='users' AND column_name='residence_country'
+                      AND data_type='character varying' AND character_maximum_length=100 AND is_nullable='YES')
+            AND EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='public' AND table_name='users' AND column_name='residence_city'
+                          AND data_type='character varying' AND character_maximum_length=100 AND is_nullable='YES')
+            AND EXISTS (SELECT 1 FROM pg_constraint
+                        WHERE conrelid='public.users'::regclass AND conname='ck_users_residence_city_requires_country')";
+                await using (var residenceCommand = new NpgsqlCommand(residenceSchemaCheck, connection))
+                {
+                    var residenceSchemaReady = Equals(await residenceCommand.ExecuteScalarAsync(cancellationToken), true);
+                    if (!residenceSchemaReady)
+                        return Results.Json(new HealthDto(true, false,
+                            "Не применена миграция места проживания. Выполните database/migrations/11_user_residence_location.sql в Supabase SQL Editor."),
+                            statusCode: 503);
+                }
+
                 const string permissionCheck = @"
         SELECT
             has_table_privilege(current_user, 'public.user_sessions', 'SELECT')
@@ -43,6 +62,8 @@ public static class HealthEndpoints
             AND has_table_privilege(current_user, 'public.users', 'SELECT')
             AND has_table_privilege(current_user, 'public.users', 'INSERT')
             AND has_column_privilege(current_user, 'public.users', 'display_name', 'UPDATE')
+            AND has_column_privilege(current_user, 'public.users', 'residence_country', 'UPDATE')
+            AND has_column_privilege(current_user, 'public.users', 'residence_city', 'UPDATE')
             AND has_table_privilege(current_user, 'public.categories', 'SELECT')
             AND has_table_privilege(current_user, 'public.countries', 'SELECT')
             AND has_table_privilege(current_user, 'public.cities', 'SELECT')
@@ -81,7 +102,7 @@ public static class HealthEndpoints
                 var hasPermissions = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
                 if (!hasPermissions)
                     return Results.Json(new HealthDto(true, false,
-                        "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграций 04, 07 и 08_server_sessions.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql."),
+                        "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграции 11_user_residence_location.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql."),
                         statusCode: 503);
                 return Results.Ok(new HealthDto(true, true, "Supabase PostgreSQL подключена; права роли LocaLoca проверены."));
             }
