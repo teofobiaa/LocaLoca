@@ -82,7 +82,7 @@
       "name": "update_runtime_permissions",
       "path": "security/06_update_runtime_permissions.sql",
       "repeatable": true,
-      "sha256": "23b777a2e71ad532a525e5730a973eb11fc2e3cf1675459fa9a7c0a7c0185702"
+      "sha256": "16320aee7a3f3a6349bb1358a6547ff9956b1d42834f4976b73f9d924405924b"
     }
   ]
 }
