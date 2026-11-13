@@ -10,6 +10,7 @@ using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+using Windows.Storage.Streams;
 using Windows.Graphics;
 using WinRT.Interop;
 
@@ -747,7 +748,7 @@ public sealed partial class MainWindow : Window
 
     private void SupportNav_Click(object sender, RoutedEventArgs e) => ShowPage("support");
 
-    private void Profile_Click(object sender, RoutedEventArgs e)
+    private async void Profile_Click(object sender, RoutedEventArgs e)
     {
         if (_currentUser is null) return;
 
@@ -759,6 +760,132 @@ public sealed partial class MainWindow : Window
         SetProfileStatus(string.Empty, "muted");
         SetResidenceStatus(string.Empty, "muted");
         ShowPage("profile");
+        await LoadProfileAvatarAsync();
+    }
+
+
+    private async Task LoadProfileAvatarAsync()
+    {
+        if (_currentUser is null) return;
+
+        ProfileAvatarInitialsText.Text = string.IsNullOrWhiteSpace(_currentUser.DisplayName)
+            ? "LL"
+            : _currentUser.DisplayName.Trim()[0].ToString().ToUpperInvariant();
+        ProfileAvatarInitialsText.Visibility = Visibility.Visible;
+        ProfileAvatarImageEllipse.Visibility = Visibility.Collapsed;
+        ProfileAvatarDeleteButton.IsEnabled = _currentUser.HasAvatar;
+
+        if (!_currentUser.HasAvatar) return;
+
+        try
+        {
+            var bytes = await _api.GetAvatarBytesAsync(thumbnail: true);
+            if (bytes is null)
+            {
+                _currentUser = _currentUser with { HasAvatar = false };
+                ProfileAvatarDeleteButton.IsEnabled = false;
+                return;
+            }
+
+            using var imageStream = new InMemoryRandomAccessStream();
+            using (var writer = new DataWriter(imageStream))
+            {
+                writer.WriteBytes(bytes);
+                await writer.StoreAsync();
+                await writer.FlushAsync();
+            }
+
+            imageStream.Seek(0);
+            var bitmap = new BitmapImage();
+            await bitmap.SetSourceAsync(imageStream);
+            ProfileAvatarImageEllipse.Fill = new ImageBrush
+            {
+                ImageSource = bitmap,
+                Stretch = Stretch.UniformToFill
+            };
+            ProfileAvatarImageEllipse.Visibility = Visibility.Visible;
+            ProfileAvatarInitialsText.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            SetAvatarStatus("Не удалось загрузить аватар: " + ex.Message, "error");
+        }
+    }
+
+    private async void ChangeAvatar_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentUser is null) return;
+
+        var picker = new FileOpenPicker
+        {
+            ViewMode = PickerViewMode.Thumbnail,
+            SuggestedStartLocation = PickerLocationId.PicturesLibrary
+        };
+        foreach (var extension in new[] { ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif" })
+            picker.FileTypeFilter.Add(extension);
+        InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+
+        var file = await picker.PickSingleFileAsync();
+        if (file is null) return;
+
+        ProfileAvatarChangeButton.IsEnabled = false;
+        ProfileAvatarDeleteButton.IsEnabled = false;
+        SetAvatarStatus("Загружаем и обрабатываем изображение…", "muted");
+        try
+        {
+            await _api.UploadAvatarAsync(file);
+            _currentUser = _currentUser with { HasAvatar = true };
+            await LoadProfileAvatarAsync();
+            SetAvatarStatus("Аватар загружен. Миниатюра создана сервером.", "success");
+        }
+        catch (Exception ex)
+        {
+            SetAvatarStatus(ex.Message, "error");
+            ProfileAvatarDeleteButton.IsEnabled = _currentUser.HasAvatar;
+        }
+        finally
+        {
+            ProfileAvatarChangeButton.IsEnabled = true;
+        }
+    }
+
+    private async void DeleteAvatar_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentUser is null || !_currentUser.HasAvatar) return;
+
+        var confirmation = await ConfirmAsync("Удалить аватар?", "Фотография профиля и её миниатюра будут удалены.");
+        if (confirmation != ContentDialogResult.Primary) return;
+
+        ProfileAvatarChangeButton.IsEnabled = false;
+        ProfileAvatarDeleteButton.IsEnabled = false;
+        SetAvatarStatus("Удаляем аватар…", "muted");
+        try
+        {
+            await _api.DeleteAvatarAsync();
+            _currentUser = _currentUser with { HasAvatar = false };
+            await LoadProfileAvatarAsync();
+            SetAvatarStatus("Аватар удалён.", "success");
+        }
+        catch (Exception ex)
+        {
+            SetAvatarStatus(ex.Message, "error");
+            ProfileAvatarDeleteButton.IsEnabled = _currentUser.HasAvatar;
+        }
+        finally
+        {
+            ProfileAvatarChangeButton.IsEnabled = true;
+        }
+    }
+
+    private void SetAvatarStatus(string message, string tone)
+    {
+        ProfileAvatarStatusText.Text = message;
+        ProfileAvatarStatusText.Foreground = Brush(tone switch
+        {
+            "success" => "#4F8758",
+            "error" => "#B85D4D",
+            _ => "#7A8980"
+        });
     }
 
     private async void SaveProfile_Click(object sender, RoutedEventArgs e)
