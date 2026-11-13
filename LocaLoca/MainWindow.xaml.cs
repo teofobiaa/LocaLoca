@@ -736,8 +736,11 @@ public sealed partial class MainWindow : Window
 
         ProfileDisplayNameBox.Text = _currentUser.DisplayName;
         ProfileLoginText.Text = _currentUser.Login;
+        ProfileResidenceCountryBox.Text = _currentUser.ResidenceCountry ?? string.Empty;
+        ProfileResidenceCityBox.Text = _currentUser.ResidenceCity ?? string.Empty;
         ProfileThemeToggle.IsOn = _isDarkTheme;
         SetProfileStatus(string.Empty, "muted");
+        SetResidenceStatus(string.Empty, "muted");
         ShowPage("profile");
     }
 
@@ -776,6 +779,63 @@ public sealed partial class MainWindow : Window
         {
             ProfileSaveButton.IsEnabled = true;
         }
+    }
+
+    private async void SaveResidence_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentUser is null) return;
+
+        var country = string.IsNullOrWhiteSpace(ProfileResidenceCountryBox.Text) ? null : ProfileResidenceCountryBox.Text.Trim();
+        var city = string.IsNullOrWhiteSpace(ProfileResidenceCityBox.Text) ? null : ProfileResidenceCityBox.Text.Trim();
+
+        if (country is { Length: > 100 } || city is { Length: > 100 })
+        {
+            SetResidenceStatus("Страна и город должны содержать не более 100 символов.", "error");
+            return;
+        }
+        if (city is not null && country is null)
+        {
+            SetResidenceStatus("Укажи страну, чтобы сохранить город проживания.", "error");
+            return;
+        }
+        if (string.Equals(country, _currentUser.ResidenceCountry, StringComparison.Ordinal) &&
+            string.Equals(city, _currentUser.ResidenceCity, StringComparison.Ordinal))
+        {
+            SetResidenceStatus("Изменений нет.", "muted");
+            return;
+        }
+
+        ProfileResidenceSaveButton.IsEnabled = false;
+        SetResidenceStatus("Сохраняем место проживания…", "muted");
+        try
+        {
+            var updatedUser = await _api.UpdateResidenceAsync(country, city);
+            _currentUser = updatedUser;
+            ProfileNameText.Text = updatedUser.DisplayName;
+            ProfileLoginText.Text = updatedUser.Login;
+            ProfileResidenceCountryBox.Text = updatedUser.ResidenceCountry ?? string.Empty;
+            ProfileResidenceCityBox.Text = updatedUser.ResidenceCity ?? string.Empty;
+            SetResidenceStatus("Место проживания сохранено. История посещений не изменена.", "success");
+        }
+        catch (Exception ex)
+        {
+            SetResidenceStatus(ex.Message, "error");
+        }
+        finally
+        {
+            ProfileResidenceSaveButton.IsEnabled = true;
+        }
+    }
+
+    private void SetResidenceStatus(string message, string tone)
+    {
+        ProfileResidenceStatusText.Text = message;
+        ProfileResidenceStatusText.Foreground = Brush(tone switch
+        {
+            "success" => "#4F8758",
+            "error" => "#B85D4D",
+            _ => "#7A8980"
+        });
     }
 
     private void SetProfileStatus(string message, string tone)
