@@ -1,8 +1,8 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 12,
+  "currentSchemaVersion": 13,
   "baseline": {
-    "version": 12,
+    "version": 13,
     "path": "schema/01_schema.sql",
     "includesSchemaMigrations": [
       3,
@@ -12,9 +12,10 @@
       9,
       10,
       11,
-      12
+      12,
+      13
     ],
-    "sha256": "d6f250e789cc8fd0f87bca158c49aa83c0354bb2530b0c27e8aa6b356ab8b18d"
+    "sha256": "b3cd7e6f00ff8d60e069ece970ec4970a93f1bcb0d58d42803ef929fa390b084"
   },
   "seed": {
     "version": 2,
@@ -24,7 +25,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "7d7c90d48d8e486a7338a081013923f7f3b17e7a11774854debfe99f92254f22"
+    "sha256": "438f63a837280e73d92db83718cc50d997d2f08519318ea33674ac88dbc91118"
   },
   "schemaMigrations": [
     {
@@ -74,6 +75,12 @@
       "name": "distributed_auth_rate_limits",
       "path": "migrations/12_distributed_auth_rate_limits.sql",
       "sha256": "4aea7e73e0203f213d2d42e697bdf6ca6e209969be180946e5065ecdbe9c279c"
+    },
+    {
+      "version": 13,
+      "name": "user_avatars",
+      "path": "migrations/13_user_avatars.sql",
+      "sha256": "ed05f0afbbf76d7c518404a02ca9e69cab5f13bd60ab70fb6da9e36bb6600c24"
     }
   ],
   "securityScripts": [

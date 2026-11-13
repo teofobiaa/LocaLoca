@@ -16,6 +16,13 @@ GRANT SELECT, INSERT, DELETE
     ON TABLE public.user_map_place_photos
     TO localoca_app;
 
+DO $
+BEGIN
+    IF to_regclass('public.user_avatars') IS NOT NULL THEN
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_avatars TO localoca_app';
+    END IF;
+END $;
+
 GRANT USAGE ON SEQUENCE
     public.user_map_places_user_map_place_id_seq,
     public.user_map_place_photos_photo_id_seq
@@ -33,6 +40,12 @@ SELECT
     has_table_privilege('localoca_app', 'public.user_map_place_photos', 'SELECT') AS map_photos_select,
     has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT') AS map_photos_insert,
     has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE') AS map_photos_delete,
+    CASE WHEN to_regclass('public.user_avatars') IS NOT NULL THEN
+        has_table_privilege('localoca_app', 'public.user_avatars', 'SELECT')
+        AND has_table_privilege('localoca_app', 'public.user_avatars', 'INSERT')
+        AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
+        AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
+    ELSE false END AS user_avatars_permissions,
     has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE') AS map_places_sequence,
     has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE') AS map_photos_sequence,
     has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AS auth_rate_limit_select,

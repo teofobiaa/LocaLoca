@@ -364,6 +364,92 @@ public sealed class ApiIntegrationTests
         Assert.Equal(HttpStatusCode.NotFound, afterDelete.StatusCode);
     }
 
+
+    [Fact]
+    public async Task Avatar_Can_Be_Uploaded_Replaced_And_Deleted_Only_By_Its_Owner()
+    {
+        using var factory = _database.CreateFactory();
+        using var ownerClient = factory.CreateClient();
+        using var otherClient = factory.CreateClient();
+        using var anonymousClient = factory.CreateClient();
+
+        var owner = await RegisterAsync(ownerClient);
+        var other = await RegisterAsync(otherClient);
+        SetBearer(ownerClient, owner.Token);
+        SetBearer(otherClient, other.Token);
+
+        byte[] jpegBytes = Convert.FromBase64String("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABQODxIPDRQSEBIXFRQYHjIhHhwcHj0sLiQySUBMS0dARkVQWnNiUFVtVkVGZIhlbXd7gYKBTmCNl4x9lnN+gXz/2wBDARUXFx4aHjshITt8U0ZTfHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHz/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIwAH//Z");
+
+        using var uploadForm = new MultipartFormDataContent();
+        uploadForm.Add(new ByteArrayContent(jpegBytes), "file", "avatar.jpg");
+        using var upload = await ownerClient.PutAsync("/api/me/avatar", uploadForm);
+        Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        Assert.Equal(1L, await CountAvatarsAsync(owner.Id));
+
+        using var ownerProfile = await ownerClient.GetAsync("/api/me/profile");
+        using var ownerProfileJson = JsonDocument.Parse(await ownerProfile.Content.ReadAsStringAsync());
+        Assert.True(ownerProfileJson.RootElement.GetProperty("hasAvatar").GetBoolean());
+
+        using var fullImage = await ownerClient.GetAsync("/api/me/avatar");
+        using var thumbnail = await ownerClient.GetAsync("/api/me/avatar?size=thumbnail");
+        using var foreignRead = await otherClient.GetAsync("/api/me/avatar");
+        using var anonymousRead = await anonymousClient.GetAsync("/api/me/avatar");
+        Assert.Equal(HttpStatusCode.OK, fullImage.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, thumbnail.StatusCode);
+        Assert.Equal("image/jpeg", fullImage.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("image/jpeg", thumbnail.Content.Headers.ContentType?.MediaType);
+        Assert.NotEmpty(await fullImage.Content.ReadAsByteArrayAsync());
+        Assert.NotEmpty(await thumbnail.Content.ReadAsByteArrayAsync());
+        Assert.Equal(HttpStatusCode.NotFound, foreignRead.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousRead.StatusCode);
+
+        // A second upload replaces the existing row rather than consuming another slot.
+        using var replacementForm = new MultipartFormDataContent();
+        replacementForm.Add(new ByteArrayContent(jpegBytes), "file", "replacement.jpg");
+        using var replacement = await ownerClient.PutAsync("/api/me/avatar", replacementForm);
+        Assert.Equal(HttpStatusCode.OK, replacement.StatusCode);
+        Assert.Equal(1L, await CountAvatarsAsync(owner.Id));
+
+        using var foreignDelete = await otherClient.DeleteAsync("/api/me/avatar");
+        using var stillAvailable = await ownerClient.GetAsync("/api/me/avatar");
+        Assert.Equal(HttpStatusCode.OK, foreignDelete.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, stillAvailable.StatusCode);
+
+        using var delete = await ownerClient.DeleteAsync("/api/me/avatar");
+        using var afterDelete = await ownerClient.GetAsync("/api/me/avatar");
+        using var profileAfterDelete = await ownerClient.GetAsync("/api/me/profile");
+        using var profileAfterDeleteJson = JsonDocument.Parse(await profileAfterDelete.Content.ReadAsStringAsync());
+        Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, afterDelete.StatusCode);
+        Assert.False(profileAfterDeleteJson.RootElement.GetProperty("hasAvatar").GetBoolean());
+        Assert.Equal(0L, await CountAvatarsAsync(owner.Id));
+    }
+
+    [Fact]
+    public async Task Avatar_Upload_Rejects_Invalid_Content_And_Files_Over_Quota()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+
+        using var invalidForm = new MultipartFormDataContent();
+        invalidForm.Add(new ByteArrayContent([0x00, 0x01, 0x02]), "file", "not-an-image.jpg");
+        using var invalidUpload = await client.PutAsync("/api/me/avatar", invalidForm);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidUpload.StatusCode);
+        Assert.Equal(0L, await CountAvatarsAsync(account.Id));
+
+        using var oversizedForm = new MultipartFormDataContent();
+        oversizedForm.Add(
+            new ByteArrayContent(new byte[5 * 1024 * 1024 + 1]),
+            "file",
+            "too-large.jpg");
+        using var oversizedUpload = await client.PutAsync("/api/me/avatar", oversizedForm);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedUpload.StatusCode);
+        Assert.Equal(0L, await CountAvatarsAsync(account.Id));
+    }
+
     [Fact]
     public async Task Personal_Map_Place_Cannot_Be_Changed_By_Another_Account()
     {
@@ -1024,6 +1110,17 @@ public sealed class ApiIntegrationTests
             connection);
         command.Parameters.AddWithValue("login", login);
         return Convert.ToInt32(await command.ExecuteScalarAsync());
+    }
+
+
+    private async Task<long> CountAvatarsAsync(int userId)
+    {
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT count(*) FROM user_avatars WHERE user_id = @user", connection);
+        command.Parameters.AddWithValue("user", userId);
+        return Convert.ToInt64(await command.ExecuteScalarAsync());
     }
 
     private async Task<long> CountPhotosAsync()

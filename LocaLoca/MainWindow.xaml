@@ -346,6 +346,29 @@
                                         <TextBlock Text="Здесь можно изменить имя, которое видят в приложении. Логин остаётся постоянным и используется для входа." FontSize="13" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
                                     </StackPanel>
                                 </Border>
+                                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="18">
+                                        <Grid Width="104" Height="104" VerticalAlignment="Center">
+                                            <Ellipse Fill="{ThemeResource Palette_DDEBCB}" />
+                                            <TextBlock x:Name="ProfileAvatarInitialsText" Text="LL" FontSize="28" FontWeight="SemiBold"
+                                                       Foreground="{ThemeResource Palette_5F7844}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Ellipse x:Name="ProfileAvatarImageEllipse" Visibility="Collapsed" />
+                                        </Grid>
+                                        <StackPanel Grid.Column="1" Spacing="9" VerticalAlignment="Center">
+                                            <TextBlock Text="Фотография профиля" FontSize="17" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
+                                            <TextBlock Text="JPG, PNG, WEBP, BMP или GIF. Максимальный размер файла — 5 МиБ. Изображение будет оптимизировано, а миниатюра создана на сервере."
+                                                       FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Button x:Name="ProfileAvatarChangeButton" Content="Загрузить / заменить" Style="{StaticResource PrimaryButtonStyle}"
+                                                        Click="ChangeAvatar_Click" />
+                                                <Button x:Name="ProfileAvatarDeleteButton" Content="Удалить" Style="{StaticResource QuietButtonStyle}"
+                                                        Click="DeleteAvatar_Click" IsEnabled="False" />
+                                            </StackPanel>
+                                            <TextBlock x:Name="ProfileAvatarStatusText" Text="" FontSize="12" TextWrapping="Wrap"
+                                                       Foreground="{ThemeResource MutedBrush}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                                 <Grid ColumnDefinitions="1.15*,0.85*" ColumnSpacing="16">
                                     <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                                         <StackPanel Spacing="12">

@@ -1,7 +1,7 @@
 namespace LocaLoca.Models;
 
 public sealed record HealthDto(bool ApiConfigured, bool DatabaseConnected, string Message);
-public sealed record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null);
+public sealed record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
 public sealed record UpdateDisplayNameRequest(string DisplayName);
 public sealed record UpdateResidenceRequest(string? ResidenceCountry, string? ResidenceCity);
 public sealed record AuthResponse(UserDto User, string Token);
