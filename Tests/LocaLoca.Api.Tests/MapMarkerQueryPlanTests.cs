@@ -90,7 +90,7 @@ public sealed class MapMarkerQueryPlanTests
         {
             await admin.OpenAsync();
             await using var createDatabase = new NpgsqlCommand(
-                $"CREATE DATABASE \\"{databaseName}\\"", admin);
+                $"CREATE DATABASE {databaseName}", admin);
             await createDatabase.ExecuteNonQueryAsync();
         }
 
@@ -162,7 +162,7 @@ RETURNING attraction_id", connection))
             await terminate.ExecuteNonQueryAsync();
         }
 
-        await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS \\"{databaseName}\\"", admin);
+        await using var drop = new NpgsqlCommand($"DROP DATABASE IF EXISTS {databaseName}", admin);
         await drop.ExecuteNonQueryAsync();
     }
 
