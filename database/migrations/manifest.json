@@ -75,7 +75,7 @@
       "name": "create_app_role",
       "path": "security/05_create_app_role.sql",
       "repeatable": false,
-      "sha256": "3727b8b9ee199ef35b44d3f998018b4aface68a560424ea0ec0e1a0c10598da4"
+      "sha256": "3403e54dc93450cd035b00bde9e3640cd17aa545e3364332bc5058ac379e3dbf"
     },
     {
       "version": 6,
