@@ -27,6 +27,20 @@ public sealed class PostgreSqlSchemaTests
                 AND to_regclass('public.user_map_place_photos') IS NOT NULL
                 AND EXISTS (
                     SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='users' AND column_name='residence_country'
+                      AND data_type='character varying' AND character_maximum_length=100 AND is_nullable='YES'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='users' AND column_name='residence_city'
+                      AND data_type='character varying' AND character_maximum_length=100 AND is_nullable='YES'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM pg_constraint
+                    WHERE conrelid='public.users'::regclass AND conname='ck_users_residence_city_requires_country'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM information_schema.columns
                     WHERE table_schema = 'public'
                       AND table_name = 'photos'
                       AND column_name = 'image_data'
@@ -265,7 +279,20 @@ public sealed class PostgreSqlSchemaTests
         }
         await _database.ExecuteSqlFileAsync("migrations", "10_map_marker_visit_lookup_index.sql");
         await _database.ExecuteSqlFileAsync("migrations", "10_map_marker_visit_lookup_index.sql");
-        // Reconcile the journal after the unchanged historical scripts have run.
+
+        // Simulate an existing v010 database before applying migration 011.
+        await using (var resetResidenceSchema = new NpgsqlCommand(@"
+            ALTER TABLE public.users DROP CONSTRAINT IF EXISTS ck_users_residence_city_requires_country;
+            ALTER TABLE public.users DROP COLUMN IF EXISTS residence_city;
+            ALTER TABLE public.users DROP COLUMN IF EXISTS residence_country;
+            DELETE FROM public.localoca_schema_migrations WHERE version = 11;", connection))
+        {
+            await resetResidenceSchema.ExecuteNonQueryAsync();
+        }
+        await _database.ExecuteSqlFileAsync("migrations", "11_user_residence_location.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "11_user_residence_location.sql");
+
+        // Reconcile the journal after the migration sequence.
         await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
 
         await using (var revokeSessionPermissions = new NpgsqlCommand(
@@ -280,6 +307,8 @@ public sealed class PostgreSqlSchemaTests
         await using var permissionCheck = new NpgsqlCommand(@"
             SELECT
                 has_column_privilege('localoca_app', 'public.users', 'display_name', 'UPDATE')
+                AND has_column_privilege('localoca_app', 'public.users', 'residence_country', 'UPDATE')
+                AND has_column_privilege('localoca_app', 'public.users', 'residence_city', 'UPDATE')
                 AND has_table_privilege('localoca_app', 'public.user_sessions', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_sessions', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_sessions', 'UPDATE')
@@ -303,13 +332,13 @@ public sealed class PostgreSqlSchemaTests
         Assert.True((bool)(await permissionCheck.ExecuteScalarAsync() ?? false));
 
         await using var versionCheck = new NpgsqlCommand(@"
-            SELECT count(*) = 6
+            SELECT count(*) = 7
                AND count(*) FILTER (WHERE name IN (
                    'migrate_wishlist', 'migrate_user_map_places', 'migrate_photo_storage',
                    'server_sessions', 'map_marker_viewport_indexes',
-                   'map_marker_visit_lookup_index')) = 6
+                   'map_marker_visit_lookup_index', 'user_residence_location')) = 7
             FROM public.localoca_schema_migrations
-            WHERE version IN (3, 4, 7, 8, 9, 10)", connection);
+            WHERE version IN (3, 4, 7, 8, 9, 10, 11)", connection);
         Assert.True((bool)(await versionCheck.ExecuteScalarAsync() ?? false));
     }
 
