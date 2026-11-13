@@ -158,6 +158,154 @@ public sealed class AuthenticationSecurityTests
         Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.TooManyRequests));
     }
 
+
+    [Fact]
+    public async Task Current_Profile_Returns_The_User_For_The_Active_Session()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+
+        using var response = await client.GetAsync("/api/me/profile");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(account.Login, json.RootElement.GetProperty("login").GetString());
+        Assert.Equal("Authentication security test",
+            json.RootElement.GetProperty("displayName").GetString());
+    }
+
+    [Fact]
+    public async Task Active_Session_Survives_Api_Host_Restart_With_The_Same_Secret()
+    {
+        string token;
+        string sessionSecret;
+
+        using (var firstFactory = _database.CreateFactory())
+        {
+            sessionSecret = firstFactory.SessionSecretForTests;
+            using var firstClient = firstFactory.CreateClient();
+            var account = await RegisterAsync(firstClient);
+            token = account.Token;
+        }
+
+        using var restartedFactory = _database.CreateFactory(sessionSecret);
+        using var restartedClient = restartedFactory.CreateClient();
+        SetBearer(restartedClient, token);
+
+        using var response = await restartedClient.GetAsync("/api/me/visits");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Login_Rate_Limit_Is_Shared_Across_Api_Instances()
+    {
+        using var firstFactory = _database.CreateFactory();
+        using var secondFactory = _database.CreateFactory(
+            firstFactory.SessionSecretForTests,
+            firstFactory.RateLimitClientIpForTests);
+        using var firstClient = firstFactory.CreateClient();
+        using var secondClient = secondFactory.CreateClient();
+        var account = await RegisterAsync(firstClient);
+        var statuses = new List<HttpStatusCode>();
+
+        for (var attempt = 0; attempt < 7; attempt++)
+        {
+            var client = attempt % 2 == 0 ? firstClient : secondClient;
+            using var response = await client.PostAsJsonAsync("/api/auth/login", new
+            {
+                login = account.Login,
+                password = "Definitely-the-wrong-password!"
+            });
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.Equal(5, statuses.Count(status => status == HttpStatusCode.Unauthorized));
+        Assert.Equal(2, statuses.Count(status => status == HttpStatusCode.TooManyRequests));
+    }
+
+    [Fact]
+    public async Task Registration_Rate_Limit_Is_Shared_Across_Api_Instances()
+    {
+        using var firstFactory = _database.CreateFactory();
+        using var secondFactory = _database.CreateFactory(
+            firstFactory.SessionSecretForTests,
+            firstFactory.RateLimitClientIpForTests);
+        using var firstClient = firstFactory.CreateClient();
+        using var secondClient = secondFactory.CreateClient();
+        var logins = Enumerable.Range(0, 4)
+            .Select(_ => "shared-register-" + Guid.NewGuid().ToString("N"))
+            .ToArray();
+        var statuses = new List<HttpStatusCode>();
+
+        for (var attempt = 0; attempt < logins.Length; attempt++)
+        {
+            var client = attempt % 2 == 0 ? firstClient : secondClient;
+            using var response = await client.PostAsJsonAsync("/api/auth/register", new
+            {
+                login = logins[attempt],
+                password = CreateTestPassword(),
+                displayName = "Shared registration limiter test"
+            });
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.Equal(3, statuses.Count(status => status == HttpStatusCode.OK));
+        Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.TooManyRequests));
+        Assert.Equal(0L, await CountUsersAsync(logins[^1]));
+    }
+
+    [Fact]
+    public async Task Revoked_Session_Remains_Revoked_After_Api_Host_Restart()
+    {
+        string token;
+        string sessionSecret;
+
+        using (var firstFactory = _database.CreateFactory())
+        using (var firstClient = firstFactory.CreateClient())
+        {
+            sessionSecret = firstFactory.SessionSecretForTests;
+            var account = await RegisterAsync(firstClient);
+            token = account.Token;
+            SetBearer(firstClient, token);
+
+            using var logout = await firstClient.PostAsync("/api/auth/logout", content: null);
+            Assert.Equal(HttpStatusCode.OK, logout.StatusCode);
+        }
+
+        using var restartedFactory = _database.CreateFactory(sessionSecret);
+        using var restartedClient = restartedFactory.CreateClient();
+        SetBearer(restartedClient, token);
+
+        using var response = await restartedClient.GetAsync("/api/me/visits");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Logout_Rate_Limit_Is_Shared_Across_Api_Instances()
+    {
+        using var firstFactory = _database.CreateFactory();
+        using var secondFactory = _database.CreateFactory(
+            firstFactory.SessionSecretForTests,
+            firstFactory.RateLimitClientIpForTests);
+        using var firstClient = firstFactory.CreateClient();
+        using var secondClient = secondFactory.CreateClient();
+        var statuses = new List<HttpStatusCode>();
+
+        for (var attempt = 0; attempt < 11; attempt++)
+        {
+            var client = attempt % 2 == 0 ? firstClient : secondClient;
+            using var response = await client.PostAsync("/api/auth/logout", content: null);
+            statuses.Add(response.StatusCode);
+        }
+
+        Assert.Equal(10, statuses.Count(status => status == HttpStatusCode.Unauthorized));
+        Assert.Equal(1, statuses.Count(status => status == HttpStatusCode.TooManyRequests));
+    }
+
     [Fact]
     public async Task Revoked_Session_Is_Rejected_By_Another_Api_Instance()
     {

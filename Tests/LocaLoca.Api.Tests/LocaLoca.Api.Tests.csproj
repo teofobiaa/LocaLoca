@@ -43,5 +43,8 @@
     <Content Include="../../database/migrations/11_user_residence_location.sql"
              Link="Database/migrations/11_user_residence_location.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/12_distributed_auth_rate_limits.sql"
+             Link="Database/migrations/12_distributed_auth_rate_limits.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

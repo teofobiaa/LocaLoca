@@ -1,8 +1,12 @@
 -- Upgrade an existing LocaLoca runtime role to the current application schema.
--- Run as the database administrator after migrations/03, /04 and /11; safe to rerun.
+-- Run as the database administrator after migrations/03, /04, /11 and /12; safe to rerun.
 -- Safe to execute more than once; it does not change ownership or grant admin privileges.
 
 GRANT UPDATE (display_name, residence_country, residence_city) ON TABLE public.users TO localoca_app;
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+    ON TABLE public.auth_rate_limit_counters
+    TO localoca_app;
 
 GRANT SELECT, INSERT, UPDATE, DELETE
     ON TABLE public.user_map_places
@@ -30,10 +34,14 @@ SELECT
     has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT') AS map_photos_insert,
     has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE') AS map_photos_delete,
     has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE') AS map_places_sequence,
-    has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE') AS map_photos_sequence;
+    has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE') AS map_photos_sequence,
+    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AS auth_rate_limit_select,
+    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'INSERT') AS auth_rate_limit_insert,
+    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AS auth_rate_limit_update,
+    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE') AS auth_rate_limit_delete;
 
--- Residence columns are introduced by migration 011, so run this script after 011.
--- Session access remains conditional for installations where user_sessions is absent.
+-- Residence fields and the shared limiter are introduced by migrations 011 and 012.
+-- Run this script after migration 012. Session access remains conditional for legacy installations.
 DO $grant_session_permissions$
 BEGIN
     IF to_regclass('public.user_sessions') IS NOT NULL THEN

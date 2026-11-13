@@ -133,6 +133,20 @@ CREATE TABLE user_sessions (
 CREATE INDEX ix_user_sessions_user_active ON user_sessions(user_id, created_at DESC) WHERE revoked_at IS NULL;
 CREATE INDEX ix_user_sessions_expiry ON user_sessions(expires_at);
 
+-- Shared, atomic fixed-window counters for login, registration and logout attempts.
+CREATE TABLE auth_rate_limit_counters (
+    policy_key          varchar(32) NOT NULL,
+    client_ip           inet         NOT NULL,
+    window_started_at   timestamptz  NOT NULL,
+    request_count       bigint       NOT NULL,
+    expires_at          timestamptz  NOT NULL,
+    CONSTRAINT pk_auth_rate_limit_counters PRIMARY KEY (policy_key, client_ip),
+    CONSTRAINT ck_auth_rate_limit_counters_request_count CHECK (request_count > 0),
+    CONSTRAINT ck_auth_rate_limit_counters_expiry_after_window CHECK (expires_at > window_started_at)
+);
+CREATE INDEX ix_auth_rate_limit_counters_expires_at
+    ON auth_rate_limit_counters(expires_at);
+
 CREATE INDEX ix_attractions_city      ON attractions (city_id);
 CREATE INDEX ix_attractions_category  ON attractions (category_id);
 CREATE INDEX ix_attractions_coordinates ON attractions (latitude, longitude);
@@ -160,7 +174,8 @@ INSERT INTO localoca_schema_migrations (version, name, source) VALUES
  (8, 'server_sessions', 'baseline'),
  (9, 'map_marker_viewport_indexes', 'baseline'),
  (10, 'map_marker_visit_lookup_index', 'baseline'),
- (11, 'user_residence_location', 'baseline');
+ (11, 'user_residence_location', 'baseline'),
+ (12, 'distributed_auth_rate_limits', 'baseline');
 
 -- Представление для отчётов и ручной проверки данных.
 CREATE VIEW v_visit_details AS

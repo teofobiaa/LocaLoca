@@ -77,10 +77,27 @@ public sealed partial class MainWindow : Window
         SetAuthStatus("Подключаем локальный API и облачную PostgreSQL…", "muted");
         try
         {
-            var health = await _api.EnsureApiAndDatabaseAsync();
-            SetAuthStatus("Облачная база подключена. Можно войти или создать аккаунт.", "success");
+            await _api.EnsureApiAndDatabaseAsync();
             RetryConnectionButton.Visibility = Visibility.Collapsed;
             ConnectionStatusText.Text = "Облачная база подключена";
+
+            var restoredUser = await _api.TryRestoreSessionAsync();
+            if (restoredUser is not null)
+            {
+                _currentUser = restoredUser;
+                ProfileNameText.Text = restoredUser.DisplayName;
+                AuthPage.Visibility = Visibility.Collapsed;
+                MainShell.Visibility = Visibility.Visible;
+                ShowPage("home");
+                SetAuthStatus("Сессия восстановлена.", "success");
+                await LoadMainDataAsync();
+            }
+            else
+            {
+                MainShell.Visibility = Visibility.Collapsed;
+                AuthPage.Visibility = Visibility.Visible;
+                SetAuthStatus("Облачная база подключена. Можно войти или создать аккаунт.", "success");
+            }
         }
         catch (Exception ex)
         {
@@ -932,8 +949,7 @@ public sealed partial class MainWindow : Window
             Debug.WriteLine($"Server logout failed: {ex.Message}");
             await ShowMessageAsync(
                 "Не удалось завершить сессию",
-                "Сервер не подтвердил выход. Ты останешься в аккаунте. Проверь подключение и повтори попытку.\n\n" +
-                ex.Message);
+                "Сервер не подтвердил выход. Ты останешься в аккаунте, пока выход не будет подтверждён. Проверь подключение и повтори попытку.\n\n" + ex.Message);
             return;
         }
         if (_mapInitialized && MapWebView.CoreWebView2 is not null)
