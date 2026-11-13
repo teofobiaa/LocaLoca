@@ -41,7 +41,9 @@ public static class AuthenticationEndpoints
             var password = request.Password ?? string.Empty;
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(
-                "SELECT user_id, password_hash, display_name, residence_country, residence_city FROM users WHERE login = @login", connection);
+                "SELECT user_id, password_hash, display_name, residence_country, residence_city,
+                       EXISTS (SELECT 1 FROM user_avatars a WHERE a.user_id = users.user_id)
+                FROM users WHERE login = @login", connection);
             command.Parameters.AddWithValue("login", NpgsqlDbType.Varchar, login);
         
             int userId;
@@ -49,6 +51,7 @@ public static class AuthenticationEndpoints
             string displayName;
             string? residenceCountry;
             string? residenceCity;
+            bool hasAvatar;
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 if (!await reader.ReadAsync(cancellationToken))
@@ -59,6 +62,7 @@ public static class AuthenticationEndpoints
                 displayName = reader.GetString(2);
                 residenceCountry = reader.IsDBNull(3) ? null : reader.GetString(3);
                 residenceCity = reader.IsDBNull(4) ? null : reader.GetString(4);
+                hasAvatar = reader.GetBoolean(5);
             }
         
             if (!PasswordHasher.Verify(password, storedHash))
@@ -93,7 +97,7 @@ public static class AuthenticationEndpoints
                 }
             }
         
-            var user = new UserDto(userId, login, displayName, residenceCountry, residenceCity);
+            var user = new UserDto(userId, login, displayName, residenceCountry, residenceCity, hasAvatar);
             return Results.Ok(new AuthResponse(user, await sessions.CreateAsync(user.Id, connectionString!, cancellationToken)));
         });
         
@@ -116,7 +120,8 @@ public static class AuthenticationEndpoints
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
-                SELECT login, display_name, residence_country, residence_city
+                SELECT login, display_name, residence_country, residence_city,
+                       EXISTS (SELECT 1 FROM user_avatars a WHERE a.user_id = users.user_id)
                 FROM users
                 WHERE user_id = @user", connection);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
@@ -130,7 +135,8 @@ public static class AuthenticationEndpoints
                 reader.GetString(0),
                 reader.GetString(1),
                 reader.IsDBNull(2) ? null : reader.GetString(2),
-                reader.IsDBNull(3) ? null : reader.GetString(3)));
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.GetBoolean(4)));
         });
 
         app.MapGet("/api/me/sessions", async (HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
@@ -156,7 +162,9 @@ public static class AuthenticationEndpoints
         
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(
-                "UPDATE users SET display_name = @display WHERE user_id = @user RETURNING login, residence_country, residence_city", connection);
+                "UPDATE users SET display_name = @display WHERE user_id = @user
+                RETURNING login, residence_country, residence_city,
+                    EXISTS (SELECT 1 FROM user_avatars a WHERE a.user_id = users.user_id)", connection);
             command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
 
@@ -167,7 +175,7 @@ public static class AuthenticationEndpoints
             var login = reader.GetString(0);
             var residenceCountry = reader.IsDBNull(1) ? null : reader.GetString(1);
             var residenceCity = reader.IsDBNull(2) ? null : reader.GetString(2);
-            return Results.Ok(new UserDto(userId, login, displayName, residenceCountry, residenceCity));
+            return Results.Ok(new UserDto(userId, login, displayName, residenceCountry, residenceCity, reader.GetBoolean(3)));
         });
 
         app.MapPut("/api/me/profile/residence", async Task<IResult> (UpdateResidenceRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
@@ -189,7 +197,8 @@ public static class AuthenticationEndpoints
                 UPDATE users
                 SET residence_country = @country, residence_city = @city
                 WHERE user_id = @user
-                RETURNING login, display_name", connection);
+                RETURNING login, display_name,
+                    EXISTS (SELECT 1 FROM user_avatars a WHERE a.user_id = users.user_id)", connection);
             command.Parameters.Add("country", NpgsqlDbType.Varchar).Value = (object?)country ?? DBNull.Value;
             command.Parameters.Add("city", NpgsqlDbType.Varchar).Value = (object?)city ?? DBNull.Value;
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
@@ -198,7 +207,7 @@ public static class AuthenticationEndpoints
             if (!await reader.ReadAsync(cancellationToken))
                 return Results.NotFound(new ApiErrorResponse("Аккаунт не найден."));
 
-            return Results.Ok(new UserDto(userId, reader.GetString(0), reader.GetString(1), country, city));
+            return Results.Ok(new UserDto(userId, reader.GetString(0), reader.GetString(1), country, city, reader.GetBoolean(2)));
         });
     }
 }
