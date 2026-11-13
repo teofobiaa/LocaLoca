@@ -29,7 +29,7 @@ Blueprint описывает один Docker Web Service `localoca-api` на Fre
 )
 ```
 
-Сохраняй оба значения только в защищённых настройках Render. Не добавляй их в `render.yaml`, исходный код, Dockerfile, клиент, установщик или коммиты. Для настройки самой базы и роли см. [database/README.md](../../database/README.md). Для новой пустой базы используй полный снимок `database/schema/01_schema.sql` версии 009: он уже содержит `user_sessions`. Для существующей базы сначала выполни `database/migrations/00_migration_history.sql`, проверь журнал `public.localoca_schema_migrations` и примени отсутствующие миграции в числовом порядке. Подробный порядок и контрольные суммы закреплены в [реестре версий](../../database/migrations/manifest.json) и [инструкции по БД](../../database/README.md). Права уже существующей runtime-роли при необходимости обнови скриптом `database/security/06_update_runtime_permissions.sql`.
+Сохраняй оба значения только в защищённых настройках Render. Не добавляй их в `render.yaml`, исходный код, Dockerfile, клиент, установщик или коммиты. Для настройки самой базы и роли см. [database/README.md](../../database/README.md). Для новой пустой базы используй полный снимок `database/schema/01_schema.sql` версии 011: он уже содержит `user_sessions`. Для существующей базы сначала выполни `database/migrations/00_migration_history.sql`, проверь журнал `public.localoca_schema_migrations` и примени отсутствующие миграции в числовом порядке. Подробный порядок и контрольные суммы закреплены в [реестре версий](../../database/migrations/manifest.json) и [инструкции по БД](../../database/README.md). Права уже существующей runtime-роли при необходимости обнови скриптом `database/security/06_update_runtime_permissions.sql`.
 
 ## Первичное развёртывание
 
@@ -97,7 +97,7 @@ https://<service>.onrender.com/ready
 
 Фотографии записываются в PostgreSQL в столбцы `bytea` таблиц `public.photos` и `public.user_map_place_photos`. Байты изображения и MIME-тип сохраняются вместе с метаданными. Новые загрузки не зависят от временной файловой системы Render и входят в резервные копии PostgreSQL.
 
-**Для существующей базы до деплоя API проверь журнал версий и наличие миграций 007 и 008.** Если записи или объекты отсутствуют, примени `database/migrations/07_migrate_photo_storage.sql` и/или `database/migrations/08_server_sessions.sql` в Supabase SQL Editor под ролью администратора. Без столбцов фото и таблицы `public.user_sessions` проверка `/ready` не пройдёт. В новой базе все эти объекты уже входят в `schema/01_schema.sql` версии 009.
+**Для существующей базы до деплоя API проверь журнал версий и наличие миграций 007 и 008.** Если записи или объекты отсутствуют, примени `database/migrations/07_migrate_photo_storage.sql` и/или `database/migrations/08_server_sessions.sql` в Supabase SQL Editor под ролью администратора. Без столбцов фото, таблицы `public.user_sessions` и полей проживания из миграции 011 проверка `/ready` не пройдёт. Для существующей базы также примени `database/migrations/11_user_residence_location.sql` и обнови права через `database/security/06_update_runtime_permissions.sql`. В новой базе все эти объекты уже входят в `schema/01_schema.sql` версии 009.
 
 Совместимость со старыми файлами, оставшимися на сервере от прежней файловой реализации, не гарантирует их восстановление: временная файловая система Render может быть очищена. Эта миграция не восстанавливает файлы, уже потерянные с диска.
 
