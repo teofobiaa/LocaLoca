@@ -133,7 +133,7 @@ public static class PerformanceDiagnosticsExtensions
         }
     }
 
-    private static string NormalizeHttpMethod(string? method) =>
+    internal static string NormalizeHttpMethod(string? method) =>
         method?.ToUpperInvariant() switch
         {
             "GET" => "GET",
