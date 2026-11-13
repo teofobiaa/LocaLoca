@@ -72,7 +72,7 @@ jobs:
           global-json-file: global.json
 
       - name: Run API integration tests
-        run: dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release --verbosity minimal
+        run: dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release --verbosity normal --logger "console;verbosity=detailed"
 
   database:
     name: PostgreSQL schema and migration tests

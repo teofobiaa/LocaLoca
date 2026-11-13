@@ -62,3 +62,8 @@ SELECT 9,'map_marker_viewport_indexes','adopted'
 WHERE to_regclass('public.ix_attractions_coordinates') IS NOT NULL
  AND to_regclass('public.ix_user_map_places_user_coordinates') IS NOT NULL
 ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 10,'map_marker_visit_lookup_index','adopted'
+WHERE to_regclass('public.ix_visits_user_attraction') IS NOT NULL
+ON CONFLICT (version) DO NOTHING;
