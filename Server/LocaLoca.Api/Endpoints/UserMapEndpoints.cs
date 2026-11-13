@@ -42,73 +42,25 @@ public static class UserMapEndpoints
             var items = new List<MapMarkerDto>();
             await using var connection = await OpenAsync(connectionString, cancellationToken);
         
-            const string markerSourceSql = @"
-        SELECT a.attraction_id AS id, a.name, a.latitude, a.longitude,
-               EXISTS(SELECT 1 FROM visits v WHERE v.user_id = @u AND v.attraction_id = a.attraction_id) AS visited,
-               EXISTS(SELECT 1 FROM wishlist w WHERE w.user_id = @u AND w.attraction_id = a.attraction_id) AS wished,
-               NULL::integer AS user_place_id,
-               NULL::date AS visit_date,
-               NULL::smallint AS rating,
-               ''::text AS impressions,
-               ''::text AS notes
-        FROM attractions a
-        
-        UNION ALL
-        
-        SELECT m.user_map_place_id AS id, m.name, m.latitude, m.longitude,
-               m.status = 'visited' AS visited,
-               m.status = 'planned' AS wished,
-               m.user_map_place_id AS user_place_id,
-               m.visit_date,
-               m.rating,
-               m.impressions,
-               m.notes
-        FROM user_map_places m
-        WHERE m.user_id = @u";
-            const string markerFilterSql = @"
-        WHERE (@hasBounds = FALSE OR (
-            latitude BETWEEN @south AND @north
-            AND (
-                (@west <= @east AND longitude BETWEEN @west AND @east)
-                OR
-                (@west > @east AND (longitude >= @west OR longitude <= @east))
-            )
-        ))";
-        
+            var crossesAntimeridian = hasBounds && west!.Value > east!.Value;
+
             void AddMarkerParameters(NpgsqlCommand command)
             {
                 command.Parameters.AddWithValue("u", NpgsqlDbType.Integer, userId);
-                command.Parameters.AddWithValue("hasBounds", NpgsqlDbType.Boolean, hasBounds);
-                command.Parameters.AddWithValue("south", NpgsqlDbType.Numeric,
-                    hasBounds ? (object)Convert.ToDecimal(south!.Value) : DBNull.Value);
-                command.Parameters.AddWithValue("north", NpgsqlDbType.Numeric,
-                    hasBounds ? (object)Convert.ToDecimal(north!.Value) : DBNull.Value);
-                command.Parameters.AddWithValue("west", NpgsqlDbType.Numeric,
-                    hasBounds ? (object)Convert.ToDecimal(west!.Value) : DBNull.Value);
-                command.Parameters.AddWithValue("east", NpgsqlDbType.Numeric,
-                    hasBounds ? (object)Convert.ToDecimal(east!.Value) : DBNull.Value);
+                if (!hasBounds) return;
+
+                command.Parameters.AddWithValue("south", NpgsqlDbType.Numeric, Convert.ToDecimal(south!.Value));
+                command.Parameters.AddWithValue("north", NpgsqlDbType.Numeric, Convert.ToDecimal(north!.Value));
+                command.Parameters.AddWithValue("west", NpgsqlDbType.Numeric, Convert.ToDecimal(west!.Value));
+                command.Parameters.AddWithValue("east", NpgsqlDbType.Numeric, Convert.ToDecimal(east!.Value));
             }
-        
-            var countSql = $@"
-        WITH markers AS (
-        {markerSourceSql}
-        )
-        SELECT count(*) FROM markers
-        {markerFilterSql}";
+
+            var countSql = MapMarkerSqlBuilder.BuildCountSql(hasBounds, crossesAntimeridian);
             await using var countCommand = new NpgsqlCommand(countSql, connection);
             AddMarkerParameters(countCommand);
             var totalCount = Convert.ToInt64(await countCommand.ExecuteScalarAsync(cancellationToken));
-        
-            var sql = $@"
-        WITH markers AS (
-        {markerSourceSql}
-        )
-        SELECT id, name, latitude, longitude, visited, wished, user_place_id,
-               visit_date, rating, impressions, notes
-        FROM markers
-        {markerFilterSql}
-        ORDER BY name, id
-        LIMIT @limit OFFSET @offset";
+
+            var sql = MapMarkerSqlBuilder.BuildPageSql(hasBounds, crossesAntimeridian);
             await using var command = new NpgsqlCommand(sql, connection);
             AddMarkerParameters(command);
             command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, currentPageSize);

@@ -46,6 +46,10 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
         await using (var viewportIndexesCommand = new NpgsqlCommand(viewportIndexesSql, connection))
             await viewportIndexesCommand.ExecuteNonQueryAsync();
 
+        var mapVisitIndexSql = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Database", "migrations", "10_map_marker_visit_lookup_index.sql"));
+        await using (var mapVisitIndexCommand = new NpgsqlCommand(mapVisitIndexSql, connection))
+            await mapVisitIndexCommand.ExecuteNonQueryAsync();
+
         await using var categoryCommand = new NpgsqlCommand(
             "INSERT INTO categories(name) VALUES ('API test category') RETURNING category_id",
             connection);
