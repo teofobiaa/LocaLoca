@@ -41,7 +41,7 @@ public static class AuthenticationEndpoints
             var password = request.Password ?? string.Empty;
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(
-                "SELECT user_id, password_hash, display_name, residence_country, residence_city,
+                @"SELECT user_id, password_hash, display_name, residence_country, residence_city,
                        EXISTS (SELECT 1 FROM user_avatars a WHERE a.user_id = users.user_id)
                 FROM users WHERE login = @login", connection);
             command.Parameters.AddWithValue("login", NpgsqlDbType.Varchar, login);
@@ -162,7 +162,7 @@ public static class AuthenticationEndpoints
         
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(
-                "UPDATE users SET display_name = @display WHERE user_id = @user
+                @"UPDATE users SET display_name = @display WHERE user_id = @user
                 RETURNING login, residence_country, residence_city,
                     EXISTS (SELECT 1 FROM user_avatars a WHERE a.user_id = users.user_id)", connection);
             command.Parameters.AddWithValue("display", NpgsqlDbType.Varchar, displayName);
