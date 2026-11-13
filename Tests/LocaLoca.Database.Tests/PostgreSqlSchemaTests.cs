@@ -262,7 +262,7 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "03_migrate_wishlist.sql");
         await _database.ExecuteSqlFileAsync("migrations", "04_migrate_user_map_places.sql");
         await _database.ExecuteSqlFileAsync("migrations", "04_migrate_user_map_places.sql");
-        // Migration 06 must be safe both before and after the session table exists.
+        // Migration 06 grants the new profile columns and remains safe to rerun.
         await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
         await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
         await _database.ExecuteSqlFileAsync("migrations", "07_migrate_photo_storage.sql");
