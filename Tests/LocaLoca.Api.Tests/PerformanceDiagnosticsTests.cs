@@ -48,4 +48,16 @@ public sealed class PerformanceDiagnosticsTests(PostgreSqlApiFixture fixture)
             dbDurations.Any(duration => duration >= 0),
             "The PostgreSQL command histogram did not record a measurement.");
     }
+
+    [Theory]
+    [InlineData("GET", "GET")]
+    [InlineData("post", "POST")]
+    [InlineData("PATCH", "PATCH")]
+    [InlineData("CUSTOM", "OTHER")]
+    [InlineData("CUSTOM\\r\\nInjected: true", "OTHER")]
+    [InlineData("", "OTHER")]
+    public void Http_method_is_reduced_to_a_safe_standard_value(string input, string expected)
+    {
+        Assert.Equal(expected, PerformanceDiagnosticsExtensions.NormalizeHttpMethod(input));
+    }
 }
