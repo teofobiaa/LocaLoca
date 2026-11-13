@@ -870,7 +870,11 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             Debug.WriteLine($"Server logout failed: {ex.Message}");
-            _api.ClearLocalSession();
+            await ShowMessageAsync(
+                "Не удалось завершить сессию",
+                "Сервер не подтвердил выход. Ты останешься в аккаунте. Проверь подключение и повтори попытку.\n\n" +
+                ex.Message);
+            return;
         }
         if (_mapInitialized && MapWebView.CoreWebView2 is not null)
         {

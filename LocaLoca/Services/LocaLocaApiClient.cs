@@ -369,15 +369,20 @@ public sealed class LocaLocaApiClient : IDisposable
     {
         var token = _token;
         if (string.IsNullOrWhiteSpace(token)) return;
-        try
+        using var request = new HttpRequestMessage(HttpMethod.Post, "api/auth/logout");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await _http.SendAsync(request, cancellationToken);
+
+        if (response.StatusCode == HttpStatusCode.OK ||
+            response.StatusCode == HttpStatusCode.Unauthorized)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, "api/auth/logout");
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            using var response = await _http.SendAsync(request, cancellationToken);
-            if (response.StatusCode != HttpStatusCode.OK && response.StatusCode != HttpStatusCode.Unauthorized)
-                await EnsureSuccessAsync(response, cancellationToken);
+            // The server confirmed that the session was revoked or was already invalid.
+            _token = null;
+            return;
         }
-        finally { _token = null; }
+
+        // Keep the credential when revocation could not be confirmed so the user can retry.
+        await EnsureSuccessAsync(response, cancellationToken);
     }
 
     public void ClearLocalSession() => _token = null;
