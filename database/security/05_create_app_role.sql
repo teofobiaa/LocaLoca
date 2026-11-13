@@ -1,5 +1,6 @@
 -- LocaLoca runtime login with least-privilege access.
--- Run once in Supabase SQL Editor as the database administrator after creating the current schema and before any optional grant-only migrations 06/07.
+-- Run once in Supabase SQL Editor as the database administrator after creating schema baseline 011,
+-- or after applying the required existing-database migrations through 011.
 -- Replace the password placeholder with a unique, randomly generated password.
 -- Do not commit a real password or reuse the postgres account password.
 
