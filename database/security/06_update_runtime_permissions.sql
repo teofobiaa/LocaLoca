@@ -1,8 +1,8 @@
 -- Upgrade an existing LocaLoca runtime role to the current application schema.
--- Run as the database administrator after migrations/03 and /04; safe before or after migration/08.
+-- Run as the database administrator after migrations/03, /04 and /11; safe to rerun.
 -- Safe to execute more than once; it does not change ownership or grant admin privileges.
 
-GRANT UPDATE (display_name) ON TABLE public.users TO localoca_app;
+GRANT UPDATE (display_name, residence_country, residence_city) ON TABLE public.users TO localoca_app;
 
 GRANT SELECT, INSERT, UPDATE, DELETE
     ON TABLE public.user_map_places
@@ -20,6 +20,8 @@ GRANT USAGE ON SEQUENCE
 -- Every result must be true.
 SELECT
     has_column_privilege('localoca_app', 'public.users', 'display_name', 'UPDATE') AS can_update_display_name,
+    has_column_privilege('localoca_app', 'public.users', 'residence_country', 'UPDATE') AS can_update_residence_country,
+    has_column_privilege('localoca_app', 'public.users', 'residence_city', 'UPDATE') AS can_update_residence_city,
     has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT') AS map_places_select,
     has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT') AS map_places_insert,
     has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE') AS map_places_update,
