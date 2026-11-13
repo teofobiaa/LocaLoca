@@ -1,8 +1,8 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 10,
+  "currentSchemaVersion": 11,
   "baseline": {
-    "version": 10,
+    "version": 11,
     "path": "schema/01_schema.sql",
     "includesSchemaMigrations": [
       3,
@@ -10,9 +10,10 @@
       7,
       8,
       9,
-      10
+      10,
+      11
     ],
-    "sha256": "2453843be96b853be73ed0472a0a6e5a4c365abb9be6b0a51c97513c2af9a32d"
+    "sha256": "dc3e78f80a4f7a5881ee6abd9b405bc2edc1ba5443a7bb6925af51baf736f636"
   },
   "seed": {
     "version": 2,
@@ -22,7 +23,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "c7f7a5690be3a27e3d576df2210cf24a6991181abd034ca41b8cb51feec8a357"
+    "sha256": "2ef6335fcaa64371aab7832bdfbb84f9bb1a0158c586745e29a287586788b64a"
   },
   "schemaMigrations": [
     {
@@ -60,6 +61,12 @@
       "name": "map_marker_visit_lookup_index",
       "path": "migrations/10_map_marker_visit_lookup_index.sql",
       "sha256": "9d578c4d2504db9bf764c35c3b6b11a1ba1ebcf1f59cc0daecf22c8c13d08768"
+    },
+    {
+      "version": 11,
+      "name": "user_residence_location",
+      "path": "migrations/11_user_residence_location.sql",
+      "sha256": "8d1b747c1669aa69413984b9febf5f54fa85cefa606afe50bb65de0c26a95508"
     }
   ],
   "securityScripts": [
@@ -68,14 +75,14 @@
       "name": "create_app_role",
       "path": "security/05_create_app_role.sql",
       "repeatable": false,
-      "sha256": "52bd80f5e0911105a27d99384a2138dde60cab67de400c27539fccd9e779bf08"
+      "sha256": "3727b8b9ee199ef35b44d3f998018b4aface68a560424ea0ec0e1a0c10598da4"
     },
     {
       "version": 6,
       "name": "update_runtime_permissions",
       "path": "security/06_update_runtime_permissions.sql",
       "repeatable": true,
-      "sha256": "d0b3785b4b367823fea965770976d4f92b381f08626dfac6642d3aa98bed2243"
+      "sha256": "23b777a2e71ad532a525e5730a973eb11fc2e3cf1675459fa9a7c0a7c0185702"
     }
   ]
 }
