@@ -1,6 +1,7 @@
 using Npgsql;
 using NpgsqlTypes;
 using SkiaSharp;
+using LocaLoca.Api.Security;
 using static LocaLoca.Api.ApiEndpointHelpers;
 
 namespace LocaLoca.Api.Endpoints;
@@ -10,8 +11,8 @@ public static class AvatarEndpoints
     public const long MaximumUploadBytes = 5L * 1024 * 1024;
     private const int MaximumStoredImageBytes = 1024 * 1024;
     private const int MaximumStoredThumbnailBytes = 128 * 1024;
-    private const int MaximumAvatarDimension = 512;
-    private const int ThumbnailDimension = 96;
+    internal const int MaximumAvatarDimension = 512;
+    internal const int ThumbnailDimension = 96;
 
     private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -44,7 +45,7 @@ public static class AvatarEndpoints
 
             var data = reader.GetFieldValue<byte[]>(useThumbnail ? 1 : 0);
             var contentType = reader.GetString(2);
-            context.Response.Headers.CacheControl = "private, max-age=300";
+            context.Response.Headers["Cache-Control"] = "private, max-age=300";
             return Results.File(data, contentType);
         });
 
@@ -122,8 +123,7 @@ internal static class AvatarImageProcessor
         if (source is null || source.Width <= 0 || source.Height <= 0)
             return null;
 
-        var scale = Math.Min(1d, (double)AvatarEndpoints.MaximumUploadBytes / Math.Max(source.Width, source.Height));
-        scale = Math.Min(scale, 512d / Math.Max(source.Width, source.Height));
+        var scale = Math.Min(1d, (double)AvatarEndpoints.MaximumAvatarDimension / Math.Max(source.Width, source.Height));
         var width = Math.Max(1, (int)Math.Round(source.Width * scale));
         var height = Math.Max(1, (int)Math.Round(source.Height * scale));
 
@@ -148,7 +148,7 @@ internal static class AvatarImageProcessor
         var left = (width - side) / 2f;
         var top = (height - side) / 2f;
         using var thumbnail = new SKBitmap(new SKImageInfo(
-            96, 96, SKColorType.Rgba8888, SKAlphaType.Premul));
+            AvatarEndpoints.ThumbnailDimension, AvatarEndpoints.ThumbnailDimension, SKColorType.Rgba8888, SKAlphaType.Premul));
         using (var canvas = new SKCanvas(thumbnail))
         using (var paint = new SKPaint { FilterQuality = SKFilterQuality.High, IsAntialias = true })
         {
@@ -156,7 +156,7 @@ internal static class AvatarImageProcessor
             canvas.DrawBitmap(
                 optimized,
                 new SKRect(left, top, left + side, top + side),
-                new SKRect(0, 0, 96, 96),
+                new SKRect(0, 0, AvatarEndpoints.ThumbnailDimension, AvatarEndpoints.ThumbnailDimension),
                 paint);
             canvas.Flush();
         }
