@@ -54,7 +54,7 @@ public sealed class PerformanceDiagnosticsTests(PostgreSqlApiFixture fixture)
     [InlineData("post", "POST")]
     [InlineData("PATCH", "PATCH")]
     [InlineData("CUSTOM", "OTHER")]
-    [InlineData("CUSTOM\\r\\nInjected: true", "OTHER")]
+    [InlineData("CUSTOM\r\nInjected: true", "OTHER")]
     [InlineData("", "OTHER")]
     public void Http_method_is_reduced_to_a_safe_standard_value(string input, string expected)
     {
