@@ -5,6 +5,20 @@ BEGIN;
 ALTER TABLE public.users
     ADD COLUMN IF NOT EXISTS date_of_birth date;
 
+DO $user_constraints$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.users'::regclass
+          AND conname = 'ck_users_date_of_birth_range'
+    ) THEN
+        ALTER TABLE public.users
+            ADD CONSTRAINT ck_users_date_of_birth_range
+            CHECK (date_of_birth IS NULL OR date_of_birth >= DATE '1900-01-01');
+    END IF;
+END
+$user_constraints$;
+
 ALTER TABLE public.attractions
     ADD COLUMN IF NOT EXISTS min_recommended_age smallint,
     ADD COLUMN IF NOT EXISTS max_recommended_age smallint;
@@ -44,13 +58,26 @@ CREATE INDEX IF NOT EXISTS ix_birthday_contacts_user_birth_date
     ON public.birthday_contacts (user_id, birth_date);
 
 COMMENT ON COLUMN public.users.date_of_birth IS
-    'Private self-reported date of birth. Never include in public profile, search, or authentication DTOs.';
+    'Private self-reported date of birth. Return only through owner-authenticated profile endpoints; never expose in public profile, search, or authentication DTOs.';
 COMMENT ON TABLE public.birthday_contacts IS
     'Private per-user address book for friends birthdays. Contacts are visible only to their owner.';
 COMMENT ON COLUMN public.attractions.min_recommended_age IS
     'Optional lower bound for age-based recommendations; NULL means no lower age restriction.';
 COMMENT ON COLUMN public.attractions.max_recommended_age IS
     'Optional upper bound for age-based recommendations; NULL means no upper age restriction.';
+
+-- Birthday contacts are an application-private address book, not a public Supabase Data API resource.
+DO $public_access$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        EXECUTE 'REVOKE ALL ON TABLE public.birthday_contacts FROM anon';
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        EXECUTE 'REVOKE ALL ON TABLE public.birthday_contacts FROM authenticated';
+    END IF;
+    EXECUTE 'REVOKE ALL ON TABLE public.birthday_contacts FROM PUBLIC';
+END
+$public_access$;
 
 DO $permissions$
 BEGIN
