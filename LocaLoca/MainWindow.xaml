@@ -230,11 +230,18 @@
                                     <StackPanel Spacing="5"><TextBlock Text="Стран" FontSize="11" Foreground="{ThemeResource Palette_819087}" /><TextBlock x:Name="CountriesCountText" Text="0" FontSize="29" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1C3028}" /><TextBlock Text="в коллекции" FontSize="10" Foreground="{ThemeResource Palette_91A097}" /></StackPanel>
                                 </Border>
                             </Grid>
-                            <Grid ColumnDefinitions="*,Auto">
-                                <StackPanel Spacing="3"><TextBlock Text="Продолжай исследовать" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1C3028}" /><TextBlock Text="Места, с которых можно начать следующую историю" FontSize="12" Foreground="{ThemeResource Palette_87948C}" /></StackPanel>
-                                <Button Grid.Column="1" Content="Весь каталог  →" Style="{StaticResource QuietButtonStyle}" Click="CatalogNav_Click" VerticalAlignment="Center" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Интересное рядом" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1C3028}" />
+                                    <TextBlock x:Name="DashboardRecommendationsStatusText" Text="Укажи страну и город проживания в профиле, чтобы получить локальную подборку." FontSize="12" Foreground="{ThemeResource Palette_87948C}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                    <Button x:Name="DashboardResidenceButton" Content="Указать место" Style="{StaticResource QuietButtonStyle}" Click="OpenResidenceFromDashboard_Click" />
+                                    <Button x:Name="RefreshRecommendationsButton" Content="Обновить" Style="{StaticResource QuietButtonStyle}" Click="RefreshRecommendations_Click" />
+                                    <Button Content="Каталог  →" Style="{StaticResource QuietButtonStyle}" Click="CatalogNav_Click" />
+                                </StackPanel>
                             </Grid>
-                            <ListView x:Name="DashboardAttractionsList" IsItemClickEnabled="True" ItemClick="DashboardAttraction_ItemClick" ItemTemplate="{StaticResource AttractionTemplate}" SelectionMode="None" Background="Transparent" BorderThickness="0" MaxHeight="360" />
+                            <ListView x:Name="DashboardRecommendationsList" IsItemClickEnabled="True" ItemClick="DashboardAttraction_ItemClick" ItemTemplate="{StaticResource AttractionTemplate}" SelectionMode="None" Background="Transparent" BorderThickness="0" MaxHeight="420" />
                         </StackPanel>
                     </ScrollViewer>
 

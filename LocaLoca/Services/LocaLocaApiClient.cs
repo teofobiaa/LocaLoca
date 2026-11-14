@@ -278,6 +278,19 @@ public sealed class LocaLocaApiClient : IDisposable
         return GetJsonAsync<PagedItemsResponse<AttractionDto>>(path, cancellationToken);
     }
 
+    public async Task<List<AttractionDto>> GetLocalRecommendationsAsync(
+        int take = 8,
+        CancellationToken cancellationToken = default)
+    {
+        if (take is < 1 or > 20)
+            throw new ArgumentOutOfRangeException(nameof(take), "Число рекомендаций должно быть от 1 до 20.");
+
+        var result = await GetJsonAsync<ItemsResponse<AttractionDto>>(
+            $"api/me/recommendations?take={take.ToString(CultureInfo.InvariantCulture)}",
+            cancellationToken);
+        return result.Items;
+    }
+
     public async Task<List<AttractionDto>> GetCatalogByIdsAsync(
         IEnumerable<int> attractionIds,
         CancellationToken cancellationToken = default)
