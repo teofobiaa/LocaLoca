@@ -426,11 +426,19 @@ public sealed class PostgreSqlSchemaTests
         var multiCityCountry = "Audience country multi " + suffix;
         var singleCityCountry = "Audience country single " + suffix;
         var smallCountry = "Audience country small " + suffix;
+        var smallCityCountry = "Audience country with small city " + suffix;
+        var noCityResidualCountry = "Audience country with no-city residual " + suffix;
 
         await InsertResidenceProfilesAsync(connection, multiCityCountry, "Alpha", 5);
         await InsertResidenceProfilesAsync(connection, multiCityCountry, "Beta", 5);
         await InsertResidenceProfilesAsync(connection, singleCityCountry, "Only city", 6);
         await InsertResidenceProfilesAsync(connection, smallCountry, "Small city", 4);
+        await InsertResidenceProfilesAsync(connection, smallCityCountry, "Alpha", 5);
+        await InsertResidenceProfilesAsync(connection, smallCityCountry, "Beta", 5);
+        await InsertResidenceProfilesAsync(connection, smallCityCountry, "Tiny city", 2);
+        await InsertResidenceProfilesAsync(connection, noCityResidualCountry, "Alpha", 5);
+        await InsertResidenceProfilesAsync(connection, noCityResidualCountry, "Beta", 5);
+        await InsertResidenceProfilesAsync(connection, noCityResidualCountry, null, 2);
 
         var sqlPath = Path.Combine(AppContext.BaseDirectory, "Database", "analytics", "01_audience_geography.sql");
         var sql = await File.ReadAllTextAsync(sqlPath);
@@ -457,6 +465,14 @@ public sealed class PostgreSqlSchemaTests
         Assert.Contains(rows, row => row.Level == "country" && row.Country == singleCityCountry && row.Count == 6);
         Assert.DoesNotContain(rows, row => row.Country == singleCityCountry && row.Level == "city");
 
+        // If any city group is small, suppress the entire country's city breakdown.
+        Assert.Contains(rows, row => row.Level == "country" && row.Country == smallCityCountry && row.Count == 12);
+        Assert.DoesNotContain(rows, row => row.Country == smallCityCountry && row.Level == "city");
+
+        // The same suppression applies when a residual group has no city in the profile.
+        Assert.Contains(rows, row => row.Level == "country" && row.Country == noCityResidualCountry && row.Count == 12);
+        Assert.DoesNotContain(rows, row => row.Country == noCityResidualCountry && row.Level == "city");
+
         // Neither the country nor its city appears below the five-profile threshold.
         Assert.DoesNotContain(rows, row => row.Country == smallCountry);
     }
@@ -464,7 +480,7 @@ public sealed class PostgreSqlSchemaTests
     private static async Task InsertResidenceProfilesAsync(
         NpgsqlConnection connection,
         string country,
-        string city,
+        string? city,
         int count)
     {
         for (var index = 0; index < count; index++)
@@ -475,7 +491,7 @@ public sealed class PostgreSqlSchemaTests
                 connection);
             command.Parameters.AddWithValue("login", $"geo-{Guid.NewGuid():N}");
             command.Parameters.AddWithValue("country", country);
-            command.Parameters.AddWithValue("city", city);
+            command.Parameters.Add("city", NpgsqlTypes.NpgsqlDbType.Varchar).Value = (object?)city ?? DBNull.Value;
             await command.ExecuteNonQueryAsync();
         }
     }
