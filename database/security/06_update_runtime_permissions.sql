@@ -1,8 +1,8 @@
 -- Upgrade an existing LocaLoca runtime role to the current application schema.
--- Run as the database administrator after migrations/03, /04, /11 and /12; safe to rerun.
+-- Run as the database administrator after migrations/03, /04, /11, /12 and /14; safe to rerun.
 -- Safe to execute more than once; it does not change ownership or grant admin privileges.
 
-GRANT UPDATE (display_name, residence_country, residence_city) ON TABLE public.users TO localoca_app;
+GRANT UPDATE (display_name, residence_country, residence_city, date_of_birth) ON TABLE public.users TO localoca_app;
 
 GRANT SELECT, INSERT, UPDATE, DELETE
     ON TABLE public.auth_rate_limit_counters
@@ -15,6 +15,12 @@ GRANT SELECT, INSERT, UPDATE, DELETE
 GRANT SELECT, INSERT, DELETE
     ON TABLE public.user_map_place_photos
     TO localoca_app;
+
+GRANT SELECT, INSERT, UPDATE, DELETE
+    ON TABLE public.birthday_contacts
+    TO localoca_app;
+
+GRANT USAGE ON SEQUENCE public.birthday_contacts_birthday_contact_id_seq TO localoca_app;
 
 DO $grant_avatar_permissions$
 BEGIN
@@ -34,6 +40,7 @@ SELECT
     has_column_privilege('localoca_app', 'public.users', 'display_name', 'UPDATE') AS can_update_display_name,
     has_column_privilege('localoca_app', 'public.users', 'residence_country', 'UPDATE') AS can_update_residence_country,
     has_column_privilege('localoca_app', 'public.users', 'residence_city', 'UPDATE') AS can_update_residence_city,
+    has_column_privilege('localoca_app', 'public.users', 'date_of_birth', 'UPDATE') AS can_update_date_of_birth,
     has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT') AS map_places_select,
     has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT') AS map_places_insert,
     has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE') AS map_places_update,
@@ -52,9 +59,14 @@ SELECT
     has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AS auth_rate_limit_select,
     has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'INSERT') AS auth_rate_limit_insert,
     has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AS auth_rate_limit_update,
-    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE') AS auth_rate_limit_delete;
+    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE') AS auth_rate_limit_delete,
+    has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT') AS birthday_contacts_select,
+    has_table_privilege('localoca_app', 'public.birthday_contacts', 'INSERT') AS birthday_contacts_insert,
+    has_table_privilege('localoca_app', 'public.birthday_contacts', 'UPDATE') AS birthday_contacts_update,
+    has_table_privilege('localoca_app', 'public.birthday_contacts', 'DELETE') AS birthday_contacts_delete,
+    has_sequence_privilege('localoca_app', 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE') AS birthday_contacts_sequence;
 
--- Residence fields and the shared limiter are introduced by migrations 011 and 012.
+-- Residence fields, the shared limiter, and birthdays are introduced by migrations 011, 012 and 014.
 -- Run this script after migration 012. Session access remains conditional for legacy installations.
 DO $grant_session_permissions$
 BEGIN
