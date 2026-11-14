@@ -384,7 +384,7 @@ public sealed class ApiIntegrationTests
         uploadForm.Add(new ByteArrayContent(jpegBytes), "file", "avatar.jpg");
         using var upload = await ownerClient.PutAsync("/api/me/avatar", uploadForm);
         Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
-        Assert.Equal(1L, await CountAvatarsAsync(owner.Id));
+        Assert.Equal(1L, await CountAvatarsAsync(owner.UserId));
 
         using var ownerProfile = await ownerClient.GetAsync("/api/me/profile");
         using var ownerProfileJson = JsonDocument.Parse(await ownerProfile.Content.ReadAsStringAsync());
@@ -408,7 +408,7 @@ public sealed class ApiIntegrationTests
         replacementForm.Add(new ByteArrayContent(jpegBytes), "file", "replacement.jpg");
         using var replacement = await ownerClient.PutAsync("/api/me/avatar", replacementForm);
         Assert.Equal(HttpStatusCode.OK, replacement.StatusCode);
-        Assert.Equal(1L, await CountAvatarsAsync(owner.Id));
+        Assert.Equal(1L, await CountAvatarsAsync(owner.UserId));
 
         using var foreignDelete = await otherClient.DeleteAsync("/api/me/avatar");
         using var stillAvailable = await ownerClient.GetAsync("/api/me/avatar");
@@ -422,7 +422,7 @@ public sealed class ApiIntegrationTests
         Assert.Equal(HttpStatusCode.OK, delete.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, afterDelete.StatusCode);
         Assert.False(profileAfterDeleteJson.RootElement.GetProperty("hasAvatar").GetBoolean());
-        Assert.Equal(0L, await CountAvatarsAsync(owner.Id));
+        Assert.Equal(0L, await CountAvatarsAsync(owner.UserId));
     }
 
     [Fact]
@@ -438,7 +438,7 @@ public sealed class ApiIntegrationTests
         invalidForm.Add(new ByteArrayContent([0x00, 0x01, 0x02]), "file", "not-an-image.jpg");
         using var invalidUpload = await client.PutAsync("/api/me/avatar", invalidForm);
         Assert.Equal(HttpStatusCode.BadRequest, invalidUpload.StatusCode);
-        Assert.Equal(0L, await CountAvatarsAsync(account.Id));
+        Assert.Equal(0L, await CountAvatarsAsync(account.UserId));
 
         using var oversizedForm = new MultipartFormDataContent();
         oversizedForm.Add(
@@ -447,7 +447,7 @@ public sealed class ApiIntegrationTests
             "too-large.jpg");
         using var oversizedUpload = await client.PutAsync("/api/me/avatar", oversizedForm);
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, oversizedUpload.StatusCode);
-        Assert.Equal(0L, await CountAvatarsAsync(account.Id));
+        Assert.Equal(0L, await CountAvatarsAsync(account.UserId));
     }
 
     [Fact]
