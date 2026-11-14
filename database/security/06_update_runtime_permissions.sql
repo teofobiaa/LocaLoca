@@ -16,12 +16,13 @@ GRANT SELECT, INSERT, DELETE
     ON TABLE public.user_map_place_photos
     TO localoca_app;
 
-DO $
+DO $grant_avatar_permissions$
 BEGIN
     IF to_regclass('public.user_avatars') IS NOT NULL THEN
         EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_avatars TO localoca_app';
     END IF;
-END $;
+END;
+$grant_avatar_permissions$;
 
 GRANT USAGE ON SEQUENCE
     public.user_map_places_user_map_place_id_seq,
