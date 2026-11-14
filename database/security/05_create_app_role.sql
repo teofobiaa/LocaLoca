@@ -1,6 +1,6 @@
 -- LocaLoca runtime login with least-privilege access.
--- Run once in Supabase SQL Editor as the database administrator after creating schema baseline 012,
--- or after applying the required existing-database migrations through 012.
+-- Run once in Supabase SQL Editor as the database administrator after creating schema baseline 013 and applying migration 014,
+-- or after applying the required existing-database migrations through 014.
 -- Replace the password placeholder with a unique, randomly generated password.
 -- Do not commit a real password or reuse the postgres account password.
 
@@ -29,7 +29,7 @@ TO localoca_app;
 
 -- Application account registration and login.
 GRANT SELECT, INSERT ON TABLE public.users TO localoca_app;
-GRANT UPDATE (display_name, residence_country, residence_city) ON TABLE public.users TO localoca_app;
+GRANT UPDATE (display_name, residence_country, residence_city, date_of_birth) ON TABLE public.users TO localoca_app;
 
 -- User-owned records.
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.visits TO localoca_app;
@@ -37,6 +37,7 @@ GRANT SELECT, INSERT, DELETE ON TABLE public.photos TO localoca_app;
 GRANT SELECT, INSERT, DELETE ON TABLE public.wishlist TO localoca_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_map_places TO localoca_app;
 GRANT SELECT, INSERT, DELETE ON TABLE public.user_map_place_photos TO localoca_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.birthday_contacts TO localoca_app;
 
 -- Sessions are part of the current baseline. Keep this grant conditional
 -- for older databases where migration 008 has not yet been applied.
@@ -62,7 +63,8 @@ GRANT USAGE ON SEQUENCE
     public.visits_visit_id_seq,
     public.photos_photo_id_seq,
     public.user_map_places_user_map_place_id_seq,
-    public.user_map_place_photos_photo_id_seq
+    public.user_map_place_photos_photo_id_seq,
+    public.birthday_contacts_birthday_contact_id_seq
 TO localoca_app;
 
 -- Verify role flags and required grants. Every boolean should be true.
@@ -87,4 +89,6 @@ SELECT
     (has_table_privilege('localoca_app', 'public.wishlist', 'SELECT') AND has_table_privilege('localoca_app', 'public.wishlist', 'INSERT') AND has_table_privilege('localoca_app', 'public.wishlist', 'DELETE')) AS wishlist_ok,
     (has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE') AND has_table_privilege('localoca_app', 'public.user_map_places', 'DELETE')) AS user_map_places_ok,
     (has_table_privilege('localoca_app', 'public.user_map_place_photos', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE')) AS user_map_place_photos_ok,
+    (has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT') AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'INSERT') AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'UPDATE') AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'DELETE')) AS birthday_contacts_ok,
+    has_column_privilege('localoca_app', 'public.users', 'date_of_birth', 'UPDATE') AS date_of_birth_update_ok;
     (has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'INSERT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE')) AS auth_rate_limit_counters_ok;
