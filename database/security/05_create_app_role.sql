@@ -1,5 +1,5 @@
 -- LocaLoca runtime login with least-privilege access.
--- Run once in Supabase SQL Editor as the database administrator after creating schema baseline 013 and applying migration 014,
+-- Run once in Supabase SQL Editor as the database administrator after creating schema baseline 014,
 -- or after applying the required existing-database migrations through 014.
 -- Replace the password placeholder with a unique, randomly generated password.
 -- Do not commit a real password or reuse the postgres account password.
@@ -90,5 +90,6 @@ SELECT
     (has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE') AND has_table_privilege('localoca_app', 'public.user_map_places', 'DELETE')) AS user_map_places_ok,
     (has_table_privilege('localoca_app', 'public.user_map_place_photos', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE')) AS user_map_place_photos_ok,
     (has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT') AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'INSERT') AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'UPDATE') AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'DELETE')) AS birthday_contacts_ok,
-    has_column_privilege('localoca_app', 'public.users', 'date_of_birth', 'UPDATE') AS date_of_birth_update_ok;
-    (has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'INSERT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE')) AS auth_rate_limit_counters_ok;
+    has_column_privilege('localoca_app', 'public.users', 'date_of_birth', 'UPDATE') AS date_of_birth_update_ok,
+    (has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'INSERT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE')) AS auth_rate_limit_counters_ok,
+    has_sequence_privilege('localoca_app', 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE') AS birthday_contacts_sequence_ok;
