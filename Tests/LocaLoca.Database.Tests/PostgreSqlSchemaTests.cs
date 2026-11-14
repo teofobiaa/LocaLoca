@@ -418,6 +418,84 @@ public sealed class PostgreSqlSchemaTests
         Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, exception.SqlState);
     }
 
+    [Fact]
+    public async Task Audience_Geography_Report_Suppresses_Small_And_Inferrable_City_Cohorts()
+    {
+        await using var connection = await _database.OpenConnectionAsync();
+        var suffix = Guid.NewGuid().ToString("N");
+        var multiCityCountry = "Audience country multi " + suffix;
+        var singleCityCountry = "Audience country single " + suffix;
+        var smallCountry = "Audience country small " + suffix;
+        var smallCityCountry = "Audience country with small city " + suffix;
+        var noCityResidualCountry = "Audience country with no-city residual " + suffix;
+
+        await InsertResidenceProfilesAsync(connection, multiCityCountry, "Alpha", 5);
+        await InsertResidenceProfilesAsync(connection, multiCityCountry, "Beta", 5);
+        await InsertResidenceProfilesAsync(connection, singleCityCountry, "Only city", 6);
+        await InsertResidenceProfilesAsync(connection, smallCountry, "Small city", 4);
+        await InsertResidenceProfilesAsync(connection, smallCityCountry, "Alpha", 5);
+        await InsertResidenceProfilesAsync(connection, smallCityCountry, "Beta", 5);
+        await InsertResidenceProfilesAsync(connection, smallCityCountry, "Tiny city", 2);
+        await InsertResidenceProfilesAsync(connection, noCityResidualCountry, "Alpha", 5);
+        await InsertResidenceProfilesAsync(connection, noCityResidualCountry, "Beta", 5);
+        await InsertResidenceProfilesAsync(connection, noCityResidualCountry, null, 2);
+
+        var sqlPath = Path.Combine(AppContext.BaseDirectory, "Database", "analytics", "01_audience_geography.sql");
+        var sql = await File.ReadAllTextAsync(sqlPath);
+        var rows = new List<(string Level, string Country, string? City, long Count)>();
+        await using (var command = new NpgsqlCommand(sql, connection))
+        await using (var reader = await command.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                rows.Add((
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.GetInt64(3)));
+            }
+        }
+
+        Assert.Contains(rows, row => row.Level == "country" && row.Country == multiCityCountry && row.Count == 10);
+        Assert.Contains(rows, row => row.Level == "city" && row.Country == multiCityCountry && row.City == "Alpha" && row.Count == 5);
+        Assert.Contains(rows, row => row.Level == "city" && row.Country == multiCityCountry && row.City == "Beta" && row.Count == 5);
+
+        // A city that contains the whole country cohort is suppressed to avoid
+        // revealing the same people again through the country total.
+        Assert.Contains(rows, row => row.Level == "country" && row.Country == singleCityCountry && row.Count == 6);
+        Assert.DoesNotContain(rows, row => row.Country == singleCityCountry && row.Level == "city");
+
+        // If any city group is small, suppress the entire country's city breakdown.
+        Assert.Contains(rows, row => row.Level == "country" && row.Country == smallCityCountry && row.Count == 12);
+        Assert.DoesNotContain(rows, row => row.Country == smallCityCountry && row.Level == "city");
+
+        // The same suppression applies when a residual group has no city in the profile.
+        Assert.Contains(rows, row => row.Level == "country" && row.Country == noCityResidualCountry && row.Count == 12);
+        Assert.DoesNotContain(rows, row => row.Country == noCityResidualCountry && row.Level == "city");
+
+        // Neither the country nor its city appears below the five-profile threshold.
+        Assert.DoesNotContain(rows, row => row.Country == smallCountry);
+    }
+
+    private static async Task InsertResidenceProfilesAsync(
+        NpgsqlConnection connection,
+        string country,
+        string? city,
+        int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            await using var command = new NpgsqlCommand(@"
+                INSERT INTO users(login, password_hash, display_name, residence_country, residence_city)
+                VALUES (@login, 'test-hash-not-a-credential', 'Audience analytics test', @country, @city)",
+                connection);
+            command.Parameters.AddWithValue("login", $"geo-{Guid.NewGuid():N}");
+            command.Parameters.AddWithValue("country", country);
+            command.Parameters.Add("city", NpgsqlTypes.NpgsqlDbType.Varchar).Value = (object?)city ?? DBNull.Value;
+            await command.ExecuteNonQueryAsync();
+        }
+    }
+
     private static async Task<(int UserId, int AttractionId)> InsertUserAndAttractionAsync(
         NpgsqlConnection connection)
     {

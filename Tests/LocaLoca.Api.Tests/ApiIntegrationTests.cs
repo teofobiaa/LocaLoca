@@ -169,6 +169,87 @@ public sealed class ApiIntegrationTests
     }
 
     [Fact]
+    public async Task Local_Recommendations_Prioritize_City_Exclude_Visited_And_Fall_Back_To_Country()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        using var unauthenticated = await client.GetAsync("/api/me/recommendations");
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthenticated.StatusCode);
+
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+
+        using var emptyProfile = await client.GetAsync("/api/me/recommendations");
+        Assert.Equal(HttpStatusCode.OK, emptyProfile.StatusCode);
+        Assert.Empty(await ReadItemsAsync(emptyProfile));
+
+        var cityCandidateId = await InsertAttractionAsync(
+            "recommend-city-" + Guid.NewGuid().ToString("N"), -25, -25);
+        var visitedCandidateId = await InsertAttractionAsync(
+            "recommend-visited-" + Guid.NewGuid().ToString("N"), -26, -26);
+        var otherCityId = await InsertCityAsync(
+            "API recommendation other city " + Guid.NewGuid().ToString("N"));
+        var countryCandidateId = await InsertAttractionInCityAsync(
+            "recommend-country-" + Guid.NewGuid().ToString("N"), otherCityId);
+
+        await CreateVisitForAttractionAsync(client, visitedCandidateId);
+
+        using var residence = await client.PutAsJsonAsync("/api/me/profile/residence", new
+        {
+            residenceCountry = " API test country ",
+            residenceCity = " API test city "
+        });
+        Assert.Equal(HttpStatusCode.OK, residence.StatusCode);
+
+        using var recommendationsResponse = await client.GetAsync("/api/me/recommendations?take=20");
+        var recommendations = await ReadItemsAsync(recommendationsResponse);
+
+        Assert.Contains(recommendations, item => item.GetProperty("id").GetInt32() == cityCandidateId);
+        Assert.Contains(recommendations, item => item.GetProperty("id").GetInt32() == countryCandidateId);
+        Assert.DoesNotContain(recommendations, item => item.GetProperty("id").GetInt32() == visitedCandidateId);
+
+        var countryLevelIndex = recommendations.FindIndex(
+            item => item.GetProperty("id").GetInt32() == countryCandidateId);
+        Assert.True(countryLevelIndex >= 0);
+        Assert.All(
+            recommendations.Take(countryLevelIndex),
+            item => Assert.Equal("API test city", item.GetProperty("city").GetString()));
+
+        // A visit by one account must not hide the same attraction from another account.
+        var secondAccount = await RegisterAsync(client);
+        SetBearer(client, secondAccount.Token);
+        using var secondResidence = await client.PutAsJsonAsync("/api/me/profile/residence", new
+        {
+            residenceCountry = "API test country",
+            residenceCity = "API test city"
+        });
+        Assert.Equal(HttpStatusCode.OK, secondResidence.StatusCode);
+        using var secondAccountRecommendationsResponse = await client.GetAsync("/api/me/recommendations?take=20");
+        var secondAccountRecommendations = await ReadItemsAsync(secondAccountRecommendationsResponse);
+        Assert.Contains(secondAccountRecommendations, item => item.GetProperty("id").GetInt32() == visitedCandidateId);
+
+        SetBearer(client, account.Token);
+        using var countryOnly = await client.PutAsJsonAsync("/api/me/profile/residence", new
+        {
+            residenceCountry = "API test country",
+            residenceCity = (string?)null
+        });
+        Assert.Equal(HttpStatusCode.OK, countryOnly.StatusCode);
+
+        using var countryRecommendationsResponse = await client.GetAsync("/api/me/recommendations?take=20");
+        var countryRecommendations = await ReadItemsAsync(countryRecommendationsResponse);
+        Assert.Contains(countryRecommendations, item => item.GetProperty("id").GetInt32() == cityCandidateId);
+        Assert.Contains(countryRecommendations, item => item.GetProperty("id").GetInt32() == countryCandidateId);
+        Assert.DoesNotContain(countryRecommendations, item => item.GetProperty("id").GetInt32() == visitedCandidateId);
+
+        using var invalidLimit = await client.GetAsync("/api/me/recommendations?take=0");
+        using var excessiveLimit = await client.GetAsync("/api/me/recommendations?take=21");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidLimit.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, excessiveLimit.StatusCode);
+    }
+
+    [Fact]
     public async Task Login_Accepts_The_Correct_Password_And_Rejects_A_Wrong_One()
     {
         using var factory = _database.CreateFactory();
@@ -1011,11 +1092,14 @@ public sealed class ApiIntegrationTests
     private static void SetBearer(HttpClient client, string token) =>
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-    private async Task<int> CreateVisitAsync(HttpClient client)
+    private Task<int> CreateVisitAsync(HttpClient client) =>
+        CreateVisitForAttractionAsync(client, _database.AttractionId);
+
+    private async Task<int> CreateVisitForAttractionAsync(HttpClient client, int attractionId)
     {
         using var response = await client.PostAsJsonAsync("/api/me/visits", new
         {
-            attractionId = _database.AttractionId,
+            attractionId,
             visitDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-1)).ToString("yyyy-MM-dd"),
             rating = 5,
             impressions = "Synthetic API test data",
@@ -1026,6 +1110,41 @@ public sealed class ApiIntegrationTests
         var result = await response.Content.ReadFromJsonAsync<ApiTestVisitResponse>();
         Assert.NotNull(result);
         return result!.Id;
+    }
+
+    private async Task<int> InsertCityAsync(string cityName)
+    {
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(@"
+            INSERT INTO cities(country_id, name)
+            SELECT country_id, @city
+            FROM countries
+            WHERE name = 'API test country'
+            RETURNING city_id", connection);
+        command.Parameters.AddWithValue("city", cityName);
+        var result = await command.ExecuteScalarAsync();
+        Assert.NotNull(result);
+        return Convert.ToInt32(result);
+    }
+
+    private async Task<int> InsertAttractionInCityAsync(string name, int cityId)
+    {
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(@"
+            INSERT INTO attractions(name, description, history, latitude, longitude, category_id, city_id)
+            SELECT @name, 'Synthetic local recommendation test', '', -27, -27,
+                   category_id, @city
+            FROM attractions
+            WHERE attraction_id = @template
+            RETURNING attraction_id", connection);
+        command.Parameters.AddWithValue("name", name);
+        command.Parameters.AddWithValue("city", cityId);
+        command.Parameters.AddWithValue("template", _database.AttractionId);
+        var result = await command.ExecuteScalarAsync();
+        Assert.NotNull(result);
+        return Convert.ToInt32(result);
     }
 
     private async Task<int> InsertAttractionAsync(string name, double latitude, double longitude)

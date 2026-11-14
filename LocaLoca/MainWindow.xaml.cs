@@ -193,8 +193,8 @@ public sealed partial class MainWindow : Window
             PlacesCountText.Text = summary.DistinctAttractions.ToString();
             CitiesCountText.Text = summary.Cities.ToString();
             CountriesCountText.Text = summary.Countries.ToString();
-            DashboardAttractionsList.ItemsSource = catalogPage.Items.Take(4).ToList();
             ConnectionStatusText.Text = "Облачная база подключена";
+            await RefreshLocalRecommendationsAsync();
         }
         catch (Exception ex)
         {
@@ -321,6 +321,62 @@ public sealed partial class MainWindow : Window
         if (e.ClickedItem is not AttractionDto attraction) return;
         ShowPage("catalog");
         SelectAttraction(attraction);
+    }
+
+    private async void RefreshRecommendations_Click(object sender, RoutedEventArgs e) =>
+        await RefreshLocalRecommendationsAsync();
+
+    private void OpenResidenceFromDashboard_Click(object sender, RoutedEventArgs e) =>
+        Profile_Click(sender, e);
+
+    private async Task RefreshLocalRecommendationsAsync()
+    {
+        if (_currentUser is null) return;
+
+        RefreshRecommendationsButton.IsEnabled = false;
+        DashboardRecommendationsStatusText.Text = "Подбираем места по данным профиля…";
+        try
+        {
+            var recommendations = await _api.GetLocalRecommendationsAsync();
+            ApplyLocalRecommendations(recommendations);
+        }
+        catch (Exception ex)
+        {
+            DashboardRecommendationsList.ItemsSource = Array.Empty<AttractionDto>();
+            DashboardRecommendationsStatusText.Text = "Не удалось загрузить локальную подборку: " + ex.Message;
+        }
+        finally
+        {
+            RefreshRecommendationsButton.IsEnabled = true;
+        }
+    }
+
+    private void ApplyLocalRecommendations(IReadOnlyList<AttractionDto> recommendations)
+    {
+        var country = _currentUser?.ResidenceCountry?.Trim();
+        var city = _currentUser?.ResidenceCity?.Trim();
+        var hasCountry = !string.IsNullOrWhiteSpace(country);
+
+        DashboardRecommendationsList.ItemsSource = recommendations.ToList();
+        DashboardResidenceButton.Content = hasCountry ? "Изменить место" : "Указать место";
+
+        if (!hasCountry)
+        {
+            DashboardRecommendationsStatusText.Text =
+                "Укажи страну и, при желании, город в профиле. Посещённые места не попадут в подборку.";
+            return;
+        }
+
+        if (recommendations.Count == 0)
+        {
+            DashboardRecommendationsStatusText.Text =
+                $"В каталоге пока нет подходящих непосещённых мест для {city ?? country}.";
+            return;
+        }
+
+        DashboardRecommendationsStatusText.Text = string.IsNullOrWhiteSpace(city)
+            ? $"Подборка по стране «{country}». Посещённые достопримечательности исключены."
+            : $"Подборка для «{city}», {country}: сначала места в этом городе, затем другие места страны. Посещённые исключены.";
     }
 
     private void UpdateAttractionDetails(AttractionDto? attraction)
@@ -961,6 +1017,7 @@ public sealed partial class MainWindow : Window
             ProfileResidenceCountryBox.Text = updatedUser.ResidenceCountry ?? string.Empty;
             ProfileResidenceCityBox.Text = updatedUser.ResidenceCity ?? string.Empty;
             SetResidenceStatus("Место проживания сохранено. История посещений не изменена.", "success");
+            await RefreshLocalRecommendationsAsync();
         }
         catch (Exception ex)
         {
