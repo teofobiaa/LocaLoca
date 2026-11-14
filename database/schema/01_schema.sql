@@ -10,7 +10,11 @@ CREATE TABLE users (
     display_name   varchar(100) NOT NULL,
     residence_country varchar(100),
     residence_city    varchar(100),
+    date_of_birth     date,
     created_at     timestamptz  NOT NULL DEFAULT now(),
+    CONSTRAINT ck_users_date_of_birth_range CHECK (
+        date_of_birth IS NULL OR date_of_birth >= DATE '1900-01-01'
+    ),
     CONSTRAINT ck_users_residence_city_requires_country CHECK (
         residence_city IS NULL OR (
             residence_country IS NOT NULL
@@ -32,6 +36,40 @@ CREATE TABLE user_avatars (
     CONSTRAINT ck_user_avatars_thumbnail_size CHECK (octet_length(thumbnail_data) BETWEEN 1 AND 131072),
     CONSTRAINT ck_user_avatars_content_type CHECK (content_type = 'image/jpeg')
 );
+
+CREATE TABLE birthday_contacts (
+    birthday_contact_id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id             integer NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+    display_name        varchar(80) NOT NULL,
+    birth_date          date NOT NULL,
+    created_at          timestamptz NOT NULL DEFAULT now(),
+    updated_at          timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT ck_birthday_contacts_display_name CHECK (
+        btrim(display_name) <> '' AND length(display_name) <= 80
+    ),
+    CONSTRAINT ck_birthday_contacts_birth_date CHECK (birth_date >= DATE '1900-01-01')
+);
+CREATE INDEX ix_birthday_contacts_user_birth_date
+    ON birthday_contacts (user_id, birth_date);
+
+-- Birthdays and personal age are private application data; do not publish this table
+-- to Supabase Data API roles. LocaLoca uses owner-scoped authenticated API endpoints.
+DO $private_birthday_access$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+        EXECUTE 'REVOKE ALL ON TABLE public.birthday_contacts FROM anon';
+    END IF;
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+        EXECUTE 'REVOKE ALL ON TABLE public.birthday_contacts FROM authenticated';
+    END IF;
+    EXECUTE 'REVOKE ALL ON TABLE public.birthday_contacts FROM PUBLIC';
+END
+$private_birthday_access$;
+
+COMMENT ON COLUMN public.users.date_of_birth IS
+    'Private self-reported date of birth. Expose only through owner-authenticated endpoints.';
+COMMENT ON TABLE public.birthday_contacts IS
+    'Private per-user list of birthday contacts. Accessible through owner-scoped API endpoints only.';
 
 CREATE TABLE categories (
     category_id    integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -58,8 +96,20 @@ CREATE TABLE attractions (
     latitude       numeric(9,6) NOT NULL CHECK (latitude  BETWEEN  -90 AND  90),
     longitude      numeric(9,6) NOT NULL CHECK (longitude BETWEEN -180 AND 180),
     category_id    integer      NOT NULL REFERENCES categories (category_id),
-    city_id        integer      NOT NULL REFERENCES cities (city_id)
+    city_id        integer      NOT NULL REFERENCES cities (city_id),
+    min_recommended_age smallint,
+    max_recommended_age smallint,
+    CONSTRAINT ck_attractions_recommended_age_range CHECK (
+        (min_recommended_age IS NULL OR min_recommended_age BETWEEN 0 AND 120)
+        AND (max_recommended_age IS NULL OR max_recommended_age BETWEEN 0 AND 120)
+        AND (min_recommended_age IS NULL OR max_recommended_age IS NULL
+             OR min_recommended_age <= max_recommended_age)
+    )
 );
+COMMENT ON COLUMN public.attractions.min_recommended_age IS
+    'Optional lower age bound for recommendations. NULL means no lower age restriction.';
+COMMENT ON COLUMN public.attractions.max_recommended_age IS
+    'Optional upper age bound for recommendations. NULL means no upper age restriction.';
 
 -- Каждое посещение — отдельная запись, поэтому пара (пользователь, достопримечательность)
 -- намеренно НЕ уникальна: одно и то же место можно посетить несколько раз.
@@ -172,7 +222,7 @@ CREATE INDEX ix_user_map_places_user  ON user_map_places (user_id, created_at DE
 CREATE INDEX ix_user_map_places_user_coordinates ON user_map_places (user_id, latitude, longitude);
 CREATE INDEX ix_user_map_place_photos ON user_map_place_photos (user_map_place_id);
 
--- Current baseline includes schema migrations 003, 004, 007, 008, 009, 010, 011, 012 and 013.
+-- Current baseline includes schema migrations 003, 004, 007, 008, 009, 010, 011, 012, 013 and 014.
 CREATE TABLE localoca_schema_migrations (
  version integer PRIMARY KEY CHECK (version > 0),
  name varchar(120) NOT NULL,
@@ -189,7 +239,8 @@ INSERT INTO localoca_schema_migrations (version, name, source) VALUES
  (10, 'map_marker_visit_lookup_index', 'baseline'),
  (11, 'user_residence_location', 'baseline'),
  (12, 'distributed_auth_rate_limits', 'baseline'),
- (13, 'user_avatars', 'baseline');
+ (13, 'user_avatars', 'baseline'),
+ (14, 'user_birthdays_and_age_filtering', 'baseline');
 
 -- Представление для отчётов и ручной проверки данных.
 CREATE VIEW v_visit_details AS
