@@ -20,6 +20,19 @@ CREATE TABLE users (
     )
 );
 
+-- One normalized avatar and one small thumbnail per account. Input uploads are
+-- normalized by the API; database constraints enforce the storage quota.
+CREATE TABLE user_avatars (
+    user_id         integer PRIMARY KEY REFERENCES users (user_id) ON DELETE CASCADE,
+    image_data      bytea NOT NULL,
+    thumbnail_data  bytea NOT NULL,
+    content_type    varchar(50) NOT NULL DEFAULT 'image/jpeg',
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT ck_user_avatars_image_size CHECK (octet_length(image_data) BETWEEN 1 AND 1048576),
+    CONSTRAINT ck_user_avatars_thumbnail_size CHECK (octet_length(thumbnail_data) BETWEEN 1 AND 131072),
+    CONSTRAINT ck_user_avatars_content_type CHECK (content_type = 'image/jpeg')
+);
+
 CREATE TABLE categories (
     category_id    integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     name           varchar(60) NOT NULL UNIQUE
@@ -159,7 +172,7 @@ CREATE INDEX ix_user_map_places_user  ON user_map_places (user_id, created_at DE
 CREATE INDEX ix_user_map_places_user_coordinates ON user_map_places (user_id, latitude, longitude);
 CREATE INDEX ix_user_map_place_photos ON user_map_place_photos (user_map_place_id);
 
--- Current baseline includes schema migrations 003, 004, 007, 008, 009, 010 and 011.
+-- Current baseline includes schema migrations 003, 004, 007, 008, 009, 010, 011, 012 and 013.
 CREATE TABLE localoca_schema_migrations (
  version integer PRIMARY KEY CHECK (version > 0),
  name varchar(120) NOT NULL,
@@ -175,7 +188,8 @@ INSERT INTO localoca_schema_migrations (version, name, source) VALUES
  (9, 'map_marker_viewport_indexes', 'baseline'),
  (10, 'map_marker_visit_lookup_index', 'baseline'),
  (11, 'user_residence_location', 'baseline'),
- (12, 'distributed_auth_rate_limits', 'baseline');
+ (12, 'distributed_auth_rate_limits', 'baseline'),
+ (13, 'user_avatars', 'baseline');
 
 -- Представление для отчётов и ручной проверки данных.
 CREATE VIEW v_visit_details AS

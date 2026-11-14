@@ -214,6 +214,45 @@ public sealed class LocaLocaApiClient : IDisposable
             ?? throw new InvalidOperationException("Сервер вернул пустой профиль.");
     }
 
+
+    public async Task UploadAvatarAsync(StorageFile file, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(file);
+
+        var properties = await file.GetBasicPropertiesAsync();
+        if (properties.Size == 0)
+            throw new InvalidOperationException("Файл аватара пуст.");
+        if (properties.Size > 5UL * 1024 * 1024)
+            throw new InvalidOperationException("Размер аватара не должен превышать 5 МиБ.");
+
+        using var form = new MultipartFormDataContent();
+        var stream = await file.OpenStreamForReadAsync();
+        var content = new StreamContent(stream);
+        content.Headers.ContentType = new MediaTypeHeaderValue(GetContentType(file.FileType));
+        form.Add(content, "file", file.Name);
+
+        using var request = new HttpRequestMessage(HttpMethod.Put, "api/me/avatar") { Content = form };
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+    }
+
+    public async Task<byte[]?> GetAvatarBytesAsync(bool thumbnail = true, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, thumbnail ? "api/me/avatar?size=thumbnail" : "api/me/avatar?size=full");
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
+    public async Task DeleteAvatarAsync(CancellationToken cancellationToken = default)
+    {
+        await SendForMessageAsync(HttpMethod.Delete, "api/me/avatar", null, cancellationToken);
+    }
+
     public async Task<List<CategoryDto>> GetCategoriesAsync(CancellationToken cancellationToken = default)
     {
         var result = await GetJsonAsync<ItemsResponse<CategoryDto>>("api/catalog/categories", cancellationToken);

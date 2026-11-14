@@ -25,7 +25,7 @@ else
 }
 builder.Services.Configure<FormOptions>(options =>
 {
-    // 20 MiB is the application photo limit; leave room for multipart headers and fields.
+    // Photo uploads use 20 MiB; avatars use a smaller 5 MiB limit. Leave room for multipart headers.
     options.MultipartBodyLengthLimit = 22 * 1024 * 1024;
 });
 builder.Services.AddSingleton<SessionStore>();
@@ -205,6 +205,7 @@ Directory.CreateDirectory(photosRoot);
 
 app.MapHealthEndpoints(connectionString, connectionConfigurationError);
 app.MapAuthenticationEndpoints(connectionString, passwordHashIterations);
+app.MapAvatarEndpoints(connectionString);
 app.MapCatalogEndpoints(connectionString);
 app.MapPersonalEndpoints(connectionString, dataRoot);
 app.MapUserMapEndpoints(connectionString, dataRoot);

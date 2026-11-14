@@ -25,6 +25,7 @@ public sealed class PostgreSqlSchemaTests
                 AND to_regclass('public.wishlist') IS NOT NULL
                 AND to_regclass('public.user_map_places') IS NOT NULL
                 AND to_regclass('public.user_map_place_photos') IS NOT NULL
+                AND to_regclass('public.user_avatars') IS NOT NULL
                 AND EXISTS (
                     SELECT 1 FROM information_schema.columns
                     WHERE table_schema='public' AND table_name='users' AND column_name='residence_country'
@@ -38,6 +39,16 @@ public sealed class PostgreSqlSchemaTests
                 AND EXISTS (
                     SELECT 1 FROM pg_constraint
                     WHERE conrelid='public.users'::regclass AND conname='ck_users_residence_city_requires_country'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'user_avatars' AND column_name = 'image_data' AND data_type = 'bytea'
+                )
+                AND EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'user_avatars' AND column_name = 'thumbnail_data' AND data_type = 'bytea'
                 )
                 AND EXISTS (
                     SELECT 1 FROM information_schema.columns
@@ -292,6 +303,16 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "11_user_residence_location.sql");
         await _database.ExecuteSqlFileAsync("migrations", "11_user_residence_location.sql");
 
+        // Simulate a v012 database before applying migration 013.
+        await using (var resetAvatarSchema = new NpgsqlCommand(@"
+            DROP TABLE IF EXISTS public.user_avatars;
+            DELETE FROM public.localoca_schema_migrations WHERE version = 13;", connection))
+        {
+            await resetAvatarSchema.ExecuteNonQueryAsync();
+        }
+        await _database.ExecuteSqlFileAsync("migrations", "13_user_avatars.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "13_user_avatars.sql");
+
         // Reconcile the journal after the migration sequence.
         await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
 
@@ -320,6 +341,10 @@ public sealed class PostgreSqlSchemaTests
                 AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE')
+                AND has_table_privilege('localoca_app', 'public.user_avatars', 'SELECT')
+                AND has_table_privilege('localoca_app', 'public.user_avatars', 'INSERT')
+                AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
+                AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
                 AND has_column_privilege('localoca_app', 'public.photos', 'image_data', 'SELECT')
                 AND has_column_privilege('localoca_app', 'public.user_map_place_photos', 'image_data', 'INSERT')
                 AND NOT (SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls
@@ -332,13 +357,13 @@ public sealed class PostgreSqlSchemaTests
         Assert.True((bool)(await permissionCheck.ExecuteScalarAsync() ?? false));
 
         await using var versionCheck = new NpgsqlCommand(@"
-            SELECT count(*) = 7
+            SELECT count(*) = 8
                AND count(*) FILTER (WHERE name IN (
                    'migrate_wishlist', 'migrate_user_map_places', 'migrate_photo_storage',
                    'server_sessions', 'map_marker_viewport_indexes',
-                   'map_marker_visit_lookup_index', 'user_residence_location')) = 7
+                   'map_marker_visit_lookup_index', 'user_residence_location', 'user_avatars')) = 8
             FROM public.localoca_schema_migrations
-            WHERE version IN (3, 4, 7, 8, 9, 10, 11)", connection);
+            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 13)", connection);
         Assert.True((bool)(await versionCheck.ExecuteScalarAsync() ?? false));
     }
 

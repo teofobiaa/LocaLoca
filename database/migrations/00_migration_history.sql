@@ -92,3 +92,16 @@ WHERE (SELECT count(DISTINCT column_name)=5 FROM information_schema.columns
                AND conname='ck_auth_rate_limit_counters_expiry_after_window')
  AND to_regclass('public.ix_auth_rate_limit_counters_expires_at') IS NOT NULL
 ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 13,'user_avatars','adopted'
+WHERE (SELECT count(DISTINCT column_name)=5 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='user_avatars'
+         AND column_name IN ('user_id','image_data','thumbnail_data','content_type','updated_at'))
+ AND EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid=to_regclass('public.user_avatars')
+               AND conname='ck_user_avatars_image_size')
+ AND EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid=to_regclass('public.user_avatars')
+               AND conname='ck_user_avatars_thumbnail_size')
+ON CONFLICT (version) DO NOTHING;
