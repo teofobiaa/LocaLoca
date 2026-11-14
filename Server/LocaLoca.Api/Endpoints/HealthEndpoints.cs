@@ -54,6 +54,39 @@ public static class HealthEndpoints
                 }
 
 
+                const string birthdaySchemaCheck = @"
+        SELECT
+            EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='users'
+                      AND column_name='date_of_birth' AND data_type='date' AND is_nullable='YES')
+            AND EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='public' AND table_name='attractions'
+                          AND column_name='min_recommended_age' AND data_type='smallint')
+            AND EXISTS (SELECT 1 FROM information_schema.columns
+                        WHERE table_schema='public' AND table_name='attractions'
+                          AND column_name='max_recommended_age' AND data_type='smallint')
+            AND EXISTS (SELECT 1 FROM pg_constraint
+                        WHERE conrelid='public.users'::regclass AND conname='ck_users_date_of_birth_range')
+            AND EXISTS (SELECT 1 FROM pg_constraint
+                        WHERE conrelid='public.attractions'::regclass AND conname='ck_attractions_recommended_age_range')
+            AND (SELECT count(*) = 6 FROM information_schema.columns
+                 WHERE table_schema='public' AND table_name='birthday_contacts'
+                   AND column_name IN ('birthday_contact_id','user_id','display_name','birth_date','created_at','updated_at'))
+            AND EXISTS (SELECT 1 FROM pg_constraint
+                        WHERE conrelid='public.birthday_contacts'::regclass AND conname='ck_birthday_contacts_display_name')
+            AND EXISTS (SELECT 1 FROM pg_constraint
+                        WHERE conrelid='public.birthday_contacts'::regclass AND conname='ck_birthday_contacts_birth_date')
+            AND to_regclass('public.ix_birthday_contacts_user_birth_date') IS NOT NULL
+            AND to_regclass('public.birthday_contacts_birthday_contact_id_seq') IS NOT NULL";
+                await using (var birthdaySchemaCommand = new NpgsqlCommand(birthdaySchemaCheck, connection))
+                {
+                    var birthdaySchemaReady = Equals(await birthdaySchemaCommand.ExecuteScalarAsync(cancellationToken), true);
+                    if (!birthdaySchemaReady)
+                        return Results.Json(new HealthDto(true, false,
+                            "Не применена миграция дней рождения. Выполните database/migrations/14_user_birthdays_and_age_filtering.sql в Supabase SQL Editor."),
+                            statusCode: 503);
+                }
+
                 const string rateLimitSchemaCheck = @"
         SELECT EXISTS (
             SELECT 1 FROM information_schema.tables
@@ -83,6 +116,12 @@ public static class HealthEndpoints
             AND has_column_privilege(current_user, 'public.users', 'display_name', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'residence_country', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'residence_city', 'UPDATE')
+            AND has_column_privilege(current_user, 'public.users', 'date_of_birth', 'UPDATE')
+            AND has_table_privilege(current_user, 'public.birthday_contacts', 'SELECT')
+            AND has_table_privilege(current_user, 'public.birthday_contacts', 'INSERT')
+            AND has_table_privilege(current_user, 'public.birthday_contacts', 'UPDATE')
+            AND has_table_privilege(current_user, 'public.birthday_contacts', 'DELETE')
+            AND has_sequence_privilege(current_user, 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE')
             AND has_table_privilege(current_user, 'public.categories', 'SELECT')
             AND has_table_privilege(current_user, 'public.countries', 'SELECT')
             AND has_table_privilege(current_user, 'public.cities', 'SELECT')
@@ -121,7 +160,7 @@ public static class HealthEndpoints
                 var hasPermissions = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
                 if (!hasPermissions)
                     return Results.Json(new HealthDto(true, false,
-                        "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграций 11_user_residence_location.sql и 12_distributed_auth_rate_limits.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql."),
+                        "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграции 14_user_birthdays_and_age_filtering.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql."),
                         statusCode: 503);
                 return Results.Ok(new HealthDto(true, true, "Supabase PostgreSQL подключена; права роли LocaLoca проверены."));
             }
