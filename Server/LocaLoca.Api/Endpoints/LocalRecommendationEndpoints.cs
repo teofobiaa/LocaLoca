@@ -41,6 +41,16 @@ JOIN categories cat
   ON cat.category_id = a.category_id
 WHERE u.user_id = @user
   AND NULLIF(btrim(u.residence_country), '') IS NOT NULL
+  AND (
+      u.date_of_birth IS NULL
+      OR (
+          (a.min_recommended_age IS NULL
+           OR a.min_recommended_age <= EXTRACT(YEAR FROM age(CURRENT_DATE, u.date_of_birth))::integer)
+          AND
+          (a.max_recommended_age IS NULL
+           OR a.max_recommended_age >= EXTRACT(YEAR FROM age(CURRENT_DATE, u.date_of_birth))::integer)
+      )
+  )
   AND NOT EXISTS (
       SELECT 1
       FROM visits v
