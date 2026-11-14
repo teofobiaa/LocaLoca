@@ -73,9 +73,9 @@ public static class HealthEndpoints
                  WHERE table_schema='public' AND table_name='birthday_contacts'
                    AND column_name IN ('birthday_contact_id','user_id','display_name','birth_date','created_at','updated_at'))
             AND EXISTS (SELECT 1 FROM pg_constraint
-                        WHERE conrelid='public.birthday_contacts'::regclass AND conname='ck_birthday_contacts_display_name')
+                        WHERE conrelid=to_regclass('public.birthday_contacts') AND conname='ck_birthday_contacts_display_name')
             AND EXISTS (SELECT 1 FROM pg_constraint
-                        WHERE conrelid='public.birthday_contacts'::regclass AND conname='ck_birthday_contacts_birth_date')
+                        WHERE conrelid=to_regclass('public.birthday_contacts') AND conname='ck_birthday_contacts_birth_date')
             AND to_regclass('public.ix_birthday_contacts_user_birth_date') IS NOT NULL
             AND to_regclass('public.birthday_contacts_birthday_contact_id_seq') IS NOT NULL";
                 await using (var birthdaySchemaCommand = new NpgsqlCommand(birthdaySchemaCheck, connection))
