@@ -427,10 +427,10 @@ public sealed class PostgreSqlSchemaTests
         var singleCityCountry = "Audience country single " + suffix;
         var smallCountry = "Audience country small " + suffix;
 
-        await InsertResidenceProfilesAsync(connection, multiCityCountry, "Alpha", 5, suffix);
-        await InsertResidenceProfilesAsync(connection, multiCityCountry, "Beta", 5, suffix);
-        await InsertResidenceProfilesAsync(connection, singleCityCountry, "Only city", 6, suffix);
-        await InsertResidenceProfilesAsync(connection, smallCountry, "Small city", 4, suffix);
+        await InsertResidenceProfilesAsync(connection, multiCityCountry, "Alpha", 5);
+        await InsertResidenceProfilesAsync(connection, multiCityCountry, "Beta", 5);
+        await InsertResidenceProfilesAsync(connection, singleCityCountry, "Only city", 6);
+        await InsertResidenceProfilesAsync(connection, smallCountry, "Small city", 4);
 
         var sqlPath = Path.Combine(AppContext.BaseDirectory, "Database", "analytics", "01_audience_geography.sql");
         var sql = await File.ReadAllTextAsync(sqlPath);
@@ -465,8 +465,7 @@ public sealed class PostgreSqlSchemaTests
         NpgsqlConnection connection,
         string country,
         string city,
-        int count,
-        string suffix)
+        int count)
     {
         for (var index = 0; index < count; index++)
         {
@@ -474,7 +473,7 @@ public sealed class PostgreSqlSchemaTests
                 INSERT INTO users(login, password_hash, display_name, residence_country, residence_city)
                 VALUES (@login, 'test-hash-not-a-credential', 'Audience analytics test', @country, @city)",
                 connection);
-            command.Parameters.AddWithValue("login", $"audience-{suffix}-{Guid.NewGuid():N}");
+            command.Parameters.AddWithValue("login", $"geo-{Guid.NewGuid():N}");
             command.Parameters.AddWithValue("country", country);
             command.Parameters.AddWithValue("city", city);
             await command.ExecuteNonQueryAsync();
