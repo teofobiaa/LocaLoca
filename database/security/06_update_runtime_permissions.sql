@@ -1,5 +1,5 @@
 -- Upgrade an existing LocaLoca runtime role to the current application schema.
--- Run as the database administrator after migrations/03, /04, /11, /12 and /14; safe to rerun.
+-- Run as the database administrator after migrations/03, /04, /11, /12, /13 and /14; safe to rerun.
 -- Safe to execute more than once; it does not change ownership or grant admin privileges.
 
 GRANT UPDATE (display_name, residence_country, residence_city, date_of_birth) ON TABLE public.users TO localoca_app;
@@ -67,7 +67,7 @@ SELECT
     has_sequence_privilege('localoca_app', 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE') AS birthday_contacts_sequence;
 
 -- Residence fields, the shared limiter, and birthdays are introduced by migrations 011, 012 and 014.
--- Run this script after migration 012. Session access remains conditional for legacy installations.
+-- Run this script after migration 014. Session access remains conditional for legacy installations.
 DO $grant_session_permissions$
 BEGIN
     IF to_regclass('public.user_sessions') IS NOT NULL THEN
