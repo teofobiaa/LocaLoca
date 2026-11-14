@@ -208,6 +208,7 @@ app.MapAuthenticationEndpoints(connectionString, passwordHashIterations);
 app.MapAvatarEndpoints(connectionString);
 app.MapCatalogEndpoints(connectionString);
 app.MapLocalRecommendationEndpoints(connectionString);
+app.MapBirthdayEndpoints(connectionString);
 app.MapPersonalEndpoints(connectionString, dataRoot);
 app.MapUserMapEndpoints(connectionString, dataRoot);
 
