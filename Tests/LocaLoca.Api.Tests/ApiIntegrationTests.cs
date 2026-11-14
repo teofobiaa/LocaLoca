@@ -216,6 +216,20 @@ public sealed class ApiIntegrationTests
             recommendations.Take(countryLevelIndex),
             item => Assert.Equal("API test city", item.GetProperty("city").GetString()));
 
+        // A visit by one account must not hide the same attraction from another account.
+        var secondAccount = await RegisterAsync(client);
+        SetBearer(client, secondAccount.Token);
+        using var secondResidence = await client.PutAsJsonAsync("/api/me/profile/residence", new
+        {
+            residenceCountry = "API test country",
+            residenceCity = "API test city"
+        });
+        Assert.Equal(HttpStatusCode.OK, secondResidence.StatusCode);
+        using var secondAccountRecommendationsResponse = await client.GetAsync("/api/me/recommendations?take=20");
+        var secondAccountRecommendations = await ReadItemsAsync(secondAccountRecommendationsResponse);
+        Assert.Contains(secondAccountRecommendations, item => item.GetProperty("id").GetInt32() == visitedCandidateId);
+
+        SetBearer(client, account.Token);
         using var countryOnly = await client.PutAsJsonAsync("/api/me/profile/residence", new
         {
             residenceCountry = "API test country",
