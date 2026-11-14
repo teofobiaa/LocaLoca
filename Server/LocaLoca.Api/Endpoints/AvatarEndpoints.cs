@@ -128,14 +128,16 @@ internal static class AvatarImageProcessor
         var height = Math.Max(1, (int)Math.Round(source.Height * scale));
 
         using var optimized = new SKBitmap(new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul));
+        var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
         using (var canvas = new SKCanvas(optimized))
-        using (var paint = new SKPaint { FilterQuality = SKFilterQuality.High, IsAntialias = true })
+        using (var paint = new SKPaint { IsAntialias = true })
         {
             canvas.Clear(SKColors.White);
             canvas.DrawBitmap(
                 source,
                 new SKRect(0, 0, source.Width, source.Height),
                 new SKRect(0, 0, width, height),
+                sampling,
                 paint);
             canvas.Flush();
         }
@@ -150,13 +152,14 @@ internal static class AvatarImageProcessor
         using var thumbnail = new SKBitmap(new SKImageInfo(
             AvatarEndpoints.ThumbnailDimension, AvatarEndpoints.ThumbnailDimension, SKColorType.Rgba8888, SKAlphaType.Premul));
         using (var canvas = new SKCanvas(thumbnail))
-        using (var paint = new SKPaint { FilterQuality = SKFilterQuality.High, IsAntialias = true })
+        using (var paint = new SKPaint { IsAntialias = true })
         {
             canvas.Clear(SKColors.White);
             canvas.DrawBitmap(
                 optimized,
                 new SKRect(left, top, left + side, top + side),
                 new SKRect(0, 0, AvatarEndpoints.ThumbnailDimension, AvatarEndpoints.ThumbnailDimension),
+                sampling,
                 paint);
             canvas.Flush();
         }
