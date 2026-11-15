@@ -31,7 +31,7 @@ internal static class MapRequestAuthorization
         if (queryIndex >= 0)
             relativePath = relativePath[..queryIndex];
 
-        if (relativePath.Contains('%', StringComparison.Ordinal))
+        if (relativePath.Contains('%'))
             return null;
 
         var path = relativePath.TrimStart('/');
