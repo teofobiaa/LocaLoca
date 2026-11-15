@@ -32,6 +32,27 @@ public sealed class MapRequestAuthorizationTests
     }
 
     [Fact]
+    public void Handles_Base_Address_With_A_Path_And_A_Query_String()
+    {
+        var apiBaseAddress = new Uri("https://localoca-api.example/desktop/");
+        var requestUri = new Uri("https://localoca-api.example/desktop/api/me/map-markers?west=10&east=20");
+
+        var header = MapRequestAuthorization.CreateHeader(apiBaseAddress, Token, requestUri);
+
+        Assert.Equal($"Bearer {Token}", header);
+    }
+
+    [Fact]
+    public void Rejects_Encoded_Path_Separators()
+    {
+        var requestUri = new Uri("https://localoca-api.example/api/me/map-markers%2F..%2Fauth%2Flogout");
+
+        var header = MapRequestAuthorization.CreateHeader(ApiBaseAddress, Token, requestUri);
+
+        Assert.Null(header);
+    }
+
+    [Fact]
     public void Does_Not_Create_A_Header_When_The_Session_Is_Missing()
     {
         var header = MapRequestAuthorization.CreateHeader(
