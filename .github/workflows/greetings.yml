@@ -17,8 +17,8 @@ jobs:
       - name: Welcome first-time contributors
         uses: actions/first-interaction@v3
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: |
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          issue_message: |
             Спасибо, что сообщил(а) о проблеме в Loca Loca!
 
             Чтобы быстрее разобраться, по возможности добавь:
@@ -28,7 +28,7 @@ jobs:
             - текст ошибки или лог (предварительно удали пароли, токены и другие личные данные).
 
             Мы рассмотрим обращение и при необходимости зададим уточняющие вопросы.
-          pr-message: |
+          pr_message: |
             Спасибо за первый Pull Request в Loca Loca!
 
             Перед слиянием, пожалуйста, проверь:
