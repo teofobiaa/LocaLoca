@@ -68,6 +68,40 @@ public static class HealthEndpoints
                             statusCode: 503);
                 }
 
+                const string avatarSchemaCheck = @"
+        SELECT
+            to_regclass('public.user_avatars') IS NOT NULL
+            AND (
+                SELECT count(*) = 5
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'user_avatars'
+                  AND column_name IN ('user_id', 'image_data', 'thumbnail_data', 'content_type', 'updated_at')
+            )";
+                await using (var avatarSchemaCommand = new NpgsqlCommand(avatarSchemaCheck, connection))
+                {
+                    var avatarSchemaReady = Equals(await avatarSchemaCommand.ExecuteScalarAsync(cancellationToken), true);
+                    if (!avatarSchemaReady)
+                        return Results.Json(new HealthDto(true, false,
+                            "Не применена миграция аватаров 013 или таблица public.user_avatars имеет неполную структуру. Выполните database/migrations/13_user_avatars.sql в Supabase SQL Editor."),
+                            statusCode: StatusCodes.Status503ServiceUnavailable);
+                }
+
+                const string avatarPermissionCheck = @"
+        SELECT
+            has_table_privilege(current_user, 'public.user_avatars', 'SELECT')
+            AND has_table_privilege(current_user, 'public.user_avatars', 'INSERT')
+            AND has_table_privilege(current_user, 'public.user_avatars', 'UPDATE')
+            AND has_table_privilege(current_user, 'public.user_avatars', 'DELETE')";
+                await using (var avatarPermissionCommand = new NpgsqlCommand(avatarPermissionCheck, connection))
+                {
+                    var avatarPermissionsReady = Equals(await avatarPermissionCommand.ExecuteScalarAsync(cancellationToken), true);
+                    if (!avatarPermissionsReady)
+                        return Results.Json(new HealthDto(true, false,
+                            "У текущей роли PostgreSQL отсутствуют необходимые права на public.user_avatars (SELECT, INSERT, UPDATE, DELETE). Для существующей роли выполните database/security/06_update_runtime_permissions.sql; для новой роли — database/security/05_create_app_role.sql после миграции 013."),
+                            statusCode: StatusCodes.Status503ServiceUnavailable);
+                }
+
                 const string permissionCheck = @"
         SELECT
             has_table_privilege(current_user, 'public.user_sessions', 'SELECT')
