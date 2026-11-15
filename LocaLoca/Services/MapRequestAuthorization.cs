@@ -18,10 +18,23 @@ internal static class MapRequestAuthorization
             return null;
         }
 
+        if (!apiBaseAddress.IsBaseOf(requestUri)) return null;
+
         var relativeUri = apiBaseAddress.MakeRelativeUri(requestUri);
         if (relativeUri.IsAbsoluteUri) return null;
 
-        var path = Uri.UnescapeDataString(relativeUri.AbsolutePath).TrimStart('/');
+        // MakeRelativeUri returns a relative Uri, so AbsolutePath is not available.
+        // Keep its escaped path representation and reject encoded separators rather
+        // than decoding them into a different route before applying the allowlist.
+        var relativePath = relativeUri.OriginalString;
+        var queryIndex = relativePath.IndexOfAny(new[] { '?', '#' });
+        if (queryIndex >= 0)
+            relativePath = relativePath[..queryIndex];
+
+        if (relativePath.Contains('%', StringComparison.Ordinal))
+            return null;
+
+        var path = relativePath.TrimStart('/');
         if (path.Any(character =>
                 !(character is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '/' or '-')))
         {
