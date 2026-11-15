@@ -293,12 +293,60 @@ public static class UserMapEndpoints
             return Results.Ok(new MessageDto("Фотография удалена."));
         });
         
-        app.MapGet("/map", async Task<IResult> (CancellationToken cancellationToken) =>
+        app.MapGet("/map", async Task<IResult> (HttpContext context, CancellationToken cancellationToken) =>
         {
+            context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; connect-src 'self'; font-src 'self' data:";
+            context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+            context.Response.Headers["X-Frame-Options"] = "DENY";
+            context.Response.Headers["Referrer-Policy"] = "no-referrer";
+            context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+            context.Response.Headers["Cache-Control"] = "no-cache";
+
+            // Old releases placed a live bearer token in the query string. Reject
+            // those URLs instead of serving the page or accepting the credential.
+            if (context.Request.Query.Keys.Any(key =>
+                    string.Equals(key, "token", StringComparison.OrdinalIgnoreCase)))
+            {
+                return Results.BadRequest(new ApiErrorResponse(
+                    "Передача токена карты через URL больше не поддерживается. Открой карту из приложения."));
+            }
+
             var path = Path.Combine(app.Environment.ContentRootPath, "wwwroot", "map.html");
-            return File.Exists(path)
-                ? Results.Content(await File.ReadAllTextAsync(path, cancellationToken), "text/html; charset=utf-8")
+            return System.IO.File.Exists(path)
+                ? Results.Content(await System.IO.File.ReadAllTextAsync(path, cancellationToken), "text/html; charset=utf-8")
                 : Results.NotFound();
         });
+
+        app.MapGet("/map-bootstrap.js", (HttpContext context) =>
+            ServeMapAsset(context, "map-bootstrap.js", "text/javascript; charset=utf-8"));
+        app.MapGet("/map.js", (HttpContext context) =>
+            ServeMapAsset(context, "map.js", "text/javascript; charset=utf-8"));
+        app.MapGet("/map.css", (HttpContext context) =>
+            ServeMapAsset(context, "map.css", "text/css; charset=utf-8"));
+        app.MapGet("/leaflet/leaflet.js", (HttpContext context) =>
+            ServeMapAsset(context, "leaflet/leaflet.js", "text/javascript; charset=utf-8"));
+        app.MapGet("/leaflet/leaflet.css", (HttpContext context) =>
+            ServeMapAsset(context, "leaflet/leaflet.css", "text/css; charset=utf-8"));
+        app.MapGet("/leaflet/images/layers.png", (HttpContext context) =>
+            ServeMapAsset(context, "leaflet/images/layers.png", "image/png"));
+        app.MapGet("/leaflet/images/layers-2x.png", (HttpContext context) =>
+            ServeMapAsset(context, "leaflet/images/layers-2x.png", "image/png"));
+        app.MapGet("/leaflet/images/marker-icon.png", (HttpContext context) =>
+            ServeMapAsset(context, "leaflet/images/marker-icon.png", "image/png"));
+        app.MapGet("/leaflet/images/marker-icon-2x.png", (HttpContext context) =>
+            ServeMapAsset(context, "leaflet/images/marker-icon-2x.png", "image/png"));
+        app.MapGet("/leaflet/images/marker-shadow.png", (HttpContext context) =>
+            ServeMapAsset(context, "leaflet/images/marker-shadow.png", "image/png"));
+
+        IResult ServeMapAsset(HttpContext context, string relativePath, string contentType)
+        {
+            context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+            context.Response.Headers["Referrer-Policy"] = "no-referrer";
+            context.Response.Headers["Cache-Control"] = "no-cache";
+            var assetPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot", relativePath);
+            return System.IO.File.Exists(assetPath)
+                ? Results.File(assetPath, contentType)
+                : Results.NotFound();
+        }
     }
 }
