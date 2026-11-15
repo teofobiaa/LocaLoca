@@ -749,6 +749,16 @@ public sealed partial class MainWindow : Window
 
     private async void MapNav_Click(object sender, RoutedEventArgs e) => await OpenMapAsync();
 
+    private void MapWebView_WebResourceRequested(
+        object? sender, CoreWebView2WebResourceRequestedEventArgs args)
+    {
+        if (!Uri.TryCreate(args.Request.Uri, UriKind.Absolute, out var requestUri)) return;
+
+        var authorization = _api.GetMapAuthorizationHeader(requestUri);
+        if (!string.IsNullOrWhiteSpace(authorization))
+            args.Request.Headers.SetHeader("Authorization", authorization);
+    }
+
     private async Task OpenMapAsync(bool startNewVisit = false)
     {
         ShowPage("map");
@@ -766,7 +776,11 @@ public sealed partial class MainWindow : Window
                     webViewDataPath,
                     new CoreWebView2EnvironmentOptions());
                 await MapWebView.EnsureCoreWebView2Async(webViewEnvironment);
-                MapWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+                var coreWebView = MapWebView.CoreWebView2;
+                coreWebView.Settings.AreDefaultContextMenusEnabled = false;
+                coreWebView.AddWebResourceRequestedFilter(
+                    _api.GetMapApiRequestFilter(), CoreWebView2WebResourceContext.All);
+                coreWebView.WebResourceRequested += MapWebView_WebResourceRequested;
                 _mapInitialized = true;
             }
 
