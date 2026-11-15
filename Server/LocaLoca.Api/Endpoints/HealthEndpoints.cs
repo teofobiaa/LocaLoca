@@ -73,10 +73,11 @@ public static class HealthEndpoints
             to_regclass('public.user_avatars') IS NOT NULL
             AND (
                 SELECT count(*) = 5
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND table_name = 'user_avatars'
-                  AND column_name IN ('user_id', 'image_data', 'thumbnail_data', 'content_type', 'updated_at')
+                FROM pg_attribute
+                WHERE attrelid = to_regclass('public.user_avatars')
+                  AND attnum > 0
+                  AND NOT attisdropped
+                  AND attname IN ('user_id', 'image_data', 'thumbnail_data', 'content_type', 'updated_at')
             )";
                 await using (var avatarSchemaCommand = new NpgsqlCommand(avatarSchemaCheck, connection))
                 {
