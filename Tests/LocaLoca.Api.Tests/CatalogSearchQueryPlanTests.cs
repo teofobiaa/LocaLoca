@@ -45,15 +45,18 @@ WHERE (@category IS NULL OR a.category_id = @category)"
             var attractionPlan = await ExplainAsync(
                 connection,
                 "SELECT attraction_id FROM public.attractions WHERE name ILIKE @pattern",
-                pattern);
+                pattern,
+                forceIndex: true);
             var cityPlan = await ExplainAsync(
                 connection,
                 "SELECT city_id FROM public.cities WHERE name ILIKE @pattern",
-                pattern);
+                pattern,
+                forceIndex: true);
             var countryPlan = await ExplainAsync(
                 connection,
                 "SELECT country_id FROM public.countries WHERE name ILIKE @pattern",
-                pattern);
+                pattern,
+                forceIndex: true);
             var matches = await ExecuteCountAsync(connection, sql, pattern);
 
             _output.WriteLine($"Synthetic dataset: {SyntheticRowCount:N0} attractions, cities and countries.");
@@ -170,10 +173,23 @@ ANALYZE public.countries;", connection);
     private static async Task<PlanSummary> ExplainAsync(
         NpgsqlConnection connection,
         string sql,
-        string pattern)
+        string pattern,
+        bool forceIndex = false)
     {
+        await using var transaction = await connection.BeginTransactionAsync();
+        if (forceIndex)
+        {
+            await using var planner = new NpgsqlCommand(
+                "SET LOCAL enable_seqscan = off",
+                connection,
+                transaction);
+            await planner.ExecuteNonQueryAsync();
+        }
+
         await using var command = new NpgsqlCommand(
-            "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + sql, connection)
+            "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) " + sql,
+            connection,
+            transaction)
         {
             CommandTimeout = 120
         };
@@ -186,10 +202,12 @@ ANALYZE public.countries;", connection);
         var indexes = new SortedSet<string>(StringComparer.Ordinal);
         CollectIndexes(root.GetProperty("Plan"), indexes);
 
-        return new PlanSummary(
+        var summary = new PlanSummary(
             root.GetProperty("Planning Time").GetDouble(),
             root.GetProperty("Execution Time").GetDouble(),
             indexes.ToArray());
+        await transaction.CommitAsync();
+        return summary;
     }
 
     private static void CollectIndexes(JsonElement plan, ISet<string> indexes)
