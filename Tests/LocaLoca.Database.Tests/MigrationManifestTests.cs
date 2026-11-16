@@ -23,7 +23,8 @@ public sealed class MigrationManifestTests
         var actualVersions = root.GetProperty("schemaMigrations").EnumerateArray()
             .Select(x => x.GetProperty("version").GetInt32()).ToArray();
         Assert.Equal(schemaVersions, actualVersions);
-        Assert.Equal(schemaVersions, root.GetProperty("baseline").GetProperty("includesSchemaMigrations")
+        var baselineSchemaVersions = new[] { 3, 4, 7, 8, 9, 10, 11, 12, 13 };
+        Assert.Equal(baselineSchemaVersions, root.GetProperty("baseline").GetProperty("includesSchemaMigrations")
             .EnumerateArray().Select(x => x.GetInt32()).ToArray());
         Assert.Equal(new[] { 5, 6 }, root.GetProperty("securityScripts").EnumerateArray()
             .Select(x => x.GetProperty("version").GetInt32()).ToArray());
