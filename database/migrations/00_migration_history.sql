@@ -105,3 +105,11 @@ WHERE (SELECT count(DISTINCT column_name)=5 FROM information_schema.columns
              WHERE conrelid=to_regclass('public.user_avatars')
                AND conname='ck_user_avatars_thumbnail_size')
 ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 14,'catalog_search_trigram_indexes','adopted'
+WHERE EXISTS (SELECT 1 FROM pg_extension WHERE extname='pg_trgm')
+ AND to_regclass('public.ix_attractions_name_trgm') IS NOT NULL
+ AND to_regclass('public.ix_cities_name_trgm') IS NOT NULL
+ AND to_regclass('public.ix_countries_name_trgm') IS NOT NULL
+ON CONFLICT (version) DO NOTHING;
