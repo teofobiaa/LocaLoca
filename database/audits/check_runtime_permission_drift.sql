@@ -413,9 +413,17 @@ findings AS (
            'Revoke unexpected schema privileges from PUBLIC.'
     FROM pg_namespace n
     CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl, acldefault('n', n.nspowner))) acl
-    WHERE n.nspname = 'public'
+    WHERE n.nspname NOT IN (
+          'pg_catalog', 'information_schema', 'auth', 'storage', 'vault',
+          'graphql', 'graphql_public', 'realtime', 'pgbouncer', 'supabase_migrations'
+      )
+      AND n.nspname NOT LIKE 'pg_toast%'
+      AND pg_get_userbyid(n.nspowner) NOT IN (
+          'supabase_admin', 'supabase_storage_admin',
+          'supabase_auth_admin', 'supabase_realtime_admin', 'pgbouncer'
+      )
       AND acl.grantee = 0
-      AND acl.privilege_type <> 'USAGE'
+      AND NOT (n.nspname = 'public' AND acl.privilege_type = 'USAGE')
 
     UNION ALL
     SELECT 'HIGH', 'SCHEMA_PRIVILEGE_MISSING', 'schema', 'public',
