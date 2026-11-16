@@ -1,6 +1,7 @@
 using Npgsql;
 using NpgsqlTypes;
 using LocaLoca.Api;
+using LocaLoca.Api.Security;
 using static LocaLoca.Api.ApiEndpointHelpers;
 
 namespace LocaLoca.Api.Endpoints;
