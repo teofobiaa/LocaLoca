@@ -78,9 +78,9 @@ COMMENT ON TABLE public.user_blocks IS
 DO $grant_profile_privacy$
 BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'localoca_app') THEN
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_profile_visibility TO localoca_app;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_friendships TO localoca_app;
-        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_blocks TO localoca_app;
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_profile_visibility TO localoca_app';
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_friendships TO localoca_app';
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_blocks TO localoca_app';
     END IF;
 END;
 $grant_profile_privacy$;
