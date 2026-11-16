@@ -30,9 +30,9 @@ jobs:
           python-version: "3.12"
       - name: Collect metrics
         env:
-          GITHUB_TOKEN: \${{ github.token }}
-          GITHUB_REPOSITORY: \${{ github.repository }}
-          ANALYTICS_DAYS: \${{ inputs.period_days || '30' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ANALYTICS_DAYS: ${{ inputs.period_days || '30' }}
         run: python Tools/CiAnalytics/collect.py
       - name: Publish report to job summary
         if: always()
@@ -46,6 +46,6 @@ jobs:
         if: always() && hashFiles('ci-analytics/metrics.json') != ''
         uses: actions/upload-artifact@v6
         with:
-          name: ci-cd-analytics-\${{ github.run_id }}
+          name: ci-cd-analytics-${{ github.run_id }}
           path: ci-analytics/
           retention-days: 90
