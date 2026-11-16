@@ -88,6 +88,29 @@ public static class HealthEndpoints
                             statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
 
+                const string privacySchemaCheck = @"
+        SELECT
+            to_regclass('public.user_profile_visibility') IS NOT NULL
+            AND to_regclass('public.user_friendships') IS NOT NULL
+            AND to_regclass('public.user_blocks') IS NOT NULL
+            AND EXISTS (SELECT 1 FROM pg_trigger
+                        WHERE tgrelid = to_regclass('public.users')
+                          AND tgname = 'trg_users_default_profile_visibility' AND NOT tgisinternal)
+            AND (SELECT count(*) = 5
+                 FROM pg_attribute
+                 WHERE attrelid = to_regclass('public.user_profile_visibility')
+                   AND attnum > 0 AND NOT attisdropped
+                   AND attname IN ('user_id', 'display_name_visibility', 'avatar_visibility',
+                                   'residence_country_visibility', 'residence_city_visibility'))";
+                await using (var privacySchemaCommand = new NpgsqlCommand(privacySchemaCheck, connection))
+                {
+                    var privacySchemaReady = Equals(await privacySchemaCommand.ExecuteScalarAsync(cancellationToken), true);
+                    if (!privacySchemaReady)
+                        return Results.Json(new HealthDto(true, false,
+                            "Не применена миграция настроек приватности и отношений пользователей. Выполните database/migrations/15_profile_privacy_and_relationships.sql в Supabase SQL Editor."),
+                            statusCode: StatusCodes.Status503ServiceUnavailable);
+                }
+
                 const string avatarPermissionCheck = @"
         SELECT
             has_table_privilege(current_user, 'public.user_avatars', 'SELECT')
@@ -99,7 +122,7 @@ public static class HealthEndpoints
                     var avatarPermissionsReady = Equals(await avatarPermissionCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!avatarPermissionsReady)
                         return Results.Json(new HealthDto(true, false,
-                            "У текущей роли PostgreSQL отсутствуют необходимые права на public.user_avatars (SELECT, INSERT, UPDATE, DELETE). Для существующей роли выполните database/security/06_update_runtime_permissions.sql; для новой роли — database/security/05_create_app_role.sql после миграции 013."),
+                            "У текущей роли PostgreSQL отсутствуют необходимые права на public.user_avatars (SELECT, INSERT, UPDATE, DELETE). Для существующей роли выполните database/security/06_update_runtime_permissions.sql; для новой роли — database/security/05_create_app_role.sql после миграции 014."),
                             statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
 
@@ -113,8 +136,21 @@ public static class HealthEndpoints
             AND has_table_privilege(current_user, 'public.auth_rate_limit_counters', 'INSERT')
             AND has_table_privilege(current_user, 'public.auth_rate_limit_counters', 'UPDATE')
             AND has_table_privilege(current_user, 'public.auth_rate_limit_counters', 'DELETE')
+            AND has_table_privilege(current_user, 'public.user_profile_visibility', 'SELECT')
+            AND has_table_privilege(current_user, 'public.user_profile_visibility', 'INSERT')
+            AND has_table_privilege(current_user, 'public.user_profile_visibility', 'UPDATE')
+            AND has_table_privilege(current_user, 'public.user_profile_visibility', 'DELETE')
+            AND has_table_privilege(current_user, 'public.user_friendships', 'SELECT')
+            AND has_table_privilege(current_user, 'public.user_friendships', 'INSERT')
+            AND has_table_privilege(current_user, 'public.user_friendships', 'UPDATE')
+            AND has_table_privilege(current_user, 'public.user_friendships', 'DELETE')
+            AND has_table_privilege(current_user, 'public.user_blocks', 'SELECT')
+            AND has_table_privilege(current_user, 'public.user_blocks', 'INSERT')
+            AND has_table_privilege(current_user, 'public.user_blocks', 'UPDATE')
+            AND has_table_privilege(current_user, 'public.user_blocks', 'DELETE')
             AND has_table_privilege(current_user, 'public.users', 'SELECT')
             AND has_table_privilege(current_user, 'public.users', 'INSERT')
+            AND has_column_privilege(current_user, 'public.users', 'password_hash', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'display_name', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'residence_country', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'residence_city', 'UPDATE')
@@ -156,7 +192,7 @@ public static class HealthEndpoints
                 var hasPermissions = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
                 if (!hasPermissions)
                     return Results.Json(new HealthDto(true, false,
-                        "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграций 11_user_residence_location.sql и 12_distributed_auth_rate_limits.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql."),
+                        "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграции 15_profile_privacy_and_relationships.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql после применения всех необходимых миграций."),
                         statusCode: 503);
                 return Results.Ok(new HealthDto(true, true, "Supabase PostgreSQL подключена; права роли LocaLoca проверены."));
             }

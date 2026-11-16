@@ -832,8 +832,46 @@ public sealed partial class MainWindow : Window
         SetResidenceStatus(string.Empty, "muted");
         ShowPage("profile");
         await LoadProfileAvatarAsync();
+        await LoadProfilePrivacyAsync();
     }
 
+    private async Task LoadProfilePrivacyAsync()
+    {
+        if (_currentUser is null) return;
+
+        ProfilePrivacySaveButton.IsEnabled = false;
+        try
+        {
+            var settings = await _api.GetProfilePrivacyAsync();
+            ProfileDisplayNameVisibilityBox.SelectedValue = settings.DisplayNameVisibility;
+            ProfileAvatarVisibilityBox.SelectedValue = settings.AvatarVisibility;
+            ProfileResidenceCountryVisibilityBox.SelectedValue = settings.ResidenceCountryVisibility;
+            ProfileResidenceCityVisibilityBox.SelectedValue = settings.ResidenceCityVisibility;
+            SetProfilePrivacyStatus(string.Empty, "muted");
+        }
+        catch (Exception ex)
+        {
+            SetProfilePrivacyStatus("Не удалось загрузить настройки видимости: " + ex.Message, "error");
+        }
+        finally
+        {
+            ProfilePrivacySaveButton.IsEnabled = true;
+        }
+    }
+
+    private static string? SelectedVisibility(ComboBox comboBox) =>
+        comboBox.SelectedValue?.ToString();
+
+    private void SetProfilePrivacyStatus(string message, string tone)
+    {
+        ProfilePrivacyStatusText.Text = message;
+        ProfilePrivacyStatusText.Foreground = Brush(tone switch
+        {
+            "success" => "#4F8758",
+            "error" => "#B85D4D",
+            _ => "#7A8980"
+        });
+    }
 
     private async Task LoadProfileAvatarAsync()
     {
@@ -993,6 +1031,40 @@ public sealed partial class MainWindow : Window
         finally
         {
             ProfileSaveButton.IsEnabled = true;
+        }
+    }
+
+    private async void SaveProfilePrivacy_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentUser is null) return;
+
+        var displayName = SelectedVisibility(ProfileDisplayNameVisibilityBox);
+        var avatar = SelectedVisibility(ProfileAvatarVisibilityBox);
+        var country = SelectedVisibility(ProfileResidenceCountryVisibilityBox);
+        var city = SelectedVisibility(ProfileResidenceCityVisibilityBox);
+        var allowed = new[] { "private", "friends", "registered" };
+        if (new[] { displayName, avatar, country, city }.Any(value => value is null || !allowed.Contains(value)))
+        {
+            SetProfilePrivacyStatus("Выбери видимость для каждого поля.", "error");
+            return;
+        }
+
+        ProfilePrivacySaveButton.IsEnabled = false;
+        SetProfilePrivacyStatus("Сохраняем настройки видимости…", "muted");
+        try
+        {
+            var settings = new UpdateProfilePrivacyRequest(
+                displayName!, avatar!, country!, city!);
+            await _api.UpdateProfilePrivacyAsync(settings);
+            SetProfilePrivacyStatus("Настройки видимости сохранены.", "success");
+        }
+        catch (Exception ex)
+        {
+            SetProfilePrivacyStatus(ex.Message, "error");
+        }
+        finally
+        {
+            ProfilePrivacySaveButton.IsEnabled = true;
         }
     }
 
