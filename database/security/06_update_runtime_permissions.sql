@@ -29,11 +29,22 @@ FROM PUBLIC, anon, authenticated, localoca_app;
 REVOKE UPDATE (login, password_hash, display_name, created_at, residence_country, residence_city, date_of_birth)
     ON TABLE public.users FROM PUBLIC, anon, authenticated, localoca_app;
 
-REVOKE ALL ON SEQUENCE
-    public.users_user_id_seq, public.visits_visit_id_seq, public.photos_photo_id_seq,
-    public.user_map_places_user_map_place_id_seq, public.user_map_place_photos_photo_id_seq,
-    public.birthday_contacts_birthday_contact_id_seq
-FROM PUBLIC, anon, authenticated, localoca_app;
+DO $revoke_public_sequences$
+DECLARE
+    sequence_row record;
+BEGIN
+    FOR sequence_row IN
+        SELECT n.nspname AS schema_name, c.relname AS sequence_name
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'public' AND c.relkind = 'S'
+    LOOP
+        EXECUTE format(
+            'REVOKE ALL ON SEQUENCE %I.%I FROM PUBLIC, anon, authenticated, localoca_app',
+            sequence_row.schema_name, sequence_row.sequence_name);
+    END LOOP;
+END
+$revoke_public_sequences$;
 
 GRANT CONNECT ON DATABASE postgres TO localoca_app;
 GRANT USAGE ON SCHEMA public TO localoca_app;
