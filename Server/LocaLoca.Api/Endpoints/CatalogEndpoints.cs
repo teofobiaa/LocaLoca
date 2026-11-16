@@ -11,6 +11,7 @@ public static class CatalogEndpoints
     {
         const int DefaultPageSize = 50;
         const int MaxPageSize = 100;
+        const long MaxOffset = 100_000;
         const int MaxLookupIds = 500;
         
         app.MapGet("/api/catalog/categories", async Task<IResult> (CancellationToken cancellationToken) =>
@@ -64,6 +65,10 @@ public static class CatalogEndpoints
                 return Results.BadRequest(new ApiErrorResponse($"Параметры пагинации должны задавать страницу от 1 и размер от 1 до {MaxPageSize}."));
         
             var offset = ((long)currentPage - 1) * currentPageSize;
+            if (offset > MaxOffset)
+                return Results.BadRequest(new ApiErrorResponse(
+                    $"Смещение каталога не должно превышать {MaxOffset} записей. Уточните поиск или запросите более раннюю страницу."));
+
             var normalizedSearch = search?.Trim() ?? string.Empty;
             const string filters = @"
         FROM attractions a
