@@ -50,7 +50,23 @@ expected_table_privileges(schema_name, table_name, privilege_type) AS (
         ('public', 'user_avatars', 'SELECT'),
         ('public', 'user_avatars', 'INSERT'),
         ('public', 'user_avatars', 'UPDATE'),
-        ('public', 'user_avatars', 'DELETE')
+        ('public', 'user_avatars', 'DELETE'),
+        ('public', 'birthday_contacts', 'SELECT'),
+        ('public', 'birthday_contacts', 'INSERT'),
+        ('public', 'birthday_contacts', 'UPDATE'),
+        ('public', 'birthday_contacts', 'DELETE'),
+        ('public', 'user_profile_visibility', 'SELECT'),
+        ('public', 'user_profile_visibility', 'INSERT'),
+        ('public', 'user_profile_visibility', 'UPDATE'),
+        ('public', 'user_profile_visibility', 'DELETE'),
+        ('public', 'user_friendships', 'SELECT'),
+        ('public', 'user_friendships', 'INSERT'),
+        ('public', 'user_friendships', 'UPDATE'),
+        ('public', 'user_friendships', 'DELETE'),
+        ('public', 'user_blocks', 'SELECT'),
+        ('public', 'user_blocks', 'INSERT'),
+        ('public', 'user_blocks', 'UPDATE'),
+        ('public', 'user_blocks', 'DELETE')
 ),
 expected_tables AS (
     SELECT DISTINCT schema_name, table_name
@@ -62,17 +78,50 @@ expected_sequence_privileges(schema_name, sequence_name, privilege_type) AS (
         ('public', 'visits_visit_id_seq', 'USAGE'),
         ('public', 'photos_photo_id_seq', 'USAGE'),
         ('public', 'user_map_places_user_map_place_id_seq', 'USAGE'),
-        ('public', 'user_map_place_photos_photo_id_seq', 'USAGE')
+        ('public', 'user_map_place_photos_photo_id_seq', 'USAGE'),
+        ('public', 'birthday_contacts_birthday_contact_id_seq', 'USAGE')
 ),
 expected_sequences AS (
     SELECT DISTINCT schema_name, sequence_name
     FROM expected_sequence_privileges
 ),
+expected_rls_tables(schema_name, table_name) AS (
+    VALUES
+        ('public','users'), ('public','visits'), ('public','photos'), ('public','wishlist'),
+        ('public','user_map_places'), ('public','user_map_place_photos'),
+        ('public','user_sessions'), ('public','auth_rate_limit_counters'),
+        ('public','user_avatars'), ('public','birthday_contacts'),
+        ('public','user_profile_visibility'), ('public','user_friendships'), ('public','user_blocks'),
+        ('public','categories'), ('public','countries'), ('public','cities'), ('public','attractions'),
+        ('public','localoca_schema_migrations')
+),
+expected_rls_policies(schema_name, table_name, policy_name, command_name, qual_expression, check_expression) AS (
+    VALUES
+        ('public','users','localoca_app_runtime_access','ALL','true','true'),
+        ('public','visits','localoca_app_runtime_access','ALL','true','true'),
+        ('public','photos','localoca_app_runtime_access','ALL','true','true'),
+        ('public','wishlist','localoca_app_runtime_access','ALL','true','true'),
+        ('public','user_map_places','localoca_app_runtime_access','ALL','true','true'),
+        ('public','user_map_place_photos','localoca_app_runtime_access','ALL','true','true'),
+        ('public','user_sessions','localoca_app_runtime_access','ALL','true','true'),
+        ('public','auth_rate_limit_counters','localoca_app_runtime_access','ALL','true','true'),
+        ('public','user_avatars','localoca_app_runtime_access','ALL','true','true'),
+        ('public','birthday_contacts','localoca_app_runtime_access','ALL','true','true'),
+        ('public','user_profile_visibility','localoca_app_runtime_access','ALL','true','true'),
+        ('public','user_friendships','localoca_app_runtime_access','ALL','true','true'),
+        ('public','user_blocks','localoca_app_runtime_access','ALL','true','true'),
+        ('public','categories','localoca_app_catalog_read','SELECT','true','<none>'),
+        ('public','countries','localoca_app_catalog_read','SELECT','true','<none>'),
+        ('public','cities','localoca_app_catalog_read','SELECT','true','<none>'),
+        ('public','attractions','localoca_app_catalog_read','SELECT','true','<none>')
+),
 expected_column_privileges(schema_name, table_name, column_name, privilege_type) AS (
     VALUES
+        ('public', 'users', 'password_hash', 'UPDATE'),
         ('public', 'users', 'display_name', 'UPDATE'),
         ('public', 'users', 'residence_country', 'UPDATE'),
-        ('public', 'users', 'residence_city', 'UPDATE')
+        ('public', 'users', 'residence_city', 'UPDATE'),
+        ('public', 'users', 'date_of_birth', 'UPDATE')
 ),
 actual_table_acl AS (
     SELECT
@@ -389,27 +438,61 @@ findings AS (
       AND acl.is_grantable
 
     UNION ALL
+    SELECT 'HIGH', 'ROW_LEVEL_SECURITY_DRIFT', 'table', e.schema_name || '.' || e.table_name,
+           'RLS enabled and not forced', 'RLS is disabled or forced',
+           'Restore ENABLE ROW LEVEL SECURITY without FORCE on the reviewed application tables.'
+    FROM expected_rls_tables e
+    LEFT JOIN pg_class c ON c.oid = to_regclass(format('%I.%I', e.schema_name, e.table_name))
+    WHERE c.oid IS NULL OR NOT c.relrowsecurity OR c.relforcerowsecurity
+
+    UNION ALL
     SELECT 'HIGH', 'ROW_LEVEL_SECURITY_DRIFT', 'table', n.nspname || '.' || c.relname,
-           'No unreviewed RLS enablement in the current application baseline',
-           CASE WHEN c.relforcerowsecurity THEN 'RLS enabled and forced' ELSE 'RLS enabled' END,
-           'Review the RLS policy design and API access model; update the approved baseline only after security review.'
+           'RLS disabled on relations outside the approved application set', 'Unexpected RLS enabled',
+           'Review the relation and disable RLS only when it is not part of the reviewed application surface.'
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
       AND n.nspname NOT LIKE 'pg_toast%'
       AND c.relkind IN ('r', 'p')
       AND (c.relrowsecurity OR c.relforcerowsecurity)
+      AND NOT EXISTS (
+          SELECT 1 FROM expected_rls_tables e
+          WHERE e.schema_name = n.nspname AND e.table_name = c.relname
+      )
 
     UNION ALL
-    SELECT 'HIGH', 'RLS_POLICY_DRIFT', 'policy', n.nspname || '.' || c.relname || '.' || p.polname,
-           'No unreviewed row-level security policies in the current baseline',
-           COALESCE(pg_get_expr(p.polqual, p.polrelid), '<none>') || COALESCE(' / ' || pg_get_expr(p.polwithcheck, p.polrelid), ''),
-           'Review the policy expressions and role targets, then update the approved baseline intentionally.'
-    FROM pg_policy p
-    JOIN pg_class c ON c.oid = p.polrelid
-    JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+    SELECT 'HIGH', 'RLS_POLICY_DRIFT', 'policy', p.schemaname || '.' || p.tablename || '.' || p.policyname,
+           'Only the exact localoca_app runtime/catalog policies', p.cmd || ' / ' ||
+           array_to_string(p.roles, ',') || ' / ' || COALESCE(p.qual, '<none>') || ' / ' ||
+           COALESCE(p.with_check, '<none>'),
+           'Remove or correct the unapproved row-level security policy.'
+    FROM pg_policies p
+    WHERE NOT EXISTS (
+        SELECT 1 FROM expected_rls_policies e
+        WHERE e.schema_name = p.schemaname
+          AND e.table_name = p.tablename
+          AND e.policy_name = p.policyname
+          AND e.command_name = p.cmd
+          AND e.qual_expression = COALESCE(p.qual, '<none>')
+          AND e.check_expression = COALESCE(p.with_check, '<none>')
+          AND p.roles::text = '{localoca_app}'
+    )
+
+    UNION ALL
+    SELECT 'HIGH', 'RLS_POLICY_DRIFT', 'policy', e.schema_name || '.' || e.table_name || '.' || e.policy_name,
+           e.command_name || ' policy for localoca_app', 'Expected policy missing',
+           'Restore the reviewed localoca_app policy using migration 017.'
+    FROM expected_rls_policies e
+    WHERE NOT EXISTS (
+        SELECT 1 FROM pg_policies p
+        WHERE p.schemaname = e.schema_name
+          AND p.tablename = e.table_name
+          AND p.policyname = e.policy_name
+          AND p.cmd = e.command_name
+          AND COALESCE(p.qual, '<none>') = e.qual_expression
+          AND COALESCE(p.with_check, '<none>') = e.check_expression
+          AND p.roles::text = '{localoca_app}'
+    )
 
     -- Required application relations must exist.
     UNION ALL
@@ -482,7 +565,7 @@ findings AS (
       AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
       AND acl.grantee = 0
 
-    -- Column grants are intentionally limited to the three editable profile fields.
+    -- Column grants are intentionally limited to password_hash and the four editable profile fields.
     UNION ALL
     SELECT 'HIGH', 'COLUMN_PRIVILEGE_MISSING', 'column',
            e.schema_name || '.' || e.table_name || '.' || e.column_name,
@@ -502,7 +585,7 @@ findings AS (
     UNION ALL
     SELECT 'CRITICAL', 'COLUMN_PRIVILEGE_EXTRA', 'column',
            a.schema_name || '.' || a.table_name || '.' || a.column_name,
-           'Only UPDATE on users.display_name, users.residence_country and users.residence_city',
+           'Only UPDATE on users.password_hash, display_name, residence_country, residence_city and date_of_birth',
            a.privilege_type,
            'Revoke the unapproved column-level privilege from localoca_app.'
     FROM actual_column_acl a
