@@ -104,7 +104,6 @@ public sealed class PostgreSqlPermissionDriftTests
     [InlineData("ALTER ROLE localoca_app VALID UNTIL '2030-01-01 00:00:00+00';", "ROLE_ATTRIBUTE_DRIFT")]
     [InlineData("ALTER ROLE localoca_app SET search_path = public;", "ROLE_CONFIGURATION_DRIFT")]
     [InlineData("ALTER ROLE localoca_app SET statement_timeout = '0';", "ROLE_CONFIGURATION_DRIFT")]
-    [InlineData("ALTER ROLE localoca_app GRANT pg_read_all_data TO localoca_app;", "ROLE_MEMBERSHIP")]
     [InlineData("GRANT pg_read_all_data TO localoca_app;", "ROLE_MEMBERSHIP")]
     [InlineData("CREATE ROLE drift_reader NOLOGIN; GRANT localoca_app TO drift_reader;", "ROLE_MEMBERSHIP")]
     [InlineData("GRANT CREATE ON SCHEMA public TO localoca_app;", "SCHEMA_PRIVILEGE_EXTRA")]
