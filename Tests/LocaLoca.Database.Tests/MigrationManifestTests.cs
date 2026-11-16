@@ -18,6 +18,10 @@ public sealed class MigrationManifestTests
         Assert.Equal(1, root.GetProperty("manifestVersion").GetInt32());
         Assert.Equal(20, root.GetProperty("currentSchemaVersion").GetInt32());
         Assert.Equal(13, root.GetProperty("baseline").GetProperty("version").GetInt32());
+        Assert.Equal(20, root.GetProperty("freshInstallBaseline").GetProperty("version").GetInt32());
+        Assert.Equal(new[] { 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 },
+            root.GetProperty("freshInstallBaseline").GetProperty("includesSchemaMigrations")
+                .EnumerateArray().Select(x => x.GetInt32()).ToArray());
 
         var schemaVersions = new[] { 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
         var actualVersions = root.GetProperty("schemaMigrations").EnumerateArray()
@@ -28,7 +32,7 @@ public sealed class MigrationManifestTests
         Assert.Equal(new[] { 5, 6 }, root.GetProperty("securityScripts").EnumerateArray()
             .Select(x => x.GetProperty("version").GetInt32()).ToArray());
 
-        var entries = new List<JsonElement> { root.GetProperty("baseline"), root.GetProperty("seed"), root.GetProperty("trackingBootstrap") };
+        var entries = new List<JsonElement> { root.GetProperty("baseline"), root.GetProperty("freshInstallBaseline"), root.GetProperty("seed"), root.GetProperty("trackingBootstrap") };
         entries.AddRange(root.GetProperty("schemaMigrations").EnumerateArray());
         entries.AddRange(root.GetProperty("securityScripts").EnumerateArray());
         foreach (var entry in entries)
