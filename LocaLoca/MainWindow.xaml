@@ -468,7 +468,6 @@
                                                    Foreground="{ThemeResource MutedBrush}" />
                                     </StackPanel>
                                 </Border>
-                                </Border>
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
