@@ -21,7 +21,6 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: api-cicd-${{ github.ref }}
@@ -35,6 +34,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up .NET 10
         uses: actions/setup-dotnet@v6
@@ -51,19 +52,49 @@ jobs:
         run: dotnet test Tests/LocaLoca.Tests.sln --configuration Release --no-restore --verbosity minimal
 
   docker:
-    name: Build API Docker image
+    name: Build API Docker image (no publish)
+    if: github.event_name != 'push' || github.ref != 'refs/heads/main'
     runs-on: ubuntu-24.04
     needs: dotnet
     timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build API image (no push)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Server/LocaLoca.Api/Dockerfile
+          push: false
+          tags: ghcr.io/teofobiaa/localoca-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish:
+    name: Publish API Docker image to GHCR
+    runs-on: ubuntu-24.04
+    needs: dotnet
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -79,12 +110,12 @@ jobs:
             type=raw,value=latest
             type=sha,format=short
 
-      - name: Build API image and publish on main
+      - name: Build API image and publish
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Server/LocaLoca.Api/Dockerfile
-          push: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
@@ -95,7 +126,7 @@ jobs:
     runs-on: ubuntu-24.04
     needs:
       - dotnet
-      - docker
+      - publish
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     timeout-minutes: 15
     steps:

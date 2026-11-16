@@ -51,6 +51,33 @@ public sealed class CatalogPaginationTests(PostgreSqlApiFixture database)
     }
 
     [Fact]
+    public async Task Catalog_accepts_the_maximum_allowed_offset()
+    {
+        using var factory = database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync("/api/catalog?page=1001&pageSize=100");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(1001, document.RootElement.GetProperty("page").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("/api/catalog?page=1002&pageSize=100")]
+    [InlineData("/api/catalog?page=100001&pageSize=2")]
+    [InlineData("/api/catalog?page=2147483647&pageSize=100")]
+    public async Task Catalog_rejects_offsets_above_the_maximum(string path)
+    {
+        using var factory = database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        using var response = await client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Catalog_lookup_by_ids_returns_only_the_requested_attractions()
     {
         var secondId = await InsertAttractionAsync("Lookup-only API catalog attraction");
