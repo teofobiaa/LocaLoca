@@ -743,8 +743,6 @@ findings AS (
     WHERE acl.grantee IN (0, r.oid)
 
     UNION ALL
-    SELECT 'CRITICAL', 'OBJECT_OWNERSHIP', 'large object', m.oid::text,
-    UNION ALL
     SELECT 'HIGH', 'UNAPPROVED_ROLE_PRIVILEGE', 'large object', m.oid::text,
            'Large-object grants only to the object owner',
            'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
@@ -765,6 +763,9 @@ findings AS (
     WHERE c.relkind = 'S'
       AND n.nspname NOT IN ('pg_catalog', 'information_schema')
       AND n.nspname NOT LIKE 'pg_toast%'
+
+    UNION ALL
+    SELECT 'CRITICAL', 'OBJECT_OWNERSHIP', 'large object', m.oid::text,
            'Large objects owned by an administrative/deployment role',
            'Owned by localoca_app',
            'Transfer large-object ownership away from localoca_app.'
