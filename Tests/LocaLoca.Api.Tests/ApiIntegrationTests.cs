@@ -1185,7 +1185,7 @@ public sealed class ApiIntegrationTests
         using (var privateNameJson = JsonDocument.Parse(await friendProfileWithPrivateName.Content.ReadAsStringAsync()))
             Assert.Equal(JsonValueKind.Null, privateNameJson.RootElement.GetProperty("displayName").ValueKind);
 
-        using var friendsResponse = await ownerClient.GetAsync("/api/me/friends");
+        using var friendsResponse = await viewerClient.GetAsync("/api/me/friends");
         using (var friendsJson = JsonDocument.Parse(await friendsResponse.Content.ReadAsStringAsync()))
         {
             var friendItems = friendsJson.RootElement.GetProperty("items");
