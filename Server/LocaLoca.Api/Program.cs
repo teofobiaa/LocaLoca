@@ -6,6 +6,11 @@ using LocaLoca.Api.Security;
 using LocaLoca.Api.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
+// Keep API integration-test bursts in one fixed window on slow CI hosts.
+// Non-test environments retain the production 60-second policy.
+var rateLimitWindowSeconds = builder.Environment.IsEnvironment("Testing")
+    ? 7 * 24 * 60 * 60
+    : 60;
 var passwordHashIterations = PasswordHasher.GetConfiguredIterations(
     builder.Configuration["LOCA_PASSWORD_PBKDF2_ITERATIONS"]);
 // Local development keeps the loopback endpoint. Render supplies PORT; in the
@@ -164,7 +169,7 @@ app.Use(async (context, next) =>
         policyKey,
         clientIp,
         permitLimit,
-        windowSeconds: 60,
+        windowSeconds: rateLimitWindowSeconds,
         cancellationToken: context.RequestAborted);
 
     if (!allowed)
