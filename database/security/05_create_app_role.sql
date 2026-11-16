@@ -29,7 +29,7 @@ TO localoca_app;
 
 -- Application account registration and login.
 GRANT SELECT, INSERT ON TABLE public.users TO localoca_app;
-GRANT UPDATE (display_name, residence_country, residence_city) ON TABLE public.users TO localoca_app;
+GRANT UPDATE (password_hash, display_name, residence_country, residence_city) ON TABLE public.users TO localoca_app;
 
 -- User-owned records.
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.visits TO localoca_app;
