@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 13,
+  "currentSchemaVersion": 14,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -25,7 +25,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "438f63a837280e73d92db83718cc50d997d2f08519318ea33674ac88dbc91118"
+    "sha256": "7684b16cbec95ecb531f1778daa31f2ecec9123da2825a2b1afdc5ffe60ecafc"
   },
   "schemaMigrations": [
     {
@@ -81,6 +81,12 @@
       "name": "user_avatars",
       "path": "migrations/13_user_avatars.sql",
       "sha256": "ed05f0afbbf76d7c518404a02ca9e69cab5f13bd60ab70fb6da9e36bb6600c24"
+    },
+    {
+      "version": 14,
+      "name": "catalog_search_trigram_indexes",
+      "path": "migrations/14_catalog_search_trigram_indexes.sql",
+      "sha256": "e0af2ed4d1d321ae9efdf953a2140fba51cdd16cb78e6aba93c025cb4f66fe83"
     }
   ],
   "securityScripts": [
