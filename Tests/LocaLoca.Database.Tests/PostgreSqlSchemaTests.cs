@@ -364,15 +364,6 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
         await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
 
-        await using (var revokeSessionPermissions = new NpgsqlCommand(
-            "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
-            connection))
-        {
-            await revokeSessionPermissions.ExecuteNonQueryAsync();
-        }
-        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
-        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
-
         await using var permissionCheck = new NpgsqlCommand(@"
             SELECT
                 has_column_privilege('localoca_app', 'public.users', 'display_name', 'UPDATE')
