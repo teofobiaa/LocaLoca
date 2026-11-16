@@ -382,7 +382,7 @@ findings AS (
     UNION ALL
     SELECT 'HIGH', 'RLS_POLICY_DRIFT', 'policy', n.nspname || '.' || c.relname || '.' || p.polname,
            'No unreviewed row-level security policies in the current baseline',
-           pg_get_expr(p.polqual, p.polrelid) || COALESCE(' / ' || pg_get_expr(p.polwithcheck, p.polrelid), ''),
+           COALESCE(pg_get_expr(p.polqual, p.polrelid), '<none>') || COALESCE(' / ' || pg_get_expr(p.polwithcheck, p.polrelid), ''),
            'Review the policy expressions and role targets, then update the approved baseline intentionally.'
     FROM pg_policy p
     JOIN pg_class c ON c.oid = p.polrelid
