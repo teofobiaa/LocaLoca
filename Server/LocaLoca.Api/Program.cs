@@ -7,7 +7,7 @@ using LocaLoca.Api.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 // Keep API integration-test bursts in one fixed window on slow CI hosts.
- // Non-test environments retain the production 60-second policy.
+// Non-test environments retain the production 60-second policy.
 var rateLimitWindowSeconds = builder.Environment.IsEnvironment("Testing")
     ? 7 * 24 * 60 * 60
     : 60;
