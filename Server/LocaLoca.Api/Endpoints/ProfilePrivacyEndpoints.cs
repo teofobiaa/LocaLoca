@@ -29,6 +29,7 @@ public static class ProfilePrivacyEndpoints
             if (!await reader.ReadAsync(cancellationToken))
                 return Results.NotFound(new ApiErrorResponse("Настройки приватности не найдены."));
 
+            context.Response.Headers["Cache-Control"] = "private, no-store";
             return Results.Ok(ReadPrivacy(reader));
         });
 
@@ -69,6 +70,7 @@ public static class ProfilePrivacyEndpoints
             if (!await reader.ReadAsync(cancellationToken))
                 return Results.NotFound(new ApiErrorResponse("Аккаунт не найден."));
 
+            context.Response.Headers["Cache-Control"] = "private, no-store";
             return Results.Ok(ReadPrivacy(reader));
         });
 
