@@ -8,6 +8,7 @@ on:
       - 'refactor/**'
       - 'security/**'
       - 'test/**'
+      - 'fix/**'
       - 'ci/**'
     paths:
       - 'Tests/**'
@@ -49,13 +50,23 @@ jobs:
       - name: Build password KDF benchmark
         run: dotnet build Tools/PasswordHashBenchmarks/PasswordHashBenchmarks.csproj --configuration Release
 
-      - name: Run unit tests with coverage
+      - name: Run unit tests with coverage and TRX
         run: >
           dotnet test Tests/LocaLoca.Tests/LocaLoca.Tests.csproj
           --configuration Release
           --verbosity minimal
+          --logger "trx;LogFileName=unit-tests.trx"
           --collect:"XPlat Code Coverage"
           --results-directory TestResults/Unit
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trx-unit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: TestResults/Unit/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 90
 
       - name: Upload unit coverage data
         if: always()
@@ -81,14 +92,35 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Run API integration tests with coverage
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Execute map JavaScript tests
+        run: |
+          node --check Server/LocaLoca.Api/wwwroot/map-date.js
+          node --check Server/LocaLoca.Api/wwwroot/map.js
+          node --test Tests/MapJavaScriptTests/*.test.cjs
+
+      - name: Run API integration tests with coverage and TRX
         run: >
           dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj
           --configuration Release
           --verbosity normal
           --logger "console;verbosity=detailed"
+          --logger "trx;LogFileName=api-tests.trx"
           --collect:"XPlat Code Coverage"
           --results-directory TestResults/Api
+
+      - name: Upload API test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trx-api-${{ github.run_id }}-${{ github.run_attempt }}
+          path: TestResults/Api/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 90
 
       - name: Upload API coverage data
         if: always()
@@ -114,8 +146,21 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Run database tests
-        run: dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --configuration Release --verbosity minimal
+      - name: Run database tests with TRX
+        run: >
+          dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj
+          --configuration Release
+          --verbosity minimal
+          --logger "trx;LogFileName=database-tests.trx"
+
+      - name: Upload database test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trx-database-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Tests/LocaLoca.Database.Tests/TestResults/**/*.trx
+          if-no-files-found: ignore
+          retention-days: 90
 
   coverage-report:
     name: Aggregate code coverage report

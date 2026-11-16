@@ -1,0 +1,51 @@
+name: CI/CD analytics
+on:
+  workflow_dispatch:
+    inputs:
+      period_days:
+        description: "History window in days (1–90)"
+        required: false
+        default: "30"
+        type: string
+  schedule:
+    - cron: "25 5 * * 1"
+permissions:
+  actions: read
+  pull-requests: read
+  contents: read
+concurrency:
+  group: ci-cd-analytics
+  cancel-in-progress: false
+jobs:
+  collect:
+    name: Collect CI/CD metrics
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Collect metrics
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ANALYTICS_DAYS: ${{ inputs.period_days || '30' }}
+        run: python Tools/CiAnalytics/collect.py
+      - name: Publish report to job summary
+        if: always()
+        run: |
+          if [ -f ci-analytics/report.md ]; then
+            cat ci-analytics/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Analytics report was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload machine-readable metrics
+        if: always() && hashFiles('ci-analytics/metrics.json') != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: ci-cd-analytics-${{ github.run_id }}
+          path: ci-analytics/
+          retention-days: 90
