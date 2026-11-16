@@ -7,14 +7,33 @@ public sealed record UpdateResidenceRequest(string? ResidenceCountry, string? Re
 public sealed record UpdateBirthDateRequest(DateOnly? DateOfBirth);
 public sealed record PrivateBirthDateDto(DateOnly? DateOfBirth);
 public sealed record BirthdayContactWriteRequest(string DisplayName, DateOnly BirthDate);
-public sealed record BirthdayContactDto(
-    int Id,
-    string DisplayName,
-    DateOnly BirthDate,
-    DateOnly NextBirthdayDate,
-    int DaysUntilBirthday,
-    int AgeOnNextBirthday)
+public sealed class BirthdayContactDto
 {
+    public int Id { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+    public DateOnly BirthDate { get; set; }
+    public DateOnly NextBirthdayDate { get; set; }
+    public int DaysUntilBirthday { get; set; }
+    public int AgeOnNextBirthday { get; set; }
+
+    public BirthdayContactDto() { }
+
+    public BirthdayContactDto(
+        int id,
+        string displayName,
+        DateOnly birthDate,
+        DateOnly nextBirthdayDate,
+        int daysUntilBirthday,
+        int ageOnNextBirthday)
+    {
+        Id = id;
+        DisplayName = displayName;
+        BirthDate = birthDate;
+        NextBirthdayDate = nextBirthdayDate;
+        DaysUntilBirthday = daysUntilBirthday;
+        AgeOnNextBirthday = ageOnNextBirthday;
+    }
+
     public string ReminderText => DaysUntilBirthday switch
     {
         0 => "Сегодня день рождения",
