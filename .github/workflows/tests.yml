@@ -47,7 +47,16 @@ jobs:
         run: dotnet build Tools/PasswordHashBenchmarks/PasswordHashBenchmarks.csproj --configuration Release
 
       - name: Run unit tests
-        run: dotnet test Tests/LocaLoca.Tests/LocaLoca.Tests.csproj --configuration Release --verbosity minimal
+        run: dotnet test Tests/LocaLoca.Tests/LocaLoca.Tests.csproj --configuration Release --verbosity minimal --logger "trx;LogFileName=unit-tests.trx"
+
+      - name: Upload unit test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: trx-unit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Tests/LocaLoca.Tests/TestResults/*.trx
+          if-no-files-found: ignore
+          retention-days: 30
 
   api:
     name: API integration tests (isolated PostgreSQL)
@@ -63,7 +72,16 @@ jobs:
           global-json-file: global.json
 
       - name: Run API integration tests
-        run: dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release --verbosity normal --logger "console;verbosity=detailed"
+        run: dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release --verbosity normal --logger "console;verbosity=detailed" --logger "trx;LogFileName=api-tests.trx"
+
+      - name: Upload API test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: trx-api-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Tests/LocaLoca.Api.Tests/TestResults/*.trx
+          if-no-files-found: ignore
+          retention-days: 30
 
   database:
     name: PostgreSQL schema and migration tests
@@ -79,4 +97,13 @@ jobs:
           global-json-file: global.json
 
       - name: Run database tests
-        run: dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --configuration Release --verbosity minimal
+        run: dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --configuration Release --verbosity minimal --logger "trx;LogFileName=database-tests.trx"
+
+      - name: Upload database test results
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: trx-database-${{ github.run_id }}-${{ github.run_attempt }}
+          path: Tests/LocaLoca.Database.Tests/TestResults/*.trx
+          if-no-files-found: ignore
+          retention-days: 30
