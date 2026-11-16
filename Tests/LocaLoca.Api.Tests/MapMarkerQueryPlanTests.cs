@@ -103,6 +103,7 @@ public sealed class MapMarkerQueryPlanTests
         await using var connection = new NpgsqlConnection(isolatedConnectionString);
         await connection.OpenAsync();
         await ExecuteSqlFileAsync(connection, "schema", "01_schema.sql");
+        await ExecuteSqlFileAsync(connection, "migrations", "14_catalog_search_trigram_indexes.sql");
 
         int categoryId;
         await using (var category = new NpgsqlCommand(
