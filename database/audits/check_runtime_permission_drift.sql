@@ -370,6 +370,9 @@ findings AS (
       AND pg_get_userbyid(acl.grantee) NOT IN (
           'supabase_etl_admin', 'supabase_storage_admin', 'dashboard_user'
       )
+      AND pg_get_userbyid(acl.grantee) NOT IN (
+          'supabase_etl_admin', 'supabase_storage_admin', 'dashboard_user'
+      )
 
     -- Schema: usage on public is required; CREATE and all other schema access are forbidden.
     UNION ALL
