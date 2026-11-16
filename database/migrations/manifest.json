@@ -25,7 +25,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "438f63a837280e73d92db83718cc50d997d2f08519318ea33674ac88dbc91118"
+    "sha256": "dd4ef2fcefac8fb64dca8f4888fa9d4924e73779c40bab8f18b84a60f25d8ecc"
   },
   "schemaMigrations": [
     {
@@ -95,7 +95,7 @@
       "name": "create_app_role",
       "path": "security/05_create_app_role.sql",
       "repeatable": false,
-      "sha256": "cb822e3c06d184da33a51c57f4843d6f3b8ddf0e1f9c594d765d213c1add01f9"
+      "sha256": "b6e425d7b97b310f8df8126f7e661929bf4260a4b60502cd062e963f283bdf14"
     },
     {
       "version": 6,
