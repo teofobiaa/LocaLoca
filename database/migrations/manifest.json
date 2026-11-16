@@ -86,7 +86,7 @@
       "version": 14,
       "name": "profile_privacy_and_relationships",
       "path": "migrations/14_profile_privacy_and_relationships.sql",
-      "sha256": "1fd6903b04db18536d323bb4aa371887fe601ea6b36d26b06028a5f0d68fd4b8"
+      "sha256": "ccf80ef3ee11bd333565fa62c06f0ffde1a6a873e283de0e371d6e2fafb5e906"
     }
   ],
   "securityScripts": [
@@ -102,7 +102,7 @@
       "name": "update_runtime_permissions",
       "path": "security/06_update_runtime_permissions.sql",
       "repeatable": true,
-      "sha256": "41c5d33282e8ad274a52a35fa28fd0defcf5232760110da8c395c0a92e8984f5"
+      "sha256": "9eeaa9ad5e23d635dfc528f8ddb3b36a4deb029634ee636ea8a479b4f8acb50c"
     }
   ]
 }
