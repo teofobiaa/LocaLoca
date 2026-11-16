@@ -44,7 +44,7 @@ public static class RelationshipEndpoints
                         WHEN existing.status = 'pending'
                          AND existing.requested_by_user_id <> EXCLUDED.requested_by_user_id
                         THEN 'accepted'
-                        ELSE public.user_friendships.status
+                        ELSE existing.status
                     END,
                     updated_at = now()
                 RETURNING status", connection, transaction);
