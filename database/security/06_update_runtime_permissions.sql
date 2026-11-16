@@ -1,65 +1,106 @@
--- Upgrade an existing LocaLoca runtime role to the current application schema.
--- Run as the database administrator after migrations/03, /04, /11 and /12; safe to rerun.
--- Safe to execute more than once; it does not change ownership or grant admin privileges.
+-- Reconcile the reviewed LocaLoca runtime-role grants after schema migrations 014-019.
+-- Run as the database administrator. Safe to rerun; this does not grant BYPASSRLS or role membership.
+BEGIN;
 
-GRANT UPDATE (display_name, residence_country, residence_city) ON TABLE public.users TO localoca_app;
-
-GRANT SELECT, INSERT, UPDATE, DELETE
-    ON TABLE public.auth_rate_limit_counters
-    TO localoca_app;
-
-GRANT SELECT, INSERT, UPDATE, DELETE
-    ON TABLE public.user_map_places
-    TO localoca_app;
-
-GRANT SELECT, INSERT, DELETE
-    ON TABLE public.user_map_place_photos
-    TO localoca_app;
-
-DO $grant_avatar_permissions$
+DO $runtime_role$
 BEGIN
-    IF to_regclass('public.user_avatars') IS NOT NULL THEN
-        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_avatars TO localoca_app';
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'localoca_app') THEN
+        RAISE EXCEPTION 'Required runtime role localoca_app does not exist.';
     END IF;
-END;
-$grant_avatar_permissions$;
+END
+$runtime_role$;
+
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+    REVOKE ALL ON TABLES FROM PUBLIC, anon, authenticated, localoca_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+    REVOKE ALL ON SEQUENCES FROM PUBLIC, anon, authenticated, localoca_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+    REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
+
+REVOKE ALL ON TABLE
+    public.users, public.categories, public.countries, public.cities, public.attractions,
+    public.visits, public.photos, public.wishlist, public.user_map_places,
+    public.user_map_place_photos, public.user_sessions, public.auth_rate_limit_counters,
+    public.user_avatars, public.birthday_contacts, public.user_profile_visibility,
+    public.user_friendships, public.user_blocks, public.localoca_schema_migrations,
+    public.v_visit_details
+FROM PUBLIC, anon, authenticated, localoca_app;
+
+REVOKE UPDATE (login, password_hash, display_name, created_at, residence_country, residence_city, date_of_birth)
+    ON TABLE public.users FROM PUBLIC, anon, authenticated, localoca_app;
+
+REVOKE ALL ON SEQUENCE
+    public.users_user_id_seq, public.visits_visit_id_seq, public.photos_photo_id_seq,
+    public.user_map_places_user_map_place_id_seq, public.user_map_place_photos_photo_id_seq,
+    public.birthday_contacts_birthday_contact_id_seq
+FROM PUBLIC, anon, authenticated, localoca_app;
+
+GRANT CONNECT ON DATABASE postgres TO localoca_app;
+GRANT USAGE ON SCHEMA public TO localoca_app;
+REVOKE CREATE ON SCHEMA public FROM localoca_app;
+
+GRANT SELECT ON TABLE public.categories, public.countries, public.cities, public.attractions TO localoca_app;
+GRANT SELECT, INSERT ON TABLE public.users TO localoca_app;
+GRANT UPDATE (password_hash, display_name, residence_country, residence_city, date_of_birth)
+    ON TABLE public.users TO localoca_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.visits TO localoca_app;
+GRANT SELECT, INSERT, DELETE ON TABLE public.photos, public.wishlist, public.user_map_place_photos TO localoca_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
+    public.user_map_places, public.user_sessions, public.auth_rate_limit_counters,
+    public.user_avatars, public.birthday_contacts, public.user_profile_visibility,
+    public.user_friendships, public.user_blocks
+TO localoca_app;
 
 GRANT USAGE ON SEQUENCE
-    public.user_map_places_user_map_place_id_seq,
-    public.user_map_place_photos_photo_id_seq
-    TO localoca_app;
+    public.users_user_id_seq, public.visits_visit_id_seq, public.photos_photo_id_seq,
+    public.user_map_places_user_map_place_id_seq, public.user_map_place_photos_photo_id_seq,
+    public.birthday_contacts_birthday_contact_id_seq
+TO localoca_app;
 
--- Every result must be true.
-SELECT
-    has_column_privilege('localoca_app', 'public.users', 'display_name', 'UPDATE') AS can_update_display_name,
-    has_column_privilege('localoca_app', 'public.users', 'residence_country', 'UPDATE') AS can_update_residence_country,
-    has_column_privilege('localoca_app', 'public.users', 'residence_city', 'UPDATE') AS can_update_residence_city,
-    has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT') AS map_places_select,
-    has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT') AS map_places_insert,
-    has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE') AS map_places_update,
-    has_table_privilege('localoca_app', 'public.user_map_places', 'DELETE') AS map_places_delete,
-    has_table_privilege('localoca_app', 'public.user_map_place_photos', 'SELECT') AS map_photos_select,
-    has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT') AS map_photos_insert,
-    has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE') AS map_photos_delete,
-    CASE WHEN to_regclass('public.user_avatars') IS NOT NULL THEN
-        has_table_privilege('localoca_app', 'public.user_avatars', 'SELECT')
-        AND has_table_privilege('localoca_app', 'public.user_avatars', 'INSERT')
-        AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
-        AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
-    ELSE false END AS user_avatars_permissions,
-    has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE') AS map_places_sequence,
-    has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE') AS map_photos_sequence,
-    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AS auth_rate_limit_select,
-    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'INSERT') AS auth_rate_limit_insert,
-    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AS auth_rate_limit_update,
-    has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE') AS auth_rate_limit_delete;
+ALTER TABLE public.localoca_schema_migrations ENABLE ROW LEVEL SECURITY;
 
--- Residence fields and the shared limiter are introduced by migrations 011 and 012.
--- Run this script after migration 012. Session access remains conditional for legacy installations.
-DO $grant_session_permissions$
+DO $rls_policies$
+DECLARE
+    relation_name text;
 BEGIN
-    IF to_regclass('public.user_sessions') IS NOT NULL THEN
-        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions TO localoca_app';
-    END IF;
-END;
-$grant_session_permissions$;
+    FOREACH relation_name IN ARRAY ARRAY[
+        'users','visits','photos','wishlist','user_map_places','user_map_place_photos',
+        'user_sessions','auth_rate_limit_counters','user_avatars','birthday_contacts',
+        'user_profile_visibility','user_friendships','user_blocks'
+    ] LOOP
+        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', relation_name);
+        EXECUTE format('DROP POLICY IF EXISTS localoca_app_runtime_access ON public.%I', relation_name);
+        EXECUTE format(
+            'CREATE POLICY localoca_app_runtime_access ON public.%I FOR ALL TO localoca_app USING (true) WITH CHECK (true)',
+            relation_name);
+    END LOOP;
+
+    FOREACH relation_name IN ARRAY ARRAY['categories','countries','cities','attractions'] LOOP
+        EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', relation_name);
+        EXECUTE format('DROP POLICY IF EXISTS localoca_app_catalog_read ON public.%I', relation_name);
+        EXECUTE format(
+            'CREATE POLICY localoca_app_catalog_read ON public.%I FOR SELECT TO localoca_app USING (true)',
+            relation_name);
+    END LOOP;
+END
+$rls_policies$;
+
+ALTER VIEW public.v_visit_details SET (security_invoker = true);
+REVOKE ALL ON TABLE public.v_visit_details FROM PUBLIC, anon, authenticated, localoca_app;
+REVOKE ALL ON FUNCTION public.create_default_user_profile_visibility() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.rls_auto_enable() FROM PUBLIC, anon, authenticated;
+
+SELECT
+    (has_table_privilege('localoca_app', 'public.users', 'SELECT')
+     AND has_table_privilege('localoca_app', 'public.users', 'INSERT')
+     AND has_column_privilege('localoca_app', 'public.users', 'password_hash', 'UPDATE')) AS account_permissions_ok,
+    has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT') AS birthday_contacts_ok,
+    has_table_privilege('localoca_app', 'public.user_profile_visibility', 'SELECT') AS profile_visibility_ok,
+    has_table_privilege('localoca_app', 'public.user_friendships', 'SELECT') AS friendships_ok,
+    has_table_privilege('localoca_app', 'public.user_blocks', 'SELECT') AS blocks_ok,
+    (SELECT NOT (rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls)
+     FROM pg_roles WHERE rolname = 'localoca_app') AS role_is_restricted,
+    NOT has_table_privilege('anon', 'public.users', 'SELECT') AS anon_is_blocked,
+    NOT has_table_privilege('authenticated', 'public.users', 'SELECT') AS authenticated_is_blocked;
+
+COMMIT;
