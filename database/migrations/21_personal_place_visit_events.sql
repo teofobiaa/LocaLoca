@@ -45,7 +45,6 @@ WHERE point.status = 'visited' AND point.visit_date IS NOT NULL AND point.rating
 CREATE OR REPLACE FUNCTION public.sync_personal_place_visit_snapshot()
 RETURNS trigger
 LANGUAGE plpgsql
-SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $function$
 DECLARE latest_event_id integer;

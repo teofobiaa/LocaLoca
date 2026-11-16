@@ -128,7 +128,7 @@
       "version": 21,
       "name": "personal_place_visit_events",
       "path": "migrations/21_personal_place_visit_events.sql",
-      "sha256": "804bcb2bc5c5f62d22cf9b86e4982361e6bd7dafb46c895fd577a6d6a7f3bca5"
+      "sha256": "307111df2ffba1ed471f199ae8c5421b40782e55052fa0104f4fb9837be29901"
     }
   ],
   "securityScripts": [
