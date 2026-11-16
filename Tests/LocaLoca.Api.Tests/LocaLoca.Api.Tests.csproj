@@ -49,5 +49,8 @@
     <Content Include="../../database/migrations/13_user_avatars.sql"
              Link="Database/migrations/13_user_avatars.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/14_profile_privacy_and_relationships.sql"
+             Link="Database/migrations/14_profile_privacy_and_relationships.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
