@@ -194,7 +194,8 @@ ANALYZE public.countries;", connection);
             CommandTimeout = 120
         };
         command.Parameters.AddWithValue("pattern", NpgsqlDbType.Text, pattern);
-        command.Parameters.AddWithValue("category", NpgsqlDbType.Integer, DBNull.Value);
+        if (sql.Contains("@category", StringComparison.Ordinal))
+            command.Parameters.AddWithValue("category", NpgsqlDbType.Integer, DBNull.Value);
         var json = (string)(await command.ExecuteScalarAsync()
             ?? throw new InvalidOperationException("PostgreSQL returned an empty EXPLAIN result."));
         using var document = JsonDocument.Parse(json);
