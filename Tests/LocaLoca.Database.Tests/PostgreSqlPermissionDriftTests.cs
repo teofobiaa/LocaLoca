@@ -81,6 +81,7 @@ public sealed class PostgreSqlPermissionDriftFixture : IAsyncLifetime
             ALTER TABLE public.localoca_schema_migrations ENABLE ROW LEVEL SECURITY;
             CREATE EVENT TRIGGER localoca_test_rls_auto_enable
                 ON ddl_command_end EXECUTE FUNCTION public.rls_auto_enable();
+            GRANT localoca_app TO postgres WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
             GRANT USAGE ON SCHEMA public TO service_role;
             GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
             GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO service_role;
