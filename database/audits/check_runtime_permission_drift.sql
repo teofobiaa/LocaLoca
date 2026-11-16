@@ -634,7 +634,7 @@ findings AS (
     -- No runtime or PUBLIC grants may be introduced as default privileges.
     UNION ALL
     SELECT 'CRITICAL', 'DEFAULT_PRIVILEGE_DRIFT', 'default privileges',
-           COALESCE(n.nspname, '<all schemas>') || ' / object type ' || d.defaclobjtype,
+           COALESCE(n.nspname, '<all schemas>') || ' / object type ' || d.defaclobjtype::text,
            'No default privileges for localoca_app or PUBLIC',
            CASE WHEN acl.grantee = 0 THEN 'PUBLIC: ' ELSE 'localoca_app: ' END || acl.privilege_type,
            'Revoke the unexpected ALTER DEFAULT PRIVILEGES grant and review the grantor role.'
@@ -647,7 +647,7 @@ findings AS (
     -- PUBLIC must not be able to execute functions in the application schema.
     UNION ALL
     SELECT 'HIGH', 'UNAPPROVED_DEFAULT_PRIVILEGE', 'default privileges',
-           COALESCE(n.nspname, '<all schemas>') || ' / object type ' || d.defaclobjtype,
+           COALESCE(n.nspname, '<all schemas>') || ' / object type ' || d.defaclobjtype::text,
            'No unreviewed grants to third-party roles in default privileges',
            'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
            'Review this default privilege: it silently exposes future objects created by the grantor role.'
