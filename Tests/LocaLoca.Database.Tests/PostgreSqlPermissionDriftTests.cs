@@ -242,6 +242,7 @@ BEGIN
 END
 $drop_policies$;
 DROP OWNED BY localoca_app;
+REVOKE localoca_app FROM postgres;
 DROP ROLE localoca_app;", "ROLE_MISSING")]
     public async Task Audit_Detects_Individual_Permission_Drift(
         string mutationSql,
