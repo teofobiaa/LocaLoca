@@ -46,18 +46,16 @@ public static class RelationshipEndpoints
                         ELSE public.user_friendships.status
                     END,
                     updated_at = now()
-                RETURNING status, requested_by_user_id", connection, transaction);
+                RETURNING status", connection, transaction);
             command.Parameters.AddWithValue("low", NpgsqlDbType.Integer, lowId);
             command.Parameters.AddWithValue("high", NpgsqlDbType.Integer, highId);
             command.Parameters.AddWithValue("requester", NpgsqlDbType.Integer, userId);
 
             string status;
-            int requestedBy;
             await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
             {
                 await reader.ReadAsync(cancellationToken);
                 status = reader.GetString(0);
-                requestedBy = reader.GetInt32(1);
             }
 
             await transaction.CommitAsync(cancellationToken);
