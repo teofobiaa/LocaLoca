@@ -422,7 +422,8 @@ public sealed class AuthenticationSecurityTests
             connection);
         command.Parameters.AddWithValue("tokenHash", tokenHash);
         var value = await command.ExecuteScalarAsync();
-        return Assert.IsType<DateTimeOffset>(value);
+        var timestamp = Assert.IsType<DateTime>(value);
+        return new DateTimeOffset(DateTime.SpecifyKind(timestamp, DateTimeKind.Utc));
     }
 
     private async Task<long> CountUsersAsync(string login)
