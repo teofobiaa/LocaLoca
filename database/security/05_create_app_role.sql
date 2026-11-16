@@ -1,6 +1,6 @@
 -- LocaLoca runtime login with least-privilege access.
--- Run once in Supabase SQL Editor as the database administrator after creating schema baseline 012,
--- or after applying the required existing-database migrations through 012.
+-- Run once in Supabase SQL Editor as the database administrator after creating schema baseline 013,
+-- or after applying the required existing-database migrations through 013.
 -- Replace the password placeholder with a unique, randomly generated password.
 -- Do not commit a real password or reuse the postgres account password.
 
@@ -37,6 +37,16 @@ GRANT SELECT, INSERT, DELETE ON TABLE public.photos TO localoca_app;
 GRANT SELECT, INSERT, DELETE ON TABLE public.wishlist TO localoca_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_map_places TO localoca_app;
 GRANT SELECT, INSERT, DELETE ON TABLE public.user_map_place_photos TO localoca_app;
+
+-- Avatars are part of the current schema baseline (013).
+-- Keep this conditional for compatibility with older databases.
+DO $grant_avatar_permissions$
+BEGIN
+    IF to_regclass('public.user_avatars') IS NOT NULL THEN
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_avatars TO localoca_app';
+    END IF;
+END;
+$grant_avatar_permissions$;
 
 -- Sessions are part of the current baseline. Keep this grant conditional
 -- for older databases where migration 008 has not yet been applied.
@@ -87,4 +97,11 @@ SELECT
     (has_table_privilege('localoca_app', 'public.wishlist', 'SELECT') AND has_table_privilege('localoca_app', 'public.wishlist', 'INSERT') AND has_table_privilege('localoca_app', 'public.wishlist', 'DELETE')) AS wishlist_ok,
     (has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE') AND has_table_privilege('localoca_app', 'public.user_map_places', 'DELETE')) AS user_map_places_ok,
     (has_table_privilege('localoca_app', 'public.user_map_place_photos', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE')) AS user_map_place_photos_ok,
+    CASE WHEN to_regclass('public.user_avatars') IS NOT NULL THEN
+        has_table_privilege('localoca_app', 'public.user_avatars', 'SELECT')
+        AND has_table_privilege('localoca_app', 'public.user_avatars', 'INSERT')
+        AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
+        AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
+    ELSE false END AS user_avatars_ok,
+    (has_table_privilege('localoca_app', 'public.user_sessions', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_sessions', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_sessions', 'UPDATE') AND has_table_privilege('localoca_app', 'public.user_sessions', 'DELETE')) AS user_sessions_ok,
     (has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'INSERT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE')) AS auth_rate_limit_counters_ok;
