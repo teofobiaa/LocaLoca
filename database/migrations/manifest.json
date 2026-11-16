@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 13,
+  "currentSchemaVersion": 14,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -81,6 +81,12 @@
       "name": "user_avatars",
       "path": "migrations/13_user_avatars.sql",
       "sha256": "ed05f0afbbf76d7c518404a02ca9e69cab5f13bd60ab70fb6da9e36bb6600c24"
+    },
+    {
+      "version": 14,
+      "name": "profile_privacy_and_relationships",
+      "path": "migrations/14_profile_privacy_and_relationships.sql",
+      "sha256": "1fd6903b04db18536d323bb4aa371887fe601ea6b36d26b06028a5f0d68fd4b8"
     }
   ],
   "securityScripts": [
