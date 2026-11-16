@@ -206,6 +206,7 @@ Directory.CreateDirectory(photosRoot);
 app.MapHealthEndpoints(connectionString, connectionConfigurationError);
 app.MapAuthenticationEndpoints(connectionString, passwordHashIterations);
 app.MapAvatarEndpoints(connectionString);
+app.MapBirthdayEndpoints(connectionString);
 app.MapCatalogEndpoints(connectionString);
 app.MapLocalRecommendationEndpoints(connectionString);
 app.MapPersonalEndpoints(connectionString, dataRoot);

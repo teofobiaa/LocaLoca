@@ -4,6 +4,19 @@ record RegisterRequest(string Login, string Password, string DisplayName);
 record LoginRequest(string Login, string Password);
 record UpdateDisplayNameRequest(string? DisplayName);
 record UpdateResidenceRequest(string? ResidenceCountry, string? ResidenceCity);
+record UpdateBirthDateRequest(DateOnly? DateOfBirth);
+record PrivateBirthDateDto(DateOnly? DateOfBirth);
+record BirthdayContactWriteRequest(string? DisplayName, DateOnly BirthDate);
+record BirthdayContactDto(int Id, string DisplayName, DateOnly BirthDate, DateOnly NextBirthdayDate,
+    int DaysUntilBirthday, int AgeOnNextBirthday)
+{
+    public string ReminderText => DaysUntilBirthday switch
+    {
+        0 => "Сегодня день рождения",
+        1 => "Завтра день рождения",
+        _ => $"Через {DaysUntilBirthday} дн."
+    };
+}
 record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
 record AuthResponse(UserDto User, string Token);
 record MessageDto(string Message);
