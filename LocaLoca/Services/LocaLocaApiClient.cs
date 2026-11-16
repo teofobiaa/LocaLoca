@@ -213,6 +213,76 @@ public sealed class LocaLocaApiClient : IDisposable
     }
 
 
+    public async Task<DateOnly?> GetMyBirthDateAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await GetJsonAsync<PrivateBirthDateDto>("api/me/profile/birthday", cancellationToken);
+        return result.DateOfBirth;
+    }
+
+    public async Task<DateOnly?> UpdateMyBirthDateAsync(DateOnly? dateOfBirth, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, "api/me/profile/birthday")
+        {
+            Content = JsonContent.Create(new UpdateBirthDateRequest(dateOfBirth), options: JsonOptions)
+        };
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<PrivateBirthDateDto>(JsonOptions, cancellationToken)
+            ?? throw new InvalidOperationException("Сервер вернул пустую дату рождения.");
+        return result.DateOfBirth;
+    }
+
+    public async Task<List<BirthdayContactDto>> GetBirthdayContactsAsync(
+        DateOnly today, CancellationToken cancellationToken = default)
+    {
+        var path = "api/me/birthday-contacts?today=" + Uri.EscapeDataString(today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+        var result = await GetJsonAsync<ItemsResponse<BirthdayContactDto>>(path, cancellationToken);
+        return result.Items;
+    }
+
+    public async Task<BirthdayContactDto> CreateBirthdayContactAsync(
+        string displayName, DateOnly birthDate, CancellationToken cancellationToken = default)
+    {
+        var result = await PostJsonAsync<BirthdayContactWriteRequest, BirthdayContactDto>(
+            "api/me/birthday-contacts",
+            new BirthdayContactWriteRequest(displayName, birthDate),
+            authenticated: true,
+            cancellationToken);
+        return result;
+    }
+
+    public async Task<BirthdayContactDto> UpdateBirthdayContactAsync(
+        int contactId, string displayName, DateOnly birthDate, CancellationToken cancellationToken = default)
+    {
+        if (contactId <= 0) throw new ArgumentOutOfRangeException(nameof(contactId));
+        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/me/birthday-contacts/{contactId}")
+        {
+            Content = JsonContent.Create(new BirthdayContactWriteRequest(displayName, birthDate), options: JsonOptions)
+        };
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<BirthdayContactDto>(JsonOptions, cancellationToken))
+            ?? throw new InvalidOperationException("Сервер вернул пустой контакт.");
+    }
+
+    public Task DeleteBirthdayContactAsync(int contactId, CancellationToken cancellationToken = default)
+    {
+        if (contactId <= 0) throw new ArgumentOutOfRangeException(nameof(contactId));
+        return SendForMessageAsync(HttpMethod.Delete, $"api/me/birthday-contacts/{contactId}", null, cancellationToken);
+    }
+
+    public async Task<string> GetBirthdayCalendarAsync(int contactId, CancellationToken cancellationToken = default)
+    {
+        if (contactId <= 0) throw new ArgumentOutOfRangeException(nameof(contactId));
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/me/birthday-contacts/{contactId}/calendar.ics");
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadAsStringAsync(cancellationToken);
+    }
+
     public async Task<ProfilePrivacyDto> GetProfilePrivacyAsync(CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "api/me/profile/privacy");
