@@ -150,6 +150,7 @@ public static class HealthEndpoints
             AND has_table_privilege(current_user, 'public.user_blocks', 'DELETE')
             AND has_table_privilege(current_user, 'public.users', 'SELECT')
             AND has_table_privilege(current_user, 'public.users', 'INSERT')
+            AND has_column_privilege(current_user, 'public.users', 'password_hash', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'display_name', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'residence_country', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'residence_city', 'UPDATE')
