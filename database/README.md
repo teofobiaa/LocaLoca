@@ -77,7 +77,8 @@ ORDER BY version;
 | 010 | [migrations/10_map_marker_visit_lookup_index.sql](migrations/10_map_marker_visit_lookup_index.sql) | Составной индекс для поиска посещённости достопримечательностей на карте |
 | 011 | [migrations/11_user_residence_location.sql](migrations/11_user_residence_location.sql) | Необязательные поля страны и города проживания в профиле, отдельно от посещений |
 | 012 | [migrations/12_distributed_auth_rate_limits.sql](migrations/12_distributed_auth_rate_limits.sql) | Общие PostgreSQL-счётчики попыток входа, регистрации и выхода для всех экземпляров API |
-| 013 | [migrations/13_user_avatars.sql](migrations/13_user_avatars.sql) | Хранение одного оптимизированного аватара и миниатюры на пользователя с ограничением размера |\n| 014 | [migrations/14_catalog_search_trigram_indexes.sql](migrations/14_catalog_search_trigram_indexes.sql) | Расширение `pg_trgm` и GIN-триграммные индексы для поиска по подстроке в достопримечательностях, городах и странах |
+| 013 | [migrations/13_user_avatars.sql](migrations/13_user_avatars.sql) | Хранение одного оптимизированного аватара и миниатюры на пользователя с ограничением размера |
+| 014 | [migrations/14_catalog_search_trigram_indexes.sql](migrations/14_catalog_search_trigram_indexes.sql) | Расширение `pg_trgm` и GIN-триграммные индексы для поиска по подстроке в достопримечательностях, городах и странах |
 
 Исторические миграции 003/004/007/008/009/010 сохранены неизменными: журнал версий добавлен поверх них, а не встроен переписыванием старых SQL-файлов. После выполнения всех отсутствующих миграций повторно запусти `00_migration_history.sql`: он обнаружит полностью созданные объекты и зарегистрирует версии как `adopted`. Запускай bootstrap до и после серии миграций. Если проверка объекта не прошла, версия не будет зарегистрирована.
 
