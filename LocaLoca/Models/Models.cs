@@ -4,6 +4,16 @@ public sealed record HealthDto(bool ApiConfigured, bool DatabaseConnected, strin
 public sealed record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
 public sealed record UpdateDisplayNameRequest(string DisplayName);
 public sealed record UpdateResidenceRequest(string? ResidenceCountry, string? ResidenceCity);
+public sealed record ProfilePrivacyDto(
+    string DisplayNameVisibility,
+    string AvatarVisibility,
+    string ResidenceCountryVisibility,
+    string ResidenceCityVisibility);
+public sealed record UpdateProfilePrivacyRequest(
+    string DisplayNameVisibility,
+    string AvatarVisibility,
+    string ResidenceCountryVisibility,
+    string ResidenceCityVisibility);
 public sealed record AuthResponse(UserDto User, string Token);
 public sealed record ErrorDto(string Error);
 public sealed record MessageDto(string Message);
