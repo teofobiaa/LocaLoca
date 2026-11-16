@@ -18,7 +18,7 @@ public sealed class BirthdayEndpointTests
     [Fact]
     public async Task Full_Date_Of_Birth_Is_Available_Only_Through_Owner_Private_Profile_Route()
     {
-        using var factory = _database.CreateFactory();
+        using var factory = _database.CreateFactory(rateLimitClientIp: IPAddress.Parse("192.0.2.101"));
         using var client = factory.CreateClient();
         await RegisterAsync(client);
 
@@ -43,7 +43,7 @@ public sealed class BirthdayEndpointTests
     [Fact]
     public async Task Birthday_Contacts_Are_Owner_Scoped_And_Calendar_Uid_Is_Stable()
     {
-        using var factory = _database.CreateFactory();
+        using var factory = _database.CreateFactory(rateLimitClientIp: IPAddress.Parse("192.0.2.102"));
         using var owner = factory.CreateClient();
         using var other = factory.CreateClient();
         await RegisterAsync(owner);
@@ -92,7 +92,7 @@ public sealed class BirthdayEndpointTests
     [Fact]
     public async Task Age_Restrictions_Exclude_Unknown_Age_And_Respect_Both_Bounds()
     {
-        using var factory = _database.CreateFactory();
+        using var factory = _database.CreateFactory(rateLimitClientIp: IPAddress.Parse("192.0.2.103"));
         using var client = factory.CreateClient();
         await RegisterAsync(client);
 
