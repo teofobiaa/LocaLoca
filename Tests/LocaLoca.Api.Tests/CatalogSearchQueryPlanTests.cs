@@ -40,17 +40,33 @@ JOIN public.cities AS city ON city.city_id = a.city_id
 JOIN public.countries AS country ON country.country_id = city.country_id
 WHERE (@category IS NULL OR a.category_id = @category)"
                 + CatalogSearchSqlBuilder.BuildPredicate(search);
-            var plan = await ExplainAsync(connection, sql, "%" + search + "%");
-            var matches = await ExecuteCountAsync(connection, sql, "%" + search + "%");
-
-            Assert.Equal(3L, matches);
-            Assert.Contains("ix_attractions_name_trgm", plan.IndexNames);
-            Assert.Contains("ix_cities_name_trgm", plan.IndexNames);
-            Assert.Contains("ix_countries_name_trgm", plan.IndexNames);
+            var pattern = "%" + search + "%";
+            var plan = await ExplainAsync(connection, sql, pattern);
+            var attractionPlan = await ExplainAsync(
+                connection,
+                "SELECT attraction_id FROM public.attractions WHERE name ILIKE @pattern",
+                pattern);
+            var cityPlan = await ExplainAsync(
+                connection,
+                "SELECT city_id FROM public.cities WHERE name ILIKE @pattern",
+                pattern);
+            var countryPlan = await ExplainAsync(
+                connection,
+                "SELECT country_id FROM public.countries WHERE name ILIKE @pattern",
+                pattern);
+            var matches = await ExecuteCountAsync(connection, sql, pattern);
 
             _output.WriteLine($"Synthetic dataset: {SyntheticRowCount:N0} attractions, cities and countries.");
             _output.WriteLine($"Matching attraction count: {matches:N0}.");
-            _output.WriteLine(plan.Format());
+            _output.WriteLine($"Complete catalog query: {plan.Format()}");
+            _output.WriteLine($"Attraction lookup: {attractionPlan.Format()}");
+            _output.WriteLine($"City lookup: {cityPlan.Format()}");
+            _output.WriteLine($"Country lookup: {countryPlan.Format()}");
+
+            Assert.Equal(3L, matches);
+            Assert.Contains("ix_attractions_name_trgm", attractionPlan.IndexNames);
+            Assert.Contains("ix_cities_name_trgm", cityPlan.IndexNames);
+            Assert.Contains("ix_countries_name_trgm", countryPlan.IndexNames);
         }
         finally
         {
