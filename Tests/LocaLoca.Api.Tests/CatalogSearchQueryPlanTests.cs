@@ -102,7 +102,12 @@ WHERE (@category IS NULL OR a.category_id = @category)"
         await using var connection = new NpgsqlConnection(isolatedConnectionString);
         await connection.OpenAsync();
         await ExecuteSqlFileAsync(connection, "schema", "01_schema.sql");
-        await ExecuteSqlFileAsync(connection, "migrations", "14_catalog_search_trigram_indexes.sql");
+        await using (var extensionSchema = new NpgsqlCommand(
+            "CREATE SCHEMA IF NOT EXISTS extensions", connection))
+        {
+            await extensionSchema.ExecuteNonQueryAsync();
+        }
+        await ExecuteSqlFileAsync(connection, "migrations", "16_catalog_search_trigram_indexes.sql");
 
         await using var category = new NpgsqlCommand(
             "INSERT INTO categories(name) VALUES ('Catalog search plan category') RETURNING category_id",
