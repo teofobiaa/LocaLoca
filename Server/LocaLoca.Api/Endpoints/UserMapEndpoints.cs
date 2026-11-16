@@ -319,6 +319,8 @@ public static class UserMapEndpoints
 
         app.MapGet("/map-bootstrap.js", (HttpContext context) =>
             ServeMapAsset(context, "map-bootstrap.js", "text/javascript; charset=utf-8"));
+        app.MapGet("/map-date.js", (HttpContext context) =>
+            ServeMapAsset(context, "map-date.js", "text/javascript; charset=utf-8"));
         app.MapGet("/map.js", (HttpContext context) =>
             ServeMapAsset(context, "map.js", "text/javascript; charset=utf-8"));
         app.MapGet("/map.css", (HttpContext context) =>

@@ -76,6 +76,7 @@ public sealed class MapPageSecurityTests
         var assets = new[]
         {
             ("/map-bootstrap.js", "text/javascript"),
+            ("/map-date.js", "text/javascript"),
             ("/map.js", "text/javascript"),
             ("/map.css", "text/css"),
             ("/leaflet/leaflet.js", "text/javascript"),

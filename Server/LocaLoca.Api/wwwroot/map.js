@@ -1,3 +1,4 @@
+const today = getLocalDateString();
 const params = new URLSearchParams(location.search);
 document.documentElement.dataset.theme = params.get('theme') === 'dark' ? 'dark' : 'light';
 const startNewVisit = params.get('mode') === 'visit';
