@@ -50,6 +50,12 @@ record VisitDto(int Id, int AttractionId, string AttractionName, string City, st
 }
 record PhotoDto(int Id, string FilePath, string Caption);
 record SummaryDto(long VisitCount, long DistinctAttractions, long Cities, long Countries);
+record PersonalPlaceVisitWriteRequest(string VisitDate, int Rating, string? Impressions, string? Notes);
+record PersonalPlaceVisitSavedDto(int Id, string Message);
+record MonthlyTravelStatsDto(int Month, long VisitCount);
+record CategoryTravelStatsDto(string Name, long VisitCount);
+record AnnualTravelStatsDto(int Year, long VisitCount, long UniquePlaces, long Cities, long Countries,
+    long PersonalVisits, IReadOnlyList<MonthlyTravelStatsDto> Months, IReadOnlyList<CategoryTravelStatsDto> Categories);
 record MapMarkerDto(int Id, string Name, double Latitude, double Longitude, bool Visited, bool Wished,
     int? UserPlaceId = null, string? VisitDate = null, short? Rating = null, string? Impressions = null, string? Notes = null);
 record MapPlaceCreateRequest(string? Name, double Latitude, double Longitude, string? Status, string? VisitDate,

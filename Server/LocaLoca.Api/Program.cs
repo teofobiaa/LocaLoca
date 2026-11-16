@@ -214,6 +214,7 @@ app.MapProfilePrivacyEndpoints(connectionString);
 app.MapRelationshipEndpoints(connectionString);
 app.MapAvatarEndpoints(connectionString);
 app.MapBirthdayEndpoints(connectionString);
+app.MapTravelStatsEndpoints(connectionString);
 app.MapCatalogEndpoints(connectionString);
 app.MapLocalRecommendationEndpoints(connectionString);
 app.MapPersonalEndpoints(connectionString, dataRoot);
