@@ -93,7 +93,9 @@ public static class HealthEndpoints
             to_regclass('public.user_profile_visibility') IS NOT NULL
             AND to_regclass('public.user_friendships') IS NOT NULL
             AND to_regclass('public.user_blocks') IS NOT NULL
-            AND to_regclass('public.trg_users_default_profile_visibility') IS NOT NULL
+            AND EXISTS (SELECT 1 FROM pg_trigger
+                        WHERE tgrelid = to_regclass('public.users')
+                          AND tgname = 'trg_users_default_profile_visibility' AND NOT tgisinternal)
             AND (SELECT count(*) = 5
                  FROM pg_attribute
                  WHERE attrelid = to_regclass('public.user_profile_visibility')
