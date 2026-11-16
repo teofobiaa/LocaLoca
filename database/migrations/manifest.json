@@ -1,8 +1,8 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 13,
+  "currentSchemaVersion": 14,
   "baseline": {
-    "version": 13,
+    "version": 14,
     "path": "schema/01_schema.sql",
     "includesSchemaMigrations": [
       3,
@@ -13,9 +13,10 @@
       10,
       11,
       12,
-      13
+      13,
+      14
     ],
-    "sha256": "b3cd7e6f00ff8d60e069ece970ec4970a93f1bcb0d58d42803ef929fa390b084"
+    "sha256": "fd4456ea5622695a09b585b0f47fcd02a1c2cd197e352a92830e4a4e818c2d85"
   },
   "seed": {
     "version": 2,
@@ -25,7 +26,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "438f63a837280e73d92db83718cc50d997d2f08519318ea33674ac88dbc91118"
+    "sha256": "377040988df6a5a0e5a14dd545eeca9958ffa8722a47655e36ee74cf30ffa06e"
   },
   "schemaMigrations": [
     {
@@ -81,6 +82,12 @@
       "name": "user_avatars",
       "path": "migrations/13_user_avatars.sql",
       "sha256": "ed05f0afbbf76d7c518404a02ca9e69cab5f13bd60ab70fb6da9e36bb6600c24"
+    },
+    {
+      "version": 14,
+      "name": "user_birthdays_and_age_filtering",
+      "path": "migrations/14_user_birthdays_and_age_filtering.sql",
+      "sha256": "c4debda91c2f25f894b086c0d97d354a0ca6f3cfd8cbf7532948b382771b4809"
     }
   ],
   "securityScripts": [
@@ -89,14 +96,14 @@
       "name": "create_app_role",
       "path": "security/05_create_app_role.sql",
       "repeatable": false,
-      "sha256": "cb822e3c06d184da33a51c57f4843d6f3b8ddf0e1f9c594d765d213c1add01f9"
+      "sha256": "17f48291a56606b2673e3eefd4fdacc9cd0cb6d86e216778320db795146a6d1a"
     },
     {
       "version": 6,
       "name": "update_runtime_permissions",
       "path": "security/06_update_runtime_permissions.sql",
       "repeatable": true,
-      "sha256": "41c5d33282e8ad274a52a35fa28fd0defcf5232760110da8c395c0a92e8984f5"
+      "sha256": "66002bd5b23fdebc85606d843b8820714a35ff19bf0d81af7eeb8ca1e3f75fbd"
     }
   ]
 }
