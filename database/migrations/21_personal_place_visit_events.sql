@@ -61,6 +61,21 @@ BEGIN
         RETURN NEW;
     END IF;
     IF OLD.status <> 'visited' THEN
+        -- The repeat-visit API inserts its event before updating the legacy point fields.
+        -- Do not let this trigger create a duplicate of that already-persisted event.
+        IF EXISTS (
+            SELECT 1
+            FROM public.personal_place_visits AS event
+            WHERE event.user_id = NEW.user_id
+              AND event.user_map_place_id = NEW.user_map_place_id
+              AND event.visit_date = NEW.visit_date
+              AND event.rating = NEW.rating
+              AND event.place_name = NEW.name
+              AND event.impressions = NEW.impressions
+              AND event.notes = NEW.notes
+        ) THEN
+            RETURN NEW;
+        END IF;
         INSERT INTO public.personal_place_visits (
             user_id, user_map_place_id, place_key, place_name, latitude, longitude,
             visit_date, rating, category_name, impressions, notes
