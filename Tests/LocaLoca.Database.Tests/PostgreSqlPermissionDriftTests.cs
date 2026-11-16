@@ -105,13 +105,18 @@ public sealed class PostgreSqlPermissionDriftTests
     [InlineData("ALTER ROLE localoca_app SET search_path = public;", "ROLE_CONFIGURATION_DRIFT")]
     [InlineData("ALTER ROLE localoca_app SET statement_timeout = '0';", "ROLE_CONFIGURATION_DRIFT")]
     [InlineData("GRANT pg_read_all_data TO localoca_app;", "ROLE_MEMBERSHIP")]
+    [InlineData("GRANT pg_read_all_data TO localoca_app WITH ADMIN OPTION;", "ROLE_MEMBERSHIP")]
     [InlineData("CREATE ROLE drift_reader NOLOGIN; GRANT localoca_app TO drift_reader;", "ROLE_MEMBERSHIP")]
     [InlineData("GRANT CREATE ON SCHEMA public TO localoca_app;", "SCHEMA_PRIVILEGE_EXTRA")]
     [InlineData("CREATE SCHEMA drift_probe; GRANT USAGE ON SCHEMA drift_probe TO localoca_app;", "SCHEMA_PRIVILEGE_EXTRA")]
     [InlineData("REVOKE USAGE ON SCHEMA public FROM localoca_app; REVOKE USAGE ON SCHEMA public FROM PUBLIC;", "SCHEMA_PRIVILEGE_MISSING")]
     [InlineData("GRANT CREATE ON SCHEMA public TO PUBLIC;", "PUBLIC_SCHEMA_PRIVILEGE")]
+    [InlineData("CREATE SCHEMA drift_probe; GRANT CREATE ON SCHEMA drift_probe TO PUBLIC;", "PUBLIC_SCHEMA_PRIVILEGE")]
+    [InlineData("GRANT USAGE ON SCHEMA public TO localoca_app WITH GRANT OPTION;", "SCHEMA_GRANT_OPTION")]
     [InlineData("ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;", "ROW_LEVEL_SECURITY_DRIFT")]
     [InlineData("CREATE POLICY permission_drift_policy ON public.users USING (true);", "RLS_POLICY_DRIFT")]
+    [InlineData("ALTER TABLE public.users RENAME TO users_drift;", "EXPECTED_OBJECT_MISSING")]
+    [InlineData("ALTER SEQUENCE public.users_user_id_seq RENAME TO users_user_id_seq_drift;", "EXPECTED_OBJECT_MISSING")]
     [InlineData("GRANT DELETE ON TABLE public.categories TO localoca_app;", "TABLE_PRIVILEGE_EXTRA")]
     [InlineData("REVOKE SELECT ON TABLE public.categories FROM localoca_app;", "TABLE_PRIVILEGE_MISSING")]
     [InlineData("GRANT TRUNCATE ON TABLE public.visits TO localoca_app;", "TABLE_PRIVILEGE_EXTRA")]
@@ -120,10 +125,13 @@ public sealed class PostgreSqlPermissionDriftTests
     [InlineData("REVOKE UPDATE (display_name) ON TABLE public.users FROM localoca_app;", "COLUMN_PRIVILEGE_MISSING")]
     [InlineData("GRANT UPDATE (login) ON TABLE public.users TO PUBLIC;", "PUBLIC_COLUMN_PRIVILEGE")]
     [InlineData("GRANT SELECT ON TABLE public.users TO localoca_app WITH GRANT OPTION;", "GRANT_OPTION")]
+    [InlineData("GRANT UPDATE (display_name) ON TABLE public.users TO localoca_app WITH GRANT OPTION;", "COLUMN_GRANT_OPTION")]
     [InlineData("GRANT USAGE ON SEQUENCE public.categories_category_id_seq TO localoca_app;", "SEQUENCE_PRIVILEGE_EXTRA")]
+    [InlineData("GRANT USAGE ON SEQUENCE public.users_user_id_seq TO localoca_app WITH GRANT OPTION;", "SEQUENCE_GRANT_OPTION")]
     [InlineData("REVOKE USAGE ON SEQUENCE public.users_user_id_seq FROM localoca_app;", "SEQUENCE_PRIVILEGE_MISSING")]
     [InlineData("GRANT SELECT ON SEQUENCE public.users_user_id_seq TO PUBLIC;", "PUBLIC_SEQUENCE_PRIVILEGE")]
     [InlineData("GRANT TEMP ON DATABASE postgres TO localoca_app;", "DATABASE_PRIVILEGE_EXTRA")]
+    [InlineData("GRANT CONNECT ON DATABASE postgres TO localoca_app WITH GRANT OPTION;", "DATABASE_GRANT_OPTION")]
     [InlineData("GRANT CREATE ON DATABASE postgres TO PUBLIC;", "PUBLIC_DATABASE_PRIVILEGE")]
     [InlineData("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO localoca_app;", "DEFAULT_PRIVILEGE_DRIFT")]
     [InlineData("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO PUBLIC;", "DEFAULT_PRIVILEGE_DRIFT")]
@@ -138,6 +146,18 @@ public sealed class PostgreSqlPermissionDriftTests
     [InlineData(
         "CREATE FUNCTION public.permission_drift_probe() RETURNS integer LANGUAGE SQL SECURITY DEFINER AS 'SELECT 1';",
         "SECURITY_DEFINER_FUNCTION")]
+    [InlineData(
+        "CREATE FUNCTION public.permission_drift_probe() RETURNS integer LANGUAGE SQL AS 'SELECT 1'; GRANT EXECUTE ON FUNCTION public.permission_drift_probe() TO localoca_app WITH GRANT OPTION;",
+        "FUNCTION_GRANT_OPTION")]
+    [InlineData(
+        "CREATE FUNCTION public.permission_drift_probe() RETURNS integer LANGUAGE SQL AS 'SELECT 1'; ALTER FUNCTION public.permission_drift_probe() OWNER TO localoca_app;",
+        "OBJECT_OWNERSHIP")]
+    [InlineData(
+        "CREATE TYPE public.permission_drift_enum AS ENUM ('x', 'y'); ALTER TYPE public.permission_drift_enum OWNER TO localoca_app;",
+        "OBJECT_OWNERSHIP")]
+    [InlineData(
+        "CREATE ROLE drift_owner NOLOGIN; ALTER DEFAULT PRIVILEGES FOR ROLE localoca_app IN SCHEMA public GRANT SELECT ON TABLES TO drift_owner;",
+        "OBJECT_OWNERSHIP")]
     [InlineData(
         "SELECT lo_create(987654321); GRANT SELECT ON LARGE OBJECT 987654321 TO localoca_app;",
         "LARGE_OBJECT_PRIVILEGE")]
