@@ -122,7 +122,7 @@ public static class HealthEndpoints
                     var avatarPermissionsReady = Equals(await avatarPermissionCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!avatarPermissionsReady)
                         return Results.Json(new HealthDto(true, false,
-                            "У текущей роли PostgreSQL отсутствуют необходимые права на public.user_avatars (SELECT, INSERT, UPDATE, DELETE). Для существующей роли выполните database/security/06_update_runtime_permissions.sql; для новой роли — database/security/05_create_app_role.sql после миграции 013."),
+                            "У текущей роли PostgreSQL отсутствуют необходимые права на public.user_avatars (SELECT, INSERT, UPDATE, DELETE). Для существующей роли выполните database/security/06_update_runtime_permissions.sql; для новой роли — database/security/05_create_app_role.sql после миграции 014."),
                             statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
 
