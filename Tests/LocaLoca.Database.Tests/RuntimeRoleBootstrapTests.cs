@@ -64,7 +64,8 @@ public sealed class RuntimeRoleBootstrapTests
                 has_table_privilege('localoca_app', 'public.user_avatars', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
-                AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')",
+                AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
+                AND has_column_privilege('localoca_app', 'public.users', 'password_hash', 'UPDATE')",
             connection,
             transaction))
         {
