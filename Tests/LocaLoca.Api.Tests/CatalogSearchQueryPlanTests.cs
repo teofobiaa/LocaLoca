@@ -31,10 +31,17 @@ public sealed class CatalogSearchQueryPlanTests
             await SeedCatalogDataAsync(connection, isolated.CategoryId);
             await AnalyzeCatalogTablesAsync(connection);
 
-            var sql = CatalogSearchSqlBuilder.MatchingAttractionsCte
-                + "SELECT count(*) FROM matching_attractions";
-            var plan = await ExplainAsync(connection, sql, "%RareNeedleToken%");
-            var matches = await ExecuteCountAsync(connection, sql, "%RareNeedleToken%");
+            const string search = "RareNeedleToken";
+            var sql = CatalogSearchSqlBuilder.MatchingAttractionsCte + @"
+SELECT count(*)
+FROM public.attractions AS a
+JOIN public.categories AS category ON category.category_id = a.category_id
+JOIN public.cities AS city ON city.city_id = a.city_id
+JOIN public.countries AS country ON country.country_id = city.country_id
+WHERE (@category IS NULL OR a.category_id = @category)"
+                + CatalogSearchSqlBuilder.BuildPredicate(search);
+            var plan = await ExplainAsync(connection, sql, "%" + search + "%");
+            var matches = await ExecuteCountAsync(connection, sql, "%" + search + "%");
 
             Assert.Equal(3L, matches);
             Assert.Contains("ix_attractions_name_trgm", plan.IndexNames);
@@ -155,6 +162,7 @@ ANALYZE public.countries;", connection);
             CommandTimeout = 120
         };
         command.Parameters.AddWithValue("pattern", NpgsqlDbType.Text, pattern);
+        command.Parameters.AddWithValue("category", NpgsqlDbType.Integer, DBNull.Value);
         var json = (string)(await command.ExecuteScalarAsync()
             ?? throw new InvalidOperationException("PostgreSQL returned an empty EXPLAIN result."));
         using var document = JsonDocument.Parse(json);
@@ -191,6 +199,7 @@ ANALYZE public.countries;", connection);
     {
         await using var command = new NpgsqlCommand(sql, connection);
         command.Parameters.AddWithValue("pattern", NpgsqlDbType.Text, pattern);
+        command.Parameters.AddWithValue("category", NpgsqlDbType.Integer, DBNull.Value);
         return Convert.ToInt64(await command.ExecuteScalarAsync());
     }
 
