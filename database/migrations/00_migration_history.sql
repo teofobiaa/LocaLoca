@@ -144,8 +144,8 @@ WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname='localoca_app' AND NOT rolbyp
  AND (SELECT count(*)=17 FROM pg_policies WHERE schemaname='public'
       AND policyname IN ('localoca_app_runtime_access','localoca_app_catalog_read')
       AND 'localoca_app'=ANY(roles))
- AND NOT has_table_privilege('anon','public.users','SELECT')
- AND NOT has_table_privilege('authenticated','public.users','SELECT')
+ AND CASE WHEN to_regrole('anon') IS NOT NULL THEN NOT has_table_privilege('anon','public.users','SELECT') ELSE true END
+ AND CASE WHEN to_regrole('authenticated') IS NOT NULL THEN NOT has_table_privilege('authenticated','public.users','SELECT') ELSE true END
  AND (SELECT COALESCE(reloptions,ARRAY[]::text[]) @> ARRAY['security_invoker=true']
       FROM pg_class WHERE oid=to_regclass('public.v_visit_details'))
 ON CONFLICT (version) DO NOTHING;
@@ -155,10 +155,10 @@ SELECT 18,'harden_profile_trigger_and_migration_ledger','adopted'
 WHERE to_regclass('public.ix_user_friendships_requested_by_status') IS NOT NULL
  AND EXISTS (SELECT 1 FROM pg_proc WHERE oid=to_regprocedure('public.create_default_user_profile_visibility()')
              AND proconfig @> ARRAY['search_path=pg_catalog, public'])
- AND NOT has_table_privilege('localoca_app','public.localoca_schema_migrations','SELECT')
+ AND CASE WHEN to_regrole('localoca_app') IS NOT NULL THEN NOT has_table_privilege('localoca_app','public.localoca_schema_migrations','SELECT') ELSE false END
 ON CONFLICT (version) DO NOTHING;
 
 INSERT INTO public.localoca_schema_migrations (version,name,source)
 SELECT 19,'restore_password_hash_update_permission','adopted'
-WHERE has_column_privilege('localoca_app','public.users','password_hash','UPDATE')
+WHERE CASE WHEN to_regrole('localoca_app') IS NOT NULL THEN has_column_privilege('localoca_app','public.users','password_hash','UPDATE') ELSE false END
 ON CONFLICT (version) DO NOTHING;
