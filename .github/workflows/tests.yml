@@ -8,6 +8,7 @@ on:
       - 'refactor/**'
       - 'security/**'
       - 'test/**'
+      - 'ci/**'
     paths:
       - 'Tests/**'
       - 'Tools/PasswordHashBenchmarks/**'
@@ -46,8 +47,22 @@ jobs:
       - name: Build password KDF benchmark
         run: dotnet build Tools/PasswordHashBenchmarks/PasswordHashBenchmarks.csproj --configuration Release
 
-      - name: Run unit tests
-        run: dotnet test Tests/LocaLoca.Tests/LocaLoca.Tests.csproj --configuration Release --verbosity minimal
+      - name: Run unit tests with coverage
+        run: >
+          dotnet test Tests/LocaLoca.Tests/LocaLoca.Tests.csproj
+          --configuration Release
+          --verbosity minimal
+          --collect:"XPlat Code Coverage"
+          --results-directory TestResults/Unit
+
+      - name: Upload unit coverage data
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-unit
+          path: TestResults/Unit/**/coverage.cobertura.xml
+          if-no-files-found: ignore
+          retention-days: 30
 
   api:
     name: API integration tests (isolated PostgreSQL)
@@ -62,8 +77,23 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Run API integration tests
-        run: dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release --verbosity normal --logger "console;verbosity=detailed"
+      - name: Run API integration tests with coverage
+        run: >
+          dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj
+          --configuration Release
+          --verbosity normal
+          --logger "console;verbosity=detailed"
+          --collect:"XPlat Code Coverage"
+          --results-directory TestResults/Api
+
+      - name: Upload API coverage data
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-api
+          path: TestResults/Api/**/coverage.cobertura.xml
+          if-no-files-found: ignore
+          retention-days: 30
 
   database:
     name: PostgreSQL schema, migration and permission drift tests
@@ -80,3 +110,69 @@ jobs:
 
       - name: Run database tests
         run: dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --configuration Release --verbosity minimal
+
+  coverage-report:
+    name: Aggregate code coverage report
+    if: ${{ always() }}
+    needs:
+      - unit
+      - api
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Download unit and API coverage data
+        uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-*
+          path: coverage-input
+        continue-on-error: true
+
+      - name: Install ReportGenerator
+        run: dotnet tool install dotnet-reportgenerator-globaltool --tool-path ./.tools --version 5.6.0
+
+      - name: Generate combined report and print summary
+        shell: bash
+        run: |
+          mapfile -t coverage_files < <(find coverage-input -type f -name 'coverage.cobertura.xml' 2>/dev/null | sort)
+
+          if [ "${#coverage_files[@]}" -eq 0 ]; then
+            echo "::warning::No Coverlet coverage files were produced by the unit or API test jobs."
+            {
+              echo "### Code coverage"
+              echo
+              echo "No coverage reports were available for this run. Check the unit and API test jobs."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          printf -v report_args '%s;' "${coverage_files[@]}"
+          report_args="${report_args%;}"
+
+          ./.tools/reportgenerator             "-reports:${report_args}"             "-targetdir:CoverageReport"             "-reporttypes:Html;TextSummary;Cobertura"
+
+          {
+            echo "### Combined code coverage"
+            echo
+            echo ' ```text'
+            cat CoverageReport/Summary.txt
+            echo ' ```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          cat CoverageReport/Summary.txt
+
+      - name: Upload combined coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: code-coverage-report
+          path: CoverageReport/
+          if-no-files-found: ignore
+          retention-days: 30
