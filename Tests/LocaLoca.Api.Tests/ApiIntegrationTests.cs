@@ -1083,6 +1083,18 @@ public sealed class ApiIntegrationTests
         });
         Assert.Equal(HttpStatusCode.OK, residence.StatusCode);
 
+        byte[] avatarBytes = Convert.FromBase64String("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABQODxIPDRQSEBIXFRQYHjIhHj0sLiQySUBMS0dARkVQWnNiUFVtVkVGZIhlbXd7gYKBTmCNl4x9lnN+gXz/2wBDARUXFx4aHjshITt8U0ZTfHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHz/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIwAH//Z");
+        using (var avatarForm = new MultipartFormDataContent())
+        {
+            avatarForm.Add(new ByteArrayContent(avatarBytes), "file", "privacy-avatar.jpg");
+            using var avatarUpload = await ownerClient.PutAsync("/api/me/avatar", avatarForm);
+            Assert.Equal(HttpStatusCode.OK, avatarUpload.StatusCode);
+        }
+
+        using var publicAvatar = await viewerClient.GetAsync($"/api/users/{owner.UserId}/avatar?size=thumbnail");
+        Assert.Equal(HttpStatusCode.OK, publicAvatar.StatusCode);
+        Assert.Equal("private, no-store", publicAvatar.Headers.CacheControl?.ToString());
+
         using var defaultsResponse = await ownerClient.GetAsync("/api/me/profile/privacy");
         Assert.Equal(HttpStatusCode.OK, defaultsResponse.StatusCode);
         using var defaults = JsonDocument.Parse(await defaultsResponse.Content.ReadAsStringAsync());
@@ -1117,6 +1129,11 @@ public sealed class ApiIntegrationTests
             residenceCityVisibility = "friends"
         });
         Assert.Equal(HttpStatusCode.OK, updatePrivacy.StatusCode);
+
+        using var hiddenAvatar = await viewerClient.GetAsync($"/api/users/{owner.UserId}/avatar?size=thumbnail");
+        Assert.Equal(HttpStatusCode.NotFound, hiddenAvatar.StatusCode);
+        using var ownerAvatar = await ownerClient.GetAsync($"/api/users/{owner.UserId}/avatar?size=thumbnail");
+        Assert.Equal(HttpStatusCode.OK, ownerAvatar.StatusCode);
 
         using var nonFriendProfileResponse = await viewerClient.GetAsync($"/api/users/{owner.UserId}/profile");
         using (var nonFriendProfile = JsonDocument.Parse(await nonFriendProfileResponse.Content.ReadAsStringAsync()))
