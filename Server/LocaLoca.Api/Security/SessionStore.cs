@@ -17,32 +17,28 @@ public sealed class SessionStore
   await using var db=new NpgsqlConnection(cs);
   await db.OpenAsync(ct);
   const string sql=@"
-WITH active_session AS MATERIALIZED (
-    SELECT user_id, last_seen_at
-    FROM user_sessions
+WITH updated AS (
+    UPDATE user_sessions
+    SET last_seen_at = now()
     WHERE session_id = @id
       AND user_id = @user
       AND token_hash = @hash
       AND revoked_at IS NULL
       AND expires_at > now()
-    FOR UPDATE
-),
-updated AS (
-    UPDATE user_sessions AS s
-    SET last_seen_at = now()
-    WHERE s.session_id = @id
-      AND EXISTS (
-          SELECT 1
-          FROM active_session AS active
-          WHERE active.user_id = s.user_id
-            AND active.last_seen_at <= now() - @lastSeenUpdateInterval
-      )
-    RETURNING s.user_id
+      AND last_seen_at <= now() - @lastSeenUpdateInterval
+    RETURNING user_id
 )
-SELECT user_id FROM updated
+SELECT user_id
+FROM updated
 UNION ALL
-SELECT user_id FROM active_session
-WHERE NOT EXISTS (SELECT 1 FROM updated)
+SELECT user_id
+FROM user_sessions
+WHERE session_id = @id
+  AND user_id = @user
+  AND token_hash = @hash
+  AND revoked_at IS NULL
+  AND expires_at > now()
+  AND NOT EXISTS (SELECT 1 FROM updated)
 LIMIT 1";
   await using var cmd=new NpgsqlCommand(sql,db);
   cmd.Parameters.AddWithValue("id",NpgsqlDbType.Uuid,id);
