@@ -308,6 +308,16 @@ findings AS (
     WHERE d.datname = current_database()
       AND acl.grantee = 0
       AND acl.privilege_type = 'CREATE'
+    UNION ALL
+    SELECT 'HIGH', 'UNAPPROVED_ROLE_PRIVILEGE', 'database', current_database(),
+           'Direct database grants only for the database owner and localoca_app',
+           'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
+           'Review why another login/group role has direct database privileges; revoke or explicitly allowlist it.'
+    FROM pg_database d
+    CROSS JOIN app_role r
+    CROSS JOIN LATERAL aclexplode(COALESCE(d.datacl, acldefault('d', d.datdba))) acl
+    WHERE d.datname = current_database()
+      AND acl.grantee NOT IN (0, d.datdba, r.oid)
 
     -- Schema: usage on public is required; CREATE and all other schema access are forbidden.
     UNION ALL
@@ -354,6 +364,17 @@ findings AS (
     FROM app_role r
     JOIN pg_namespace n ON n.nspname = 'public'
     WHERE NOT has_schema_privilege(r.oid, n.oid, 'USAGE')
+    UNION ALL
+    SELECT 'HIGH', 'UNAPPROVED_ROLE_PRIVILEGE', 'schema', n.nspname,
+           'Direct schema grants only for the schema owner and localoca_app (plus PUBLIC USAGE on public)',
+           'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
+           'Review this direct schema grant and revoke it or explicitly document the additional role.'
+    FROM pg_namespace n
+    CROSS JOIN app_role r
+    CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl, acldefault('n', n.nspowner))) acl
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
+      AND acl.grantee NOT IN (0, n.nspowner, r.oid)
 
     UNION ALL
     SELECT 'CRITICAL', 'SCHEMA_GRANT_OPTION', 'schema', n.nspname,
@@ -433,6 +454,19 @@ findings AS (
            'Revoke the grant option and reapply the privilege without WITH GRANT OPTION.'
     FROM actual_table_acl a
     WHERE a.is_grantable
+    UNION ALL
+    SELECT 'HIGH', 'UNAPPROVED_ROLE_PRIVILEGE', 'table', n.nspname || '.' || c.relname,
+           'Direct table grants only for the relation owner and localoca_app',
+           'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
+           'Review direct access granted to another database role; account for approved application/service roles explicitly.'
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN app_role r
+    CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('r', c.relowner))) acl
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
+      AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND acl.grantee NOT IN (0, c.relowner, r.oid)
 
     UNION ALL
     SELECT 'CRITICAL', 'PUBLIC_TABLE_PRIVILEGE', 'table', n.nspname || '.' || c.relname,
@@ -488,6 +522,23 @@ findings AS (
            'Revoke the column grant option.'
     FROM actual_column_acl a
     WHERE a.is_grantable
+    UNION ALL
+    SELECT 'HIGH', 'UNAPPROVED_ROLE_PRIVILEGE', 'column',
+           n.nspname || '.' || c.relname || '.' || a.attname,
+           'Direct column grants only for the relation owner and localoca_app',
+           'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
+           'Review the column-level privilege assigned to another database role.'
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid
+    CROSS JOIN app_role r
+    CROSS JOIN LATERAL aclexplode(a.attacl) acl
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
+      AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND a.attnum > 0
+      AND NOT a.attisdropped
+      AND acl.grantee NOT IN (0, c.relowner, r.oid)
 
     UNION ALL
     SELECT 'CRITICAL', 'PUBLIC_COLUMN_PRIVILEGE', 'column',
@@ -550,6 +601,20 @@ findings AS (
            'Revoke the sequence grant option.'
     FROM actual_sequence_acl a
     WHERE a.is_grantable
+    UNION ALL
+    SELECT 'HIGH', 'UNAPPROVED_ROLE_PRIVILEGE', 'sequence',
+           n.nspname || '.' || c.relname,
+           'Direct sequence grants only for the sequence owner and localoca_app',
+           'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
+           'Review direct access to this sequence; sequence privileges can expose or alter generated identifiers.'
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    CROSS JOIN app_role r
+    CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('s', c.relowner))) acl
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
+      AND c.relkind = 'S'
+      AND acl.grantee NOT IN (0, c.relowner, r.oid)
 
     UNION ALL
     SELECT 'CRITICAL', 'PUBLIC_SEQUENCE_PRIVILEGE', 'sequence',
@@ -578,6 +643,20 @@ findings AS (
     LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
     CROSS JOIN LATERAL aclexplode(d.defaclacl) acl
     WHERE acl.grantee IN (0, r.oid)
+
+    -- PUBLIC must not be able to execute functions in the application schema.
+    UNION ALL
+    SELECT 'HIGH', 'UNAPPROVED_DEFAULT_PRIVILEGE', 'default privileges',
+           COALESCE(n.nspname, '<all schemas>') || ' / object type ' || d.defaclobjtype,
+           'No unreviewed grants to third-party roles in default privileges',
+           'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
+           'Review this default privilege: it silently exposes future objects created by the grantor role.'
+    FROM pg_default_acl d
+    LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
+    CROSS JOIN LATERAL aclexplode(d.defaclacl) acl
+    WHERE acl.grantee <> d.defaclrole
+      AND acl.grantee <> 0
+      AND acl.grantee <> COALESCE((SELECT oid FROM app_role), 0)
 
     -- PUBLIC must not be able to execute functions in the application schema.
     UNION ALL
@@ -624,6 +703,19 @@ findings AS (
       AND n.nspname NOT LIKE 'pg_toast%'
       AND acl.grantee = r.oid
       AND acl.is_grantable
+    UNION ALL
+    SELECT 'HIGH', 'UNAPPROVED_ROLE_PRIVILEGE', 'function',
+           n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
+           'Direct function grants only for the function owner',
+           'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
+           'Review the role that can execute this function and its security context.'
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    CROSS JOIN app_role r
+    CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) acl
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
+      AND acl.grantee NOT IN (0, p.proowner, r.oid)
 
     UNION ALL
     SELECT 'CRITICAL', 'SECURITY_DEFINER_FUNCTION', 'function',
@@ -652,6 +744,27 @@ findings AS (
 
     UNION ALL
     SELECT 'CRITICAL', 'OBJECT_OWNERSHIP', 'large object', m.oid::text,
+    UNION ALL
+    SELECT 'HIGH', 'UNAPPROVED_ROLE_PRIVILEGE', 'large object', m.oid::text,
+           'Large-object grants only to the object owner',
+           'Granted to ' || pg_get_userbyid(acl.grantee) || ': ' || acl.privilege_type,
+           'Review the large-object ACL; application payloads are stored as bytea and should not need large objects.'
+    FROM pg_largeobject_metadata m
+    CROSS JOIN app_role r
+    CROSS JOIN LATERAL aclexplode(COALESCE(m.lomacl, acldefault('L', m.lomowner))) acl
+    WHERE acl.grantee NOT IN (0, m.lomowner, r.oid)
+
+    UNION ALL
+    SELECT 'CRITICAL', 'OBJECT_OWNERSHIP', 'sequence', n.nspname || '.' || c.relname,
+           'Identity sequences owned by an administrative/deployment role',
+           'Owned by localoca_app',
+           'Transfer sequence ownership away from localoca_app.'
+    FROM app_role r
+    JOIN pg_class c ON c.relowner = r.oid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE c.relkind = 'S'
+      AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
            'Large objects owned by an administrative/deployment role',
            'Owned by localoca_app',
            'Transfer large-object ownership away from localoca_app.'
