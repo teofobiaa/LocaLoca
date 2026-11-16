@@ -418,6 +418,7 @@
                                         <Button x:Name="ProfileResidenceSaveButton" Content="Сохранить место проживания" Style="{StaticResource PrimaryButtonStyle}" Click="SaveResidence_Click" HorizontalAlignment="Left" />
                                         <TextBlock x:Name="ProfileResidenceStatusText" Text="" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource MutedBrush}" />
                                     </StackPanel>
+                                </Border>
 
                                 <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                                     <StackPanel Spacing="14">
