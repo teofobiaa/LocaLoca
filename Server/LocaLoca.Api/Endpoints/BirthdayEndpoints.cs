@@ -116,7 +116,7 @@ public static class BirthdayEndpoints
             var validation = ValidateContact(request.DisplayName, request.BirthDate);
             if (validation is not null) return Results.BadRequest(new ApiErrorResponse(validation));
 
-            var displayName = request.DisplayName.Trim();
+            var displayName = request.DisplayName?.Trim() ?? string.Empty;
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
                 INSERT INTO public.birthday_contacts (user_id, display_name, birth_date)
@@ -145,7 +145,7 @@ public static class BirthdayEndpoints
             var validation = ValidateContact(request.DisplayName, request.BirthDate);
             if (validation is not null) return Results.BadRequest(new ApiErrorResponse(validation));
 
-            var displayName = request.DisplayName.Trim();
+            var displayName = request.DisplayName?.Trim() ?? string.Empty;
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
                 UPDATE public.birthday_contacts
