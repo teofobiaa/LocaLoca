@@ -1,6 +1,6 @@
 -- LocaLoca runtime login with least-privilege access.
--- Run once in Supabase SQL Editor as the database administrator after creating schema baseline 012,
--- or after applying the required existing-database migrations through 012.
+-- Run once in Supabase SQL Editor as the database administrator after creating schema baseline 013 and applying migration 014,
+-- or after applying the required existing-database migrations through 014.
 -- Replace the password placeholder with a unique, randomly generated password.
 -- Do not commit a real password or reuse the postgres account password.
 
@@ -56,6 +56,20 @@ BEGIN
 END;
 $grant_rate_limit_permissions$;
 
+DO $grant_profile_privacy_permissions$
+BEGIN
+    IF to_regclass('public.user_profile_visibility') IS NOT NULL THEN
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_profile_visibility TO localoca_app';
+    END IF;
+    IF to_regclass('public.user_friendships') IS NOT NULL THEN
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_friendships TO localoca_app';
+    END IF;
+    IF to_regclass('public.user_blocks') IS NOT NULL THEN
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_blocks TO localoca_app';
+    END IF;
+END;
+$grant_profile_privacy_permissions$;
+
 -- Only identity sequences used by INSERT ... RETURNING.
 GRANT USAGE ON SEQUENCE
     public.users_user_id_seq,
@@ -87,4 +101,7 @@ SELECT
     (has_table_privilege('localoca_app', 'public.wishlist', 'SELECT') AND has_table_privilege('localoca_app', 'public.wishlist', 'INSERT') AND has_table_privilege('localoca_app', 'public.wishlist', 'DELETE')) AS wishlist_ok,
     (has_table_privilege('localoca_app', 'public.user_map_places', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_places', 'UPDATE') AND has_table_privilege('localoca_app', 'public.user_map_places', 'DELETE')) AS user_map_places_ok,
     (has_table_privilege('localoca_app', 'public.user_map_place_photos', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_map_place_photos', 'DELETE')) AS user_map_place_photos_ok,
-    (has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'INSERT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE')) AS auth_rate_limit_counters_ok;
+    (has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'INSERT') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AND has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE')) AS auth_rate_limit_counters_ok,
+    (has_table_privilege('localoca_app', 'public.user_profile_visibility', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_profile_visibility', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_profile_visibility', 'UPDATE') AND has_table_privilege('localoca_app', 'public.user_profile_visibility', 'DELETE')) AS profile_visibility_ok,
+    (has_table_privilege('localoca_app', 'public.user_friendships', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_friendships', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_friendships', 'UPDATE') AND has_table_privilege('localoca_app', 'public.user_friendships', 'DELETE')) AS friendships_ok,
+    (has_table_privilege('localoca_app', 'public.user_blocks', 'SELECT') AND has_table_privilege('localoca_app', 'public.user_blocks', 'INSERT') AND has_table_privilege('localoca_app', 'public.user_blocks', 'UPDATE') AND has_table_privilege('localoca_app', 'public.user_blocks', 'DELETE')) AS blocks_ok;
