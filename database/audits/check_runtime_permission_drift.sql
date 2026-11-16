@@ -291,6 +291,15 @@ findings AS (
       AND acl.privilege_type <> 'CONNECT'
 
     UNION ALL
+    SELECT 'CRITICAL', 'DATABASE_GRANT_OPTION', 'database', current_database(),
+           'No grant options', acl.privilege_type || ' WITH GRANT OPTION',
+           'Revoke the database grant option from localoca_app.'
+    FROM app_role r
+    JOIN pg_database d ON d.datname = current_database()
+    CROSS JOIN LATERAL aclexplode(COALESCE(d.datacl, acldefault('d', d.datdba))) acl
+    WHERE acl.grantee = r.oid AND acl.is_grantable
+
+    UNION ALL
     SELECT 'CRITICAL', 'PUBLIC_DATABASE_PRIVILEGE', 'database', current_database(),
            'PUBLIC must not have CREATE', 'PUBLIC has ' || acl.privilege_type,
            'Revoke the unexpected database privilege from PUBLIC.'
@@ -345,6 +354,41 @@ findings AS (
     FROM app_role r
     JOIN pg_namespace n ON n.nspname = 'public'
     WHERE NOT has_schema_privilege(r.oid, n.oid, 'USAGE')
+
+    UNION ALL
+    SELECT 'CRITICAL', 'SCHEMA_GRANT_OPTION', 'schema', n.nspname,
+           'No grant options', acl.privilege_type || ' WITH GRANT OPTION',
+           'Revoke the schema grant option from localoca_app.'
+    FROM app_role r
+    JOIN pg_namespace n ON true
+    CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl, acldefault('n', n.nspowner))) acl
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
+      AND acl.grantee = r.oid
+      AND acl.is_grantable
+
+    UNION ALL
+    SELECT 'HIGH', 'ROW_LEVEL_SECURITY_DRIFT', 'table', n.nspname || '.' || c.relname,
+           'No unreviewed RLS enablement in the current application baseline',
+           CASE WHEN c.relforcerowsecurity THEN 'RLS enabled and forced' ELSE 'RLS enabled' END,
+           'Review the RLS policy design and API access model; update the approved baseline only after security review.'
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
+      AND c.relkind IN ('r', 'p')
+      AND (c.relrowsecurity OR c.relforcerowsecurity)
+
+    UNION ALL
+    SELECT 'HIGH', 'RLS_POLICY_DRIFT', 'policy', n.nspname || '.' || c.relname || '.' || p.polname,
+           'No unreviewed row-level security policies in the current baseline',
+           pg_get_expr(p.polqual, p.polrelid) || COALESCE(' / ' || pg_get_expr(p.polwithcheck, p.polrelid), ''),
+           'Review the policy expressions and role targets, then update the approved baseline intentionally.'
+    FROM pg_policy p
+    JOIN pg_class c ON c.oid = p.polrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
 
     -- Required application relations must exist.
     UNION ALL
@@ -580,6 +624,39 @@ findings AS (
       AND n.nspname NOT LIKE 'pg_toast%'
       AND acl.grantee = r.oid
       AND acl.is_grantable
+
+    UNION ALL
+    SELECT 'CRITICAL', 'SECURITY_DEFINER_FUNCTION', 'function',
+           n.nspname || '.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
+           'No unreviewed SECURITY DEFINER functions in application schemas',
+           'SECURITY DEFINER; owner=' || pg_get_userbyid(p.proowner),
+           'Review the function body, owner, search_path and EXECUTE grants. Keep only explicitly approved SECURITY DEFINER functions.'
+
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+      AND n.nspname NOT LIKE 'pg_toast%'
+      AND p.prosecdef
+
+    UNION ALL
+    SELECT 'CRITICAL', 'LARGE_OBJECT_PRIVILEGE', 'large object', m.oid::text,
+           'No large-object privileges for localoca_app or PUBLIC',
+           CASE WHEN acl.grantee = 0 THEN 'PUBLIC: ' ELSE 'localoca_app: ' END || acl.privilege_type,
+           'Revoke large-object privileges; LocaLoca stores image payloads in bytea columns and does not require PostgreSQL large objects.'
+    FROM pg_largeobject_metadata m
+    CROSS JOIN app_role r
+    CROSS JOIN LATERAL aclexplode(
+        COALESCE(m.lomacl, acldefault('L', m.lomowner))
+    ) acl
+    WHERE acl.grantee IN (0, r.oid)
+
+    UNION ALL
+    SELECT 'CRITICAL', 'OBJECT_OWNERSHIP', 'large object', m.oid::text,
+           'Large objects owned by an administrative/deployment role',
+           'Owned by localoca_app',
+           'Transfer large-object ownership away from localoca_app.'
+    FROM app_role r
+    JOIN pg_largeobject_metadata m ON m.lomowner = r.oid
 )
 SELECT
     severity,
