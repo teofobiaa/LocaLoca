@@ -22,6 +22,7 @@ public static class BirthdayEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(
@@ -40,6 +41,7 @@ public static class BirthdayEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             if (request.DateOfBirth is { } date &&
@@ -73,6 +75,7 @@ public static class BirthdayEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
 
             var referenceDate = today ?? DateOnly.FromDateTime(DateTime.UtcNow);
             var contacts = new List<BirthdayContactDto>();
@@ -108,6 +111,7 @@ public static class BirthdayEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
 
             var validation = ValidateContact(request.DisplayName, request.BirthDate);
             if (validation is not null) return Results.BadRequest(new ApiErrorResponse(validation));
@@ -135,6 +139,7 @@ public static class BirthdayEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
             if (contactId <= 0) return Results.BadRequest(new ApiErrorResponse("Некорректный идентификатор контакта."));
 
             var validation = ValidateContact(request.DisplayName, request.BirthDate);
@@ -165,6 +170,7 @@ public static class BirthdayEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
             if (contactId <= 0) return Results.BadRequest(new ApiErrorResponse("Некорректный идентификатор контакта."));
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
@@ -186,6 +192,7 @@ public static class BirthdayEndpoints
             CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
             if (contactId <= 0) return Results.BadRequest(new ApiErrorResponse("Некорректный идентификатор контакта."));
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
@@ -203,7 +210,6 @@ public static class BirthdayEndpoints
             var displayName = reader.GetString(0);
             var birthDate = reader.GetFieldValue<DateOnly>(1);
             var calendar = BuildCalendarEvent(contactId, displayName, birthDate);
-            context.Response.Headers["Cache-Control"] = "private, no-store";
             context.Response.Headers["Content-Disposition"] =
                 $"attachment; filename=\"birthday-{contactId.ToString(CultureInfo.InvariantCulture)}.ics\"";
             return Results.Text(calendar, "text/calendar; charset=utf-8");
