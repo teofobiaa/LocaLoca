@@ -1,4 +1,4 @@
--- Reconcile the reviewed LocaLoca runtime-role grants after schema migrations 014-019.
+-- Reconcile the reviewed LocaLoca runtime-role grants after schema migrations 014-020.
 -- Run as the database administrator. Safe to rerun; this does not grant BYPASSRLS or role membership.
 BEGIN;
 
