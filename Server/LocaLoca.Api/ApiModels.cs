@@ -4,6 +4,25 @@ record RegisterRequest(string Login, string Password, string DisplayName);
 record LoginRequest(string Login, string Password);
 record UpdateDisplayNameRequest(string? DisplayName);
 record UpdateResidenceRequest(string? ResidenceCountry, string? ResidenceCity);
+record UpdateProfilePrivacyRequest(
+    string? DisplayNameVisibility,
+    string? AvatarVisibility,
+    string? ResidenceCountryVisibility,
+    string? ResidenceCityVisibility);
+record ProfilePrivacyDto(
+    string DisplayNameVisibility,
+    string AvatarVisibility,
+    string ResidenceCountryVisibility,
+    string ResidenceCityVisibility);
+record UserProfileViewDto(
+    int Id,
+    string? DisplayName,
+    string? ResidenceCountry,
+    string? ResidenceCity,
+    bool? HasAvatar);
+record UserRelationshipDto(int UserId, string? DisplayName, bool? HasAvatar);
+record FriendRequestDto(int UserId, bool IsIncoming, DateTime CreatedAt);
+record UserBlockDto(int UserId);
 record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
 record AuthResponse(UserDto User, string Token);
 record MessageDto(string Message);
