@@ -5,7 +5,7 @@ using Xunit;
 
 namespace LocaLoca.Database.Tests;
 
-[CollectionDefinition(Name, DisableParallelization = true)]
+[CollectionDefinition("PostgreSQL permission drift tests", DisableParallelization = true)]
 public sealed class PostgreSqlPermissionDriftCollection
     : ICollectionFixture<PostgreSqlPermissionDriftFixture>
 {
