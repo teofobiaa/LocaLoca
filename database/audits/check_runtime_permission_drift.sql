@@ -66,7 +66,11 @@ expected_table_privileges(schema_name, table_name, privilege_type) AS (
         ('public', 'user_blocks', 'SELECT'),
         ('public', 'user_blocks', 'INSERT'),
         ('public', 'user_blocks', 'UPDATE'),
-        ('public', 'user_blocks', 'DELETE')
+        ('public', 'user_blocks', 'DELETE'),
+        ('public', 'personal_place_visits', 'SELECT'),
+        ('public', 'personal_place_visits', 'INSERT'),
+        ('public', 'personal_place_visits', 'UPDATE'),
+        ('public', 'personal_place_visits', 'DELETE')
 ),
 expected_tables AS (
     SELECT DISTINCT schema_name, table_name
@@ -79,7 +83,8 @@ expected_sequence_privileges(schema_name, sequence_name, privilege_type) AS (
         ('public', 'photos_photo_id_seq', 'USAGE'),
         ('public', 'user_map_places_user_map_place_id_seq', 'USAGE'),
         ('public', 'user_map_place_photos_photo_id_seq', 'USAGE'),
-        ('public', 'birthday_contacts_birthday_contact_id_seq', 'USAGE')
+        ('public', 'birthday_contacts_birthday_contact_id_seq', 'USAGE'),
+        ('public', 'personal_place_visits_personal_place_visit_id_seq', 'USAGE')
 ),
 expected_sequences AS (
     SELECT DISTINCT schema_name, sequence_name
@@ -92,6 +97,7 @@ expected_rls_tables(schema_name, table_name) AS (
         ('public','user_sessions'), ('public','auth_rate_limit_counters'),
         ('public','user_avatars'), ('public','birthday_contacts'),
         ('public','user_profile_visibility'), ('public','user_friendships'), ('public','user_blocks'),
+        ('public','personal_place_visits'),
         ('public','categories'), ('public','countries'), ('public','cities'), ('public','attractions'),
         ('public','localoca_schema_migrations')
 ),
@@ -110,6 +116,7 @@ expected_rls_policies(schema_name, table_name, policy_name, command_name, qual_e
         ('public','user_profile_visibility','localoca_app_runtime_access','ALL','true','true'),
         ('public','user_friendships','localoca_app_runtime_access','ALL','true','true'),
         ('public','user_blocks','localoca_app_runtime_access','ALL','true','true'),
+        ('public','personal_place_visits','localoca_app_runtime_access','ALL','true','true'),
         ('public','categories','localoca_app_catalog_read','SELECT','true','<none>'),
         ('public','countries','localoca_app_catalog_read','SELECT','true','<none>'),
         ('public','cities','localoca_app_catalog_read','SELECT','true','<none>'),

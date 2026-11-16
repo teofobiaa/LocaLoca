@@ -72,6 +72,7 @@ public sealed class PostgreSqlPermissionDriftFixture : IAsyncLifetime
         await ExecuteSqlFileAsync("migrations", "18_harden_profile_trigger_and_migration_ledger.sql");
         await ExecuteSqlFileAsync("migrations", "19_restore_password_hash_update_permission.sql");
         await ExecuteSqlFileAsync("migrations", "20_restrict_runtime_sequence_privileges.sql");
+        await ExecuteSqlFileAsync("migrations", "21_personal_place_visit_events.sql");
         await ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
 
         // Mirror Supabase's provider-managed service role grants on the public schema.
