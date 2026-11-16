@@ -66,6 +66,10 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
         await using (var avatarsCommand = new NpgsqlCommand(avatarsSql, connection))
             await avatarsCommand.ExecuteNonQueryAsync();
 
+        var birthdaysSql = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Database", "migrations", "14_user_birthdays_and_age_filtering.sql"));
+        await using (var birthdaysCommand = new NpgsqlCommand(birthdaysSql, connection))
+            await birthdaysCommand.ExecuteNonQueryAsync();
+
         await using var categoryCommand = new NpgsqlCommand(
             "INSERT INTO categories(name) VALUES ('API test category') RETURNING category_id",
             connection);
