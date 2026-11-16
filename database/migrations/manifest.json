@@ -25,7 +25,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "e9fc1bca06048918260aafdba1f93807b613f27a80f82340876715a75cf09a0b"
+    "sha256": "eebca572a6a505d8a50926f56b4fb68d1b9db448e6feefca34d3868e3d491c64"
   },
   "schemaMigrations": [
     {
