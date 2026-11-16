@@ -105,3 +105,29 @@ WHERE (SELECT count(DISTINCT column_name)=5 FROM information_schema.columns
              WHERE conrelid=to_regclass('public.user_avatars')
                AND conname='ck_user_avatars_thumbnail_size')
 ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 14,'user_birthdays_and_age_filtering','adopted'
+WHERE (SELECT count(DISTINCT column_name)=1 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='users'
+         AND column_name='date_of_birth')
+ AND (SELECT count(DISTINCT column_name)=2 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='attractions'
+         AND column_name IN ('min_recommended_age','max_recommended_age'))
+ AND (SELECT count(DISTINCT column_name)=6 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='birthday_contacts'
+         AND column_name IN ('birthday_contact_id','user_id','display_name','birth_date','created_at','updated_at'))
+ AND EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid=to_regclass('public.users')
+               AND conname='ck_users_date_of_birth_range')
+ AND EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid=to_regclass('public.attractions')
+               AND conname='ck_attractions_recommended_age_range')
+ AND EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid=to_regclass('public.birthday_contacts')
+               AND conname='ck_birthday_contacts_display_name')
+ AND EXISTS (SELECT 1 FROM pg_constraint
+             WHERE conrelid=to_regclass('public.birthday_contacts')
+               AND conname='ck_birthday_contacts_birth_date')
+ AND to_regclass('public.ix_birthday_contacts_user_birth_date') IS NOT NULL
+ON CONFLICT (version) DO NOTHING;
