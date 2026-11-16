@@ -58,6 +58,12 @@ dotnet test Tests/LocaLoca.Database.Tests/LocaLoca.Database.Tests.csproj --confi
 
 Тесты копируют все SQL-файлы `database/`, проверяют инвентарь и отсутствие внешних connection strings/psql-команд, затем применяют актуальную схему и миграции в одноразовой PostgreSQL 16. Проверяются foreign keys, индексы, CHECK/UNIQUE constraints, каскады и повторное выполнение миграций `03`, `04`, `06`, `07`.
 
+## Code coverage в GitHub Actions
+
+Workflow `Automated tests` собирает покрытие C#-кода в Unit и API integration тестах, объединяет отчёты и публикует HTML/Cobertura-артефакт `code-coverage-report`. Сводка процентов выводится в логи и Summary запуска GitHub Actions. Отчёты хранятся 30 дней.
+
+Database integration tests не включаются в общий процент C#-покрытия: они проверяют SQL-схему и миграции. Минимальный процент для merge пока не задан — сбор покрытия носит наблюдательный характер. Подробности и порядок будущего включения порога описаны в [CODE_COVERAGE.md](CODE_COVERAGE.md).
+
 ## Изоляция и безопасная работа с данными
 
 - Тесты не должны читать `LOCA_DB_CONNECTION`, `LOCA_SESSION_SECRET` или иные секреты Render из окружения CI.
