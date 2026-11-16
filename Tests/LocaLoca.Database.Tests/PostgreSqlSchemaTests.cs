@@ -273,9 +273,6 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "03_migrate_wishlist.sql");
         await _database.ExecuteSqlFileAsync("migrations", "04_migrate_user_map_places.sql");
         await _database.ExecuteSqlFileAsync("migrations", "04_migrate_user_map_places.sql");
-        // Migration 06 grants the new profile columns and remains safe to rerun.
-        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
-        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
         await _database.ExecuteSqlFileAsync("migrations", "07_migrate_photo_storage.sql");
         await _database.ExecuteSqlFileAsync("migrations", "07_migrate_photo_storage.sql");
         await _database.ExecuteSqlFileAsync("migrations", "08_server_sessions.sql");
@@ -313,8 +310,59 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "13_user_avatars.sql");
         await _database.ExecuteSqlFileAsync("migrations", "13_user_avatars.sql");
 
+        // Supply the Supabase-managed roles and extension schema in this plain PostgreSQL test container.
+        await using (var migrationPrerequisites = new NpgsqlCommand(@"
+            DO $roles$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
+                    CREATE ROLE postgres SUPERUSER;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                    CREATE ROLE anon NOLOGIN;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+                    CREATE ROLE authenticated NOLOGIN;
+                END IF;
+            END
+            $roles$;
+            CREATE SCHEMA IF NOT EXISTS extensions;
+            CREATE OR REPLACE FUNCTION public.rls_auto_enable()
+            RETURNS event_trigger
+            LANGUAGE plpgsql
+            AS $function$
+            BEGIN
+                NULL;
+            END;
+            $function$;", connection))
+        {
+            await migrationPrerequisites.ExecuteNonQueryAsync();
+        }
+
+        await _database.ExecuteSqlFileAsync("migrations", "14_user_birthdays_and_age_filtering.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "14_user_birthdays_and_age_filtering.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "15_profile_privacy_and_relationships.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "15_profile_privacy_and_relationships.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "16_catalog_search_trigram_indexes.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "16_catalog_search_trigram_indexes.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "17_runtime_role_rls_and_grant_hardening.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "17_runtime_role_rls_and_grant_hardening.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "18_harden_profile_trigger_and_migration_ledger.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "18_harden_profile_trigger_and_migration_ledger.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "19_restore_password_hash_update_permission.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "19_restore_password_hash_update_permission.sql");
+
         // Reconcile the journal after the migration sequence.
         await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
+
+        // The repeatable security script runs only after the full schema has reached v019.
+        await using (var revokeSessionPermissions = new NpgsqlCommand(
+            "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
+            connection))
+        {
+            await revokeSessionPermissions.ExecuteNonQueryAsync();
+        }
+        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
+        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
 
         await using (var revokeSessionPermissions = new NpgsqlCommand(
             "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
@@ -330,6 +378,8 @@ public sealed class PostgreSqlSchemaTests
                 has_column_privilege('localoca_app', 'public.users', 'display_name', 'UPDATE')
                 AND has_column_privilege('localoca_app', 'public.users', 'residence_country', 'UPDATE')
                 AND has_column_privilege('localoca_app', 'public.users', 'residence_city', 'UPDATE')
+                AND has_column_privilege('localoca_app', 'public.users', 'date_of_birth', 'UPDATE')
+                AND has_column_privilege('localoca_app', 'public.users', 'password_hash', 'UPDATE')
                 AND has_table_privilege('localoca_app', 'public.user_sessions', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_sessions', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_sessions', 'UPDATE')
@@ -345,6 +395,26 @@ public sealed class PostgreSqlSchemaTests
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
+                AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT')
+                AND has_table_privilege('localoca_app', 'public.user_profile_visibility', 'SELECT')
+                AND has_table_privilege('localoca_app', 'public.user_friendships', 'SELECT')
+                AND has_table_privilege('localoca_app', 'public.user_blocks', 'SELECT')
+                AND NOT has_table_privilege('localoca_app', 'public.localoca_schema_migrations', 'SELECT')
+                AND NOT has_table_privilege('anon', 'public.users', 'SELECT')
+                AND NOT has_table_privilege('authenticated', 'public.users', 'SELECT')
+                AND EXISTS (SELECT 1 FROM pg_policy
+                            WHERE polrelid = 'public.users'::regclass
+                              AND polname = 'localoca_app_runtime_access')
+                AND EXISTS (SELECT 1 FROM pg_policy
+                            WHERE polrelid = 'public.attractions'::regclass
+                              AND polname = 'localoca_app_catalog_read')
+                AND to_regclass('public.ix_attractions_name_trgm') IS NOT NULL
+                AND to_regclass('public.ix_cities_name_trgm') IS NOT NULL
+                AND to_regclass('public.ix_countries_name_trgm') IS NOT NULL
+                AND to_regclass('public.ix_user_friendships_requested_by_status') IS NOT NULL
+                AND EXISTS (SELECT 1 FROM pg_proc
+                            WHERE oid = 'public.create_default_user_profile_visibility()'::regprocedure
+                              AND proconfig @> ARRAY['search_path=pg_catalog, public'])
                 AND has_column_privilege('localoca_app', 'public.photos', 'image_data', 'SELECT')
                 AND has_column_privilege('localoca_app', 'public.user_map_place_photos', 'image_data', 'INSERT')
                 AND NOT (SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls
@@ -357,13 +427,17 @@ public sealed class PostgreSqlSchemaTests
         Assert.True((bool)(await permissionCheck.ExecuteScalarAsync() ?? false));
 
         await using var versionCheck = new NpgsqlCommand(@"
-            SELECT count(*) = 8
+            SELECT count(*) = 15
                AND count(*) FILTER (WHERE name IN (
                    'migrate_wishlist', 'migrate_user_map_places', 'migrate_photo_storage',
-                   'server_sessions', 'map_marker_viewport_indexes',
-                   'map_marker_visit_lookup_index', 'user_residence_location', 'user_avatars')) = 8
+                   'server_sessions', 'map_marker_viewport_indexes', 'map_marker_visit_lookup_index',
+                   'user_residence_location', 'distributed_auth_rate_limits', 'user_avatars',
+                   'user_birthdays_and_age_filtering', 'profile_privacy_and_relationships',
+                   'catalog_search_trigram_indexes', 'runtime_role_rls_policies_and_grant_hardening',
+                   'harden_profile_trigger_and_migration_ledger',
+                   'restore_password_hash_update_permission')) = 15
             FROM public.localoca_schema_migrations
-            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 13)", connection);
+            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)", connection);
         Assert.True((bool)(await versionCheck.ExecuteScalarAsync() ?? false));
     }
 

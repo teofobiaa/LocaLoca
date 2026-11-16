@@ -35,10 +35,19 @@ public sealed class RuntimeRoleBootstrapTests
         // Keep this test independent of execution order and leave the shared test database unchanged.
         await using var transaction = await connection.BeginTransactionAsync();
         await using (var resetRole = new NpgsqlCommand(@"
-            DO $$
+            DO $
+            DECLARE policy_row record;
             BEGIN
                 IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'localoca_app') THEN
                     EXECUTE 'DROP OWNED BY localoca_app';
+                    FOR policy_row IN
+                        SELECT schemaname, tablename, policyname
+                        FROM pg_policies
+                        WHERE 'localoca_app' = ANY (roles)
+                    LOOP
+                        EXECUTE format('DROP POLICY %I ON %I.%I',
+                            policy_row.policyname, policy_row.schemaname, policy_row.tablename);
+                    END LOOP;
                     EXECUTE 'DROP ROLE localoca_app';
                 END IF;
             END
@@ -64,7 +73,8 @@ public sealed class RuntimeRoleBootstrapTests
                 has_table_privilege('localoca_app', 'public.user_avatars', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
-                AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')",
+                AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
+                AND has_column_privilege('localoca_app', 'public.users', 'password_hash', 'UPDATE')",
             connection,
             transaction))
         {

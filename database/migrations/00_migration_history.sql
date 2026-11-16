@@ -105,3 +105,60 @@ WHERE (SELECT count(DISTINCT column_name)=5 FROM information_schema.columns
              WHERE conrelid=to_regclass('public.user_avatars')
                AND conname='ck_user_avatars_thumbnail_size')
 ON CONFLICT (version) DO NOTHING;
+
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 14,'user_birthdays_and_age_filtering','adopted'
+WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='users' AND column_name='date_of_birth' AND data_type='date')
+ AND (SELECT count(DISTINCT column_name)=2 FROM information_schema.columns WHERE table_schema='public' AND table_name='attractions' AND column_name IN ('min_recommended_age','max_recommended_age'))
+ AND (SELECT count(DISTINCT column_name)=6 FROM information_schema.columns WHERE table_schema='public' AND table_name='birthday_contacts' AND column_name IN ('birthday_contact_id','user_id','display_name','birth_date','created_at','updated_at'))
+ AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid=to_regclass('public.users') AND conname='ck_users_date_of_birth_range')
+ AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid=to_regclass('public.attractions') AND conname='ck_attractions_recommended_age_range')
+ AND to_regclass('public.ix_birthday_contacts_user_birth_date') IS NOT NULL
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 15,'profile_privacy_and_relationships','adopted'
+WHERE to_regclass('public.user_profile_visibility') IS NOT NULL
+ AND to_regclass('public.user_friendships') IS NOT NULL
+ AND to_regclass('public.user_blocks') IS NOT NULL
+ AND to_regprocedure('public.create_default_user_profile_visibility()') IS NOT NULL
+ AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.users') AND tgname='trg_users_default_profile_visibility' AND NOT tgisinternal)
+ AND to_regclass('public.ix_user_friendships_low_status') IS NOT NULL
+ AND to_regclass('public.ix_user_friendships_high_status') IS NOT NULL
+ AND to_regclass('public.ix_user_blocks_blocked') IS NOT NULL
+ AND NOT EXISTS (SELECT 1 FROM public.users u LEFT JOIN public.user_profile_visibility v ON v.user_id=u.user_id WHERE v.user_id IS NULL)
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 16,'catalog_search_trigram_indexes','adopted'
+WHERE EXISTS (SELECT 1 FROM pg_extension WHERE extname='pg_trgm')
+ AND to_regclass('public.ix_attractions_name_trgm') IS NOT NULL
+ AND to_regclass('public.ix_cities_name_trgm') IS NOT NULL
+ AND to_regclass('public.ix_countries_name_trgm') IS NOT NULL
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 17,'runtime_role_rls_policies_and_grant_hardening','adopted'
+WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname='localoca_app' AND NOT rolbypassrls)
+ AND (SELECT count(*)=17 FROM pg_policies WHERE schemaname='public'
+      AND policyname IN ('localoca_app_runtime_access','localoca_app_catalog_read')
+      AND 'localoca_app'=ANY(roles))
+ AND CASE WHEN to_regrole('anon') IS NOT NULL THEN NOT has_table_privilege('anon','public.users','SELECT') ELSE true END
+ AND CASE WHEN to_regrole('authenticated') IS NOT NULL THEN NOT has_table_privilege('authenticated','public.users','SELECT') ELSE true END
+ AND (SELECT COALESCE(reloptions,ARRAY[]::text[]) @> ARRAY['security_invoker=true']
+      FROM pg_class WHERE oid=to_regclass('public.v_visit_details'))
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 18,'harden_profile_trigger_and_migration_ledger','adopted'
+WHERE to_regclass('public.ix_user_friendships_requested_by_status') IS NOT NULL
+ AND EXISTS (SELECT 1 FROM pg_proc WHERE oid=to_regprocedure('public.create_default_user_profile_visibility()')
+             AND proconfig @> ARRAY['search_path=pg_catalog, public'])
+ AND CASE WHEN to_regrole('localoca_app') IS NOT NULL THEN NOT has_table_privilege('localoca_app','public.localoca_schema_migrations','SELECT') ELSE false END
+ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 19,'restore_password_hash_update_permission','adopted'
+WHERE CASE WHEN to_regrole('localoca_app') IS NOT NULL THEN has_column_privilege('localoca_app','public.users','password_hash','UPDATE') ELSE false END
+ON CONFLICT (version) DO NOTHING;

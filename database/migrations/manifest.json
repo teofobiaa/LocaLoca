@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 13,
+  "currentSchemaVersion": 19,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -25,7 +25,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "438f63a837280e73d92db83718cc50d997d2f08519318ea33674ac88dbc91118"
+    "sha256": "a800ff49f4e5c46bf9d7a794857d5a0e806946a2610546ee4bd99254cd1ff05b"
   },
   "schemaMigrations": [
     {
@@ -81,6 +81,42 @@
       "name": "user_avatars",
       "path": "migrations/13_user_avatars.sql",
       "sha256": "ed05f0afbbf76d7c518404a02ca9e69cab5f13bd60ab70fb6da9e36bb6600c24"
+    },
+    {
+      "version": 14,
+      "name": "user_birthdays_and_age_filtering",
+      "path": "migrations/14_user_birthdays_and_age_filtering.sql",
+      "sha256": "c4debda91c2f25f894b086c0d97d354a0ca6f3cfd8cbf7532948b382771b4809"
+    },
+    {
+      "version": 15,
+      "name": "profile_privacy_and_relationships",
+      "path": "migrations/15_profile_privacy_and_relationships.sql",
+      "sha256": "7ebdbb56d52fa679e45830330edd6e40c750d9d96ec87b204f8775d88ba3e369"
+    },
+    {
+      "version": 16,
+      "name": "catalog_search_trigram_indexes",
+      "path": "migrations/16_catalog_search_trigram_indexes.sql",
+      "sha256": "0ba203dd159476cef37dc5f31e86a7a60d48bbb2682c1f0cc04afff9baf1ccc3"
+    },
+    {
+      "version": 17,
+      "name": "runtime_role_rls_policies_and_grant_hardening",
+      "path": "migrations/17_runtime_role_rls_and_grant_hardening.sql",
+      "sha256": "6cecb9067182ea1b2b0fa09f7ac45c263ae226d8be078c9fd0cccfc07c9e2719"
+    },
+    {
+      "version": 18,
+      "name": "harden_profile_trigger_and_migration_ledger",
+      "path": "migrations/18_harden_profile_trigger_and_migration_ledger.sql",
+      "sha256": "716f542b83c0cbd4983c71d4ff992abcfca18e4e0ff2e157ea2c562924d35e97"
+    },
+    {
+      "version": 19,
+      "name": "restore_password_hash_update_permission",
+      "path": "migrations/19_restore_password_hash_update_permission.sql",
+      "sha256": "670f30e5f68378fed4332968000e245f3af03b04164d2a82ebb275747b7dcc51"
     }
   ],
   "securityScripts": [
@@ -89,14 +125,14 @@
       "name": "create_app_role",
       "path": "security/05_create_app_role.sql",
       "repeatable": false,
-      "sha256": "02fc2a43f1eedc524e581a3915bdb97eada4e68070dcfe84efe6f6f0ca32e1e3"
+      "sha256": "2e5682458c0b380b0c36fe7fd50439a3e7b7fc8a7c1944fd4130b61e75703ee6"
     },
     {
       "version": 6,
       "name": "update_runtime_permissions",
       "path": "security/06_update_runtime_permissions.sql",
       "repeatable": true,
-      "sha256": "41c5d33282e8ad274a52a35fa28fd0defcf5232760110da8c395c0a92e8984f5"
+      "sha256": "538756b4b7f0b96d3a8e84ace46f81b9582cdc540fe24c38c51691fd405dd376"
     }
   ]
 }
