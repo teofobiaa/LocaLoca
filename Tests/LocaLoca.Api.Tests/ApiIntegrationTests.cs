@@ -1155,6 +1155,7 @@ public sealed class ApiIntegrationTests
             Assert.Single(items.EnumerateArray());
             Assert.Equal(viewer.UserId, items[0].GetProperty("userId").GetInt32());
             Assert.True(items[0].GetProperty("isIncoming").GetBoolean());
+            Assert.False(items[0].TryGetProperty("displayName", out _));
         }
 
         using var accept = await ownerClient.PostAsync($"/api/me/friend-requests/{viewer.UserId}/accept", content: null);
@@ -1168,9 +1169,27 @@ public sealed class ApiIntegrationTests
             Assert.Equal("Privacy test city", friendProfile.RootElement.GetProperty("residenceCity").GetString());
         }
 
+        using var privateNameSettings = await ownerClient.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "private",
+            avatarVisibility = "private",
+            residenceCountryVisibility = "registered",
+            residenceCityVisibility = "friends"
+        });
+        Assert.Equal(HttpStatusCode.OK, privateNameSettings.StatusCode);
+
+        using var friendProfileWithPrivateName = await viewerClient.GetAsync($"/api/users/{owner.UserId}/profile");
+        using (var privateNameJson = JsonDocument.Parse(await friendProfileWithPrivateName.Content.ReadAsStringAsync()))
+            Assert.Equal(JsonValueKind.Null, privateNameJson.RootElement.GetProperty("displayName").ValueKind);
+
         using var friendsResponse = await ownerClient.GetAsync("/api/me/friends");
         using (var friendsJson = JsonDocument.Parse(await friendsResponse.Content.ReadAsStringAsync()))
-            Assert.Single(friendsJson.RootElement.GetProperty("items").EnumerateArray());
+        {
+            var friendItems = friendsJson.RootElement.GetProperty("items");
+            Assert.Single(friendItems.EnumerateArray());
+            Assert.Equal(JsonValueKind.Null, friendItems[0].GetProperty("displayName").ValueKind);
+            Assert.Equal(JsonValueKind.Null, friendItems[0].GetProperty("hasAvatar").ValueKind);
+        }
 
         using var block = await ownerClient.PostAsync($"/api/users/{viewer.UserId}/block", content: null);
         Assert.Equal(HttpStatusCode.OK, block.StatusCode);
@@ -1184,8 +1203,11 @@ public sealed class ApiIntegrationTests
 
         using var blockedList = await ownerClient.GetAsync("/api/me/blocks");
         using (var blockedJson = JsonDocument.Parse(await blockedList.Content.ReadAsStringAsync()))
+        {
             Assert.Contains(blockedJson.RootElement.GetProperty("items").EnumerateArray(),
                 item => item.GetProperty("userId").GetInt32() == viewer.UserId);
+            Assert.False(blockedJson.RootElement.GetProperty("items")[0].TryGetProperty("displayName", out _));
+        }
 
         using var friendRequestWhileBlocked = await viewerClient.PostAsync(
             $"/api/users/{owner.UserId}/friend-request", content: null);
