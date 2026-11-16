@@ -35,13 +35,13 @@ public static class RelationshipEndpoints
             }
 
             await using var command = new NpgsqlCommand(@"
-                INSERT INTO public.user_friendships (
+                INSERT INTO public.user_friendships AS existing (
                     user_low_id, user_high_id, requested_by_user_id, status)
                 VALUES (@low, @high, @requester, 'pending')
                 ON CONFLICT (user_low_id, user_high_id) DO UPDATE
                 SET status = CASE
-                        WHEN public.user_friendships.status = 'pending'
-                         AND public.user_friendships.requested_by_user_id <> EXCLUDED.requested_by_user_id
+                        WHEN existing.status = 'pending'
+                         AND existing.requested_by_user_id <> EXCLUDED.requested_by_user_id
                         THEN 'accepted'
                         ELSE public.user_friendships.status
                     END,
@@ -63,9 +63,7 @@ public static class RelationshipEndpoints
             await transaction.CommitAsync(cancellationToken);
             var message = status == "accepted"
                 ? "Вы теперь друзья."
-                : requestedBy == userId
-                    ? "Запрос дружбы уже отправлен."
-                    : "Запрос дружбы отправлен.";
+                : "Запрос дружбы отправлен.";
             return Results.Ok(new MessageDto(message));
         });
 
