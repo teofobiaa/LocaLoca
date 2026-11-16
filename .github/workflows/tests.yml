@@ -8,6 +8,7 @@ on:
       - 'refactor/**'
       - 'security/**'
       - 'test/**'
+      - 'fix/**'
     paths:
       - 'Tests/**'
       - 'Tools/PasswordHashBenchmarks/**'
@@ -61,6 +62,17 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Execute map JavaScript tests
+        run: |
+          node --check Server/LocaLoca.Api/wwwroot/map-date.js
+          node --check Server/LocaLoca.Api/wwwroot/map.js
+          node --test Tests/MapJavaScriptTests/*.test.cjs
 
       - name: Run API integration tests
         run: dotnet test Tests/LocaLoca.Api.Tests/LocaLoca.Api.Tests.csproj --configuration Release --verbosity normal --logger "console;verbosity=detailed"
