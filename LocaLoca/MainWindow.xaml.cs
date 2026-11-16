@@ -23,7 +23,9 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<AttractionDto> _attractions = new();
     private readonly ObservableCollection<VisitDto> _visits = new();
     private readonly ObservableCollection<AttractionDto> _wishlistAttractions = new();
+    private readonly ObservableCollection<BirthdayContactDto> _birthdayContacts = new();
     private readonly HashSet<int> _wishlistIds = new();
+    private int? _editingBirthdayContactId;
     private readonly Dictionary<int, AttractionDto> _attractionCache = new();
     private const int CatalogPageSize = 50;
     private int _catalogPage = 1;
@@ -43,6 +45,7 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<AttractionDto> Attractions => _attractions;
     public ObservableCollection<VisitDto> Visits => _visits;
     public ObservableCollection<AttractionDto> WishlistAttractions => _wishlistAttractions;
+    public ObservableCollection<BirthdayContactDto> BirthdayContacts => _birthdayContacts;
     public MainWindow()
     {
         InitializeComponent();
@@ -93,6 +96,7 @@ public sealed partial class MainWindow : Window
                 ShowPage("home");
                 SetAuthStatus("Сессия восстановлена.", "success");
                 await LoadMainDataAsync();
+                await LoadDashboardBirthdayReminderAsync();
             }
             else
             {
@@ -140,6 +144,7 @@ public sealed partial class MainWindow : Window
             MainShell.Visibility = Visibility.Visible;
             ShowPage("home");
             await LoadMainDataAsync();
+            await LoadDashboardBirthdayReminderAsync();
         }
         catch (Exception ex)
         {
@@ -832,6 +837,7 @@ public sealed partial class MainWindow : Window
         SetResidenceStatus(string.Empty, "muted");
         ShowPage("profile");
         await LoadProfileAvatarAsync();
+        await LoadBirthdaySettingsAsync();
     }
 
 
@@ -1041,6 +1047,296 @@ public sealed partial class MainWindow : Window
         {
             ProfileResidenceSaveButton.IsEnabled = true;
         }
+    }
+
+
+    private static DateTimeOffset ToCalendarDate(DateOnly value)
+    {
+        var localDate = new DateTime(value.Year, value.Month, value.Day, 0, 0, 0, DateTimeKind.Unspecified);
+        return new DateTimeOffset(localDate, TimeZoneInfo.Local.GetUtcOffset(localDate));
+    }
+
+    private void InitializeBirthdayDatePickers()
+    {
+        var minimum = ToCalendarDate(new DateOnly(1900, 1, 1));
+        var maximum = ToCalendarDate(DateOnly.FromDateTime(DateTime.Today));
+        ProfileBirthDatePicker.MinDate = minimum;
+        ProfileBirthDatePicker.MaxDate = maximum;
+        BirthdayContactDatePicker.MinDate = minimum;
+        BirthdayContactDatePicker.MaxDate = maximum;
+    }
+
+    private async Task LoadBirthdaySettingsAsync()
+    {
+        InitializeBirthdayDatePickers();
+        SetBirthDateStatus(string.Empty, "muted");
+        SetBirthdayContactsStatus(string.Empty, "muted");
+        ResetBirthdayContactEditor();
+
+        try
+        {
+            var birthDate = await _api.GetMyBirthDateAsync();
+            ProfileBirthDatePicker.Date = birthDate is { } date ? ToCalendarDate(date) : null;
+            await LoadBirthdayContactsAsync();
+        }
+        catch (Exception ex)
+        {
+            SetBirthDateStatus("Не удалось загрузить дату рождения: " + ex.Message, "error");
+            SetBirthdayContactsStatus("Не удалось загрузить дни рождения друзей: " + ex.Message, "error");
+        }
+    }
+
+    private async Task LoadBirthdayContactsAsync()
+    {
+        var contacts = await _api.GetBirthdayContactsAsync(DateOnly.FromDateTime(DateTime.Today));
+        _birthdayContacts.Clear();
+        foreach (var contact in contacts)
+            _birthdayContacts.Add(contact);
+
+        UpdateDashboardBirthdayReminder(contacts);
+    }
+
+    private async Task LoadDashboardBirthdayReminderAsync()
+    {
+        try
+        {
+            var contacts = await _api.GetBirthdayContactsAsync(DateOnly.FromDateTime(DateTime.Today));
+            UpdateDashboardBirthdayReminder(contacts);
+        }
+        catch (Exception ex)
+        {
+            DashboardBirthdayReminderText.Text = "Не удалось загрузить напоминания о днях рождения: " + ex.Message;
+        }
+    }
+
+    private void UpdateDashboardBirthdayReminder(IReadOnlyList<BirthdayContactDto> contacts)
+    {
+        if (contacts.Count == 0)
+        {
+            DashboardBirthdayReminderText.Text = "Добавь дни рождения друзей в профиле — ближайшие напоминания появятся здесь.";
+            return;
+        }
+
+        var next = contacts[0];
+        var when = next.DaysUntilBirthday switch
+        {
+            0 => "Сегодня",
+            1 => "Завтра",
+            _ => $"Через {next.DaysUntilBirthday} дн."
+        };
+        DashboardBirthdayReminderText.Text = $"{when}: день рождения — {next.DisplayName}. {next.BirthdayDetails}";
+    }
+
+    private async void SaveBirthDate_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProfileBirthDatePicker.Date is not { } selectedDate)
+        {
+            SetBirthDateStatus("Выбери дату рождения или нажми «Очистить», чтобы удалить сохранённую дату.", "error");
+            return;
+        }
+
+        var date = DateOnly.FromDateTime(selectedDate.DateTime);
+        if (date > DateOnly.FromDateTime(DateTime.Today))
+        {
+            SetBirthDateStatus("Дата рождения не может быть в будущем.", "error");
+            return;
+        }
+
+        ProfileBirthDateSaveButton.IsEnabled = false;
+        ProfileBirthDateClearButton.IsEnabled = false;
+        SetBirthDateStatus("Сохраняем приватную дату рождения…", "muted");
+        try
+        {
+            await _api.UpdateMyBirthDateAsync(date);
+            SetBirthDateStatus("Дата рождения сохранена. Она не отображается в публичном профиле.", "success");
+            await RefreshLocalRecommendationsAsync();
+        }
+        catch (Exception ex)
+        {
+            SetBirthDateStatus(ex.Message, "error");
+        }
+        finally
+        {
+            ProfileBirthDateSaveButton.IsEnabled = true;
+            ProfileBirthDateClearButton.IsEnabled = true;
+        }
+    }
+
+    private async void ClearBirthDate_Click(object sender, RoutedEventArgs e)
+    {
+        ProfileBirthDateSaveButton.IsEnabled = false;
+        ProfileBirthDateClearButton.IsEnabled = false;
+        try
+        {
+            await _api.UpdateMyBirthDateAsync(null);
+            ProfileBirthDatePicker.Date = null;
+            SetBirthDateStatus("Дата рождения удалена. Возрастные ограничения для рекомендаций без неё будут применяться строго.", "success");
+            await RefreshLocalRecommendationsAsync();
+        }
+        catch (Exception ex)
+        {
+            SetBirthDateStatus(ex.Message, "error");
+        }
+        finally
+        {
+            ProfileBirthDateSaveButton.IsEnabled = true;
+            ProfileBirthDateClearButton.IsEnabled = true;
+        }
+    }
+
+    private async void SaveBirthdayContact_Click(object sender, RoutedEventArgs e)
+    {
+        var displayName = BirthdayContactNameBox.Text.Trim();
+        if (displayName.Length is < 1 or > 80)
+        {
+            SetBirthdayContactsStatus("Имя должно содержать от 1 до 80 символов.", "error");
+            return;
+        }
+        if (BirthdayContactDatePicker.Date is not { } selectedDate)
+        {
+            SetBirthdayContactsStatus("Выбери дату рождения контакта.", "error");
+            return;
+        }
+
+        var birthDate = DateOnly.FromDateTime(selectedDate.DateTime);
+        if (birthDate > DateOnly.FromDateTime(DateTime.Today))
+        {
+            SetBirthdayContactsStatus("Дата рождения не может быть в будущем.", "error");
+            return;
+        }
+
+        BirthdayContactSaveButton.IsEnabled = false;
+        BirthdayContactCancelEditButton.IsEnabled = false;
+        SetBirthdayContactsStatus(_editingBirthdayContactId.HasValue ? "Сохраняем изменения…" : "Добавляем контакт…", "muted");
+        try
+        {
+            if (_editingBirthdayContactId is { } contactId)
+                await _api.UpdateBirthdayContactAsync(contactId, displayName, birthDate);
+            else
+                await _api.CreateBirthdayContactAsync(displayName, birthDate);
+
+            ResetBirthdayContactEditor();
+            await LoadBirthdayContactsAsync();
+            SetBirthdayContactsStatus("День рождения сохранён. Напоминание и ежегодное событие доступны в списке.", "success");
+        }
+        catch (Exception ex)
+        {
+            SetBirthdayContactsStatus(ex.Message, "error");
+        }
+        finally
+        {
+            BirthdayContactSaveButton.IsEnabled = true;
+            BirthdayContactCancelEditButton.IsEnabled = true;
+        }
+    }
+
+    private void EditBirthdayContact_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || !int.TryParse(Convert.ToString(button.Tag), out var contactId))
+            return;
+
+        var contact = _birthdayContacts.FirstOrDefault(item => item.Id == contactId);
+        if (contact is null) return;
+
+        _editingBirthdayContactId = contact.Id;
+        BirthdayContactNameBox.Text = contact.DisplayName;
+        BirthdayContactDatePicker.Date = ToCalendarDate(contact.BirthDate);
+        BirthdayContactSaveButton.Content = "Сохранить";
+        BirthdayContactCancelEditButton.Visibility = Visibility.Visible;
+        SetBirthdayContactsStatus("Изменяешь контакт: " + contact.DisplayName, "muted");
+    }
+
+    private void CancelBirthdayContactEdit_Click(object sender, RoutedEventArgs e)
+    {
+        ResetBirthdayContactEditor();
+        SetBirthdayContactsStatus("Редактирование отменено.", "muted");
+    }
+
+    private void ResetBirthdayContactEditor()
+    {
+        _editingBirthdayContactId = null;
+        BirthdayContactNameBox.Text = string.Empty;
+        BirthdayContactDatePicker.Date = null;
+        BirthdayContactSaveButton.Content = "Добавить";
+        BirthdayContactCancelEditButton.Visibility = Visibility.Collapsed;
+    }
+
+    private async void DeleteBirthdayContact_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || !int.TryParse(Convert.ToString(button.Tag), out var contactId))
+            return;
+
+        button.IsEnabled = false;
+        try
+        {
+            await _api.DeleteBirthdayContactAsync(contactId);
+            if (_editingBirthdayContactId == contactId)
+                ResetBirthdayContactEditor();
+            await LoadBirthdayContactsAsync();
+            SetBirthdayContactsStatus("День рождения удалён из твоего списка.", "success");
+        }
+        catch (Exception ex)
+        {
+            SetBirthdayContactsStatus(ex.Message, "error");
+        }
+        finally
+        {
+            button.IsEnabled = true;
+        }
+    }
+
+    private async void ExportBirthdayCalendar_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || !int.TryParse(Convert.ToString(button.Tag), out var contactId))
+            return;
+
+        button.IsEnabled = false;
+        try
+        {
+            var picker = new FileSavePicker
+            {
+                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                SuggestedFileName = $"birthday-{contactId}"
+            };
+            picker.FileTypeChoices.Add("Календарь iCalendar", new List<string> { ".ics" });
+            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
+            var file = await picker.PickSaveFileAsync();
+            if (file is null) return;
+
+            var calendar = await _api.GetBirthdayCalendarAsync(contactId);
+            await FileIO.WriteTextAsync(file, calendar, UnicodeEncoding.Utf8);
+            SetBirthdayContactsStatus("Файл календаря сохранён. Импортируй .ics в календарь, чтобы получать ежегодные напоминания.", "success");
+        }
+        catch (Exception ex)
+        {
+            SetBirthdayContactsStatus(ex.Message, "error");
+        }
+        finally
+        {
+            button.IsEnabled = true;
+        }
+    }
+
+    private void SetBirthDateStatus(string message, string tone)
+    {
+        ProfileBirthDateStatusText.Text = message;
+        ProfileBirthDateStatusText.Foreground = Brush(tone switch
+        {
+            "success" => "#4F8758",
+            "error" => "#B85D4D",
+            _ => "#7A8980"
+        });
+    }
+
+    private void SetBirthdayContactsStatus(string message, string tone)
+    {
+        BirthdayContactsStatusText.Text = message;
+        BirthdayContactsStatusText.Foreground = Brush(tone switch
+        {
+            "success" => "#4F8758",
+            "error" => "#B85D4D",
+            _ => "#7A8980"
+        });
     }
 
     private void SetResidenceStatus(string message, string tone)
