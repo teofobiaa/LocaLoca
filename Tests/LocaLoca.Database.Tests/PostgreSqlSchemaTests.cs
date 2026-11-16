@@ -313,6 +313,19 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "13_user_avatars.sql");
         await _database.ExecuteSqlFileAsync("migrations", "13_user_avatars.sql");
 
+        // Simulate a v013 database before applying the catalog trigram migration.
+        await using (var resetCatalogSearchIndexes = new NpgsqlCommand(@"
+            DROP INDEX IF EXISTS public.ix_attractions_name_trgm;
+            DROP INDEX IF EXISTS public.ix_cities_name_trgm;
+            DROP INDEX IF EXISTS public.ix_countries_name_trgm;
+            DROP EXTENSION IF EXISTS pg_trgm;
+            DELETE FROM public.localoca_schema_migrations WHERE version = 14;", connection))
+        {
+            await resetCatalogSearchIndexes.ExecuteNonQueryAsync();
+        }
+        await _database.ExecuteSqlFileAsync("migrations", "14_catalog_search_trigram_indexes.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "14_catalog_search_trigram_indexes.sql");
+
         // Reconcile the journal after the migration sequence.
         await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
 
@@ -357,13 +370,14 @@ public sealed class PostgreSqlSchemaTests
         Assert.True((bool)(await permissionCheck.ExecuteScalarAsync() ?? false));
 
         await using var versionCheck = new NpgsqlCommand(@"
-            SELECT count(*) = 8
+            SELECT count(*) = 9
                AND count(*) FILTER (WHERE name IN (
                    'migrate_wishlist', 'migrate_user_map_places', 'migrate_photo_storage',
                    'server_sessions', 'map_marker_viewport_indexes',
-                   'map_marker_visit_lookup_index', 'user_residence_location', 'user_avatars')) = 8
+                   'map_marker_visit_lookup_index', 'user_residence_location', 'user_avatars',
+                   'catalog_search_trigram_indexes')) = 9
             FROM public.localoca_schema_migrations
-            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 13)", connection);
+            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 13, 14)", connection);
         Assert.True((bool)(await versionCheck.ExecuteScalarAsync() ?? false));
     }
 
