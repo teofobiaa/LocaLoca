@@ -101,7 +101,7 @@ actual_sequence_acl AS (
     JOIN pg_namespace n ON n.oid = c.relnamespace
     CROSS JOIN app_role r
     CROSS JOIN LATERAL aclexplode(
-        COALESCE(c.relacl, acldefault('S', c.relowner))
+        COALESCE(c.relacl, acldefault('s', c.relowner))
     ) acl
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
       AND n.nspname NOT LIKE 'pg_toast%'
@@ -559,7 +559,7 @@ findings AS (
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     CROSS JOIN LATERAL aclexplode(
-        COALESCE(c.relacl, acldefault('S', c.relowner))
+        COALESCE(c.relacl, acldefault('s', c.relowner))
     ) acl
     WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
       AND n.nspname NOT LIKE 'pg_toast%'
