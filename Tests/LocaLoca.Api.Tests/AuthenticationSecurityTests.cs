@@ -177,6 +177,37 @@ public sealed class AuthenticationSecurityTests
     }
 
     [Fact]
+    public async Task Active_Session_Updates_LastSeen_At_At_Most_Every_Three_Minutes()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+
+        await SetSessionLastSeenAtAsync(account.Token, DateTimeOffset.UtcNow.AddMinutes(-2));
+        var recentLastSeenAt = await GetSessionLastSeenAtAsync(account.Token);
+
+        using (var recentRequest = await client.GetAsync("/api/me/visits"))
+            Assert.Equal(HttpStatusCode.OK, recentRequest.StatusCode);
+
+        Assert.Equal(recentLastSeenAt, await GetSessionLastSeenAtAsync(account.Token));
+
+        await SetSessionLastSeenAtAsync(account.Token, DateTimeOffset.UtcNow.AddMinutes(-4));
+        var staleLastSeenAt = await GetSessionLastSeenAtAsync(account.Token);
+
+        using (var staleRequest = await client.GetAsync("/api/me/visits"))
+            Assert.Equal(HttpStatusCode.OK, staleRequest.StatusCode);
+
+        var refreshedLastSeenAt = await GetSessionLastSeenAtAsync(account.Token);
+        Assert.True(refreshedLastSeenAt > staleLastSeenAt);
+
+        using (var repeatedRequest = await client.GetAsync("/api/me/visits"))
+            Assert.Equal(HttpStatusCode.OK, repeatedRequest.StatusCode);
+
+        Assert.Equal(refreshedLastSeenAt, await GetSessionLastSeenAtAsync(account.Token));
+    }
+
+    [Fact]
     public async Task Active_Session_Survives_Api_Host_Restart_With_The_Same_Secret()
     {
         string token;
@@ -366,6 +397,32 @@ public sealed class AuthenticationSecurityTests
 
         Assert.False(string.IsNullOrWhiteSpace(token));
         return new TestAccount(login, password, token!, userId);
+    }
+
+    private async Task SetSessionLastSeenAtAsync(string token, DateTimeOffset lastSeenAt)
+    {
+        var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "UPDATE user_sessions SET last_seen_at = @lastSeenAt WHERE token_hash = @tokenHash",
+            connection);
+        command.Parameters.AddWithValue("lastSeenAt", lastSeenAt);
+        command.Parameters.AddWithValue("tokenHash", tokenHash);
+        Assert.Equal(1, await command.ExecuteNonQueryAsync());
+    }
+
+    private async Task<DateTimeOffset> GetSessionLastSeenAtAsync(string token)
+    {
+        var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "SELECT last_seen_at FROM user_sessions WHERE token_hash = @tokenHash",
+            connection);
+        command.Parameters.AddWithValue("tokenHash", tokenHash);
+        var value = await command.ExecuteScalarAsync();
+        return Assert.IsType<DateTimeOffset>(value);
     }
 
     private async Task<long> CountUsersAsync(string login)
