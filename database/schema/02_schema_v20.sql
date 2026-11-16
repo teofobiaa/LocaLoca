@@ -1,4 +1,4 @@
--- Loca Loca: схема базы данных (PostgreSQL 12+)
+-- Loca Loca: схема базы данных (PostgreSQL 15+)
 -- Перед запуском создайте базу отдельной командой:
 --     CREATE DATABASE loca_loca ENCODING 'UTF8';
 -- Затем подключитесь к loca_loca и выполните этот скрипт, после него — 02_seed.sql.
