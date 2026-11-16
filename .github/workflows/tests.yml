@@ -54,7 +54,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: trx-unit-${{ github.run_id }}-${{ github.run_attempt }}
-          path: Tests/LocaLoca.Tests/TestResults/*.trx
+          path: Tests/LocaLoca.Tests/TestResults/**/*.trx
           if-no-files-found: ignore
           retention-days: 30
 
@@ -79,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: trx-api-${{ github.run_id }}-${{ github.run_attempt }}
-          path: Tests/LocaLoca.Api.Tests/TestResults/*.trx
+          path: Tests/LocaLoca.Api.Tests/TestResults/**/*.trx
           if-no-files-found: ignore
           retention-days: 30
 
@@ -104,6 +104,6 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: trx-database-${{ github.run_id }}-${{ github.run_attempt }}
-          path: Tests/LocaLoca.Database.Tests/TestResults/*.trx
+          path: Tests/LocaLoca.Database.Tests/TestResults/**/*.trx
           if-no-files-found: ignore
           retention-days: 30
