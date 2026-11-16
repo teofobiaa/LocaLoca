@@ -53,5 +53,8 @@
     <Content Include="../../database/migrations/13_user_avatars.sql"
              Link="Database/migrations/13_user_avatars.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/16_catalog_search_trigram_indexes.sql"
+             Link="Database/migrations/16_catalog_search_trigram_indexes.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
