@@ -1064,6 +1064,174 @@ public sealed class ApiIntegrationTests
         Assert.Equal(HttpStatusCode.BadRequest, excessiveMapSize.StatusCode);
     }
 
+    [Fact]
+    public async Task Profile_Privacy_Is_Field_Specific_And_Blocks_Override_Friendship()
+    {
+        using var factory = _database.CreateFactory();
+        using var ownerClient = factory.CreateClient();
+        using var viewerClient = factory.CreateClient();
+
+        var owner = await RegisterAsync(ownerClient);
+        var viewer = await RegisterAsync(viewerClient);
+        SetBearer(ownerClient, owner.Token);
+        SetBearer(viewerClient, viewer.Token);
+
+        using var residence = await ownerClient.PutAsJsonAsync("/api/me/profile/residence", new
+        {
+            residenceCountry = "Privacy test country",
+            residenceCity = "Privacy test city"
+        });
+        Assert.Equal(HttpStatusCode.OK, residence.StatusCode);
+
+        byte[] avatarBytes = Convert.FromBase64String("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABQODxIPDRQSEBIXFRQYHjIhHj0sLiQySUBMS0dARkVQWnNiUFVtVkVGZIhlbXd7gYKBTmCNl4x9lnN+gXz/2wBDARUXFx4aHjshITt8U0ZTfHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHx8fHz/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAb/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFAEBAAAAAAAAAAAAAAAAAAAAAP/EABQRAQAAAAAAAAAAAAAAAAAAAAD/2gAMAwEAAhEDEQA/AIwAH//Z");
+        using (var avatarForm = new MultipartFormDataContent())
+        {
+            avatarForm.Add(new ByteArrayContent(avatarBytes), "file", "privacy-avatar.jpg");
+            using var avatarUpload = await ownerClient.PutAsync("/api/me/avatar", avatarForm);
+            Assert.Equal(HttpStatusCode.OK, avatarUpload.StatusCode);
+        }
+
+        using var publicAvatar = await viewerClient.GetAsync($"/api/users/{owner.UserId}/avatar?size=thumbnail");
+        Assert.Equal(HttpStatusCode.OK, publicAvatar.StatusCode);
+        Assert.Equal("private, no-store", publicAvatar.Headers.CacheControl?.ToString());
+
+        using var defaultsResponse = await ownerClient.GetAsync("/api/me/profile/privacy");
+        Assert.Equal(HttpStatusCode.OK, defaultsResponse.StatusCode);
+        using var defaults = JsonDocument.Parse(await defaultsResponse.Content.ReadAsStringAsync());
+        Assert.Equal("registered", defaults.RootElement.GetProperty("displayNameVisibility").GetString());
+        Assert.Equal("registered", defaults.RootElement.GetProperty("avatarVisibility").GetString());
+        Assert.Equal("private", defaults.RootElement.GetProperty("residenceCountryVisibility").GetString());
+        Assert.Equal("private", defaults.RootElement.GetProperty("residenceCityVisibility").GetString());
+
+        using var initialProfileResponse = await viewerClient.GetAsync($"/api/users/{owner.UserId}/profile");
+        Assert.Equal(HttpStatusCode.OK, initialProfileResponse.StatusCode);
+        using (var initialProfile = JsonDocument.Parse(await initialProfileResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal("API integration test", initialProfile.RootElement.GetProperty("displayName").GetString());
+            Assert.True(initialProfile.RootElement.GetProperty("residenceCountry").ValueKind == JsonValueKind.Null);
+            Assert.True(initialProfile.RootElement.GetProperty("residenceCity").ValueKind == JsonValueKind.Null);
+        }
+
+        using var invalidPrivacy = await ownerClient.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "public",
+            avatarVisibility = "registered",
+            residenceCountryVisibility = "private",
+            residenceCityVisibility = "private"
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, invalidPrivacy.StatusCode);
+
+        using var updatePrivacy = await ownerClient.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "friends",
+            avatarVisibility = "private",
+            residenceCountryVisibility = "registered",
+            residenceCityVisibility = "friends"
+        });
+        Assert.Equal(HttpStatusCode.OK, updatePrivacy.StatusCode);
+
+        using var hiddenAvatar = await viewerClient.GetAsync($"/api/users/{owner.UserId}/avatar?size=thumbnail");
+        Assert.Equal(HttpStatusCode.NotFound, hiddenAvatar.StatusCode);
+        using var ownerAvatar = await ownerClient.GetAsync($"/api/users/{owner.UserId}/avatar?size=thumbnail");
+        Assert.Equal(HttpStatusCode.OK, ownerAvatar.StatusCode);
+
+        using var nonFriendProfileResponse = await viewerClient.GetAsync($"/api/users/{owner.UserId}/profile");
+        using (var nonFriendProfile = JsonDocument.Parse(await nonFriendProfileResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, nonFriendProfileResponse.StatusCode);
+            Assert.Equal(JsonValueKind.Null, nonFriendProfile.RootElement.GetProperty("displayName").ValueKind);
+            Assert.Equal("Privacy test country", nonFriendProfile.RootElement.GetProperty("residenceCountry").GetString());
+            Assert.Equal(JsonValueKind.Null, nonFriendProfile.RootElement.GetProperty("residenceCity").ValueKind);
+            Assert.Equal(JsonValueKind.Null, nonFriendProfile.RootElement.GetProperty("hasAvatar").ValueKind);
+        }
+
+        using var friendRequest = await viewerClient.PostAsync($"/api/users/{owner.UserId}/friend-request", content: null);
+        Assert.Equal(HttpStatusCode.OK, friendRequest.StatusCode);
+
+        using var incomingRequests = await ownerClient.GetAsync("/api/me/friend-requests");
+        using (var incomingJson = JsonDocument.Parse(await incomingRequests.Content.ReadAsStringAsync()))
+        {
+            var items = incomingJson.RootElement.GetProperty("items");
+            Assert.Single(items.EnumerateArray());
+            Assert.Equal(viewer.UserId, items[0].GetProperty("userId").GetInt32());
+            Assert.True(items[0].GetProperty("isIncoming").GetBoolean());
+            Assert.False(items[0].TryGetProperty("displayName", out _));
+        }
+
+        using var accept = await ownerClient.PostAsync($"/api/me/friend-requests/{viewer.UserId}/accept", content: null);
+        Assert.Equal(HttpStatusCode.OK, accept.StatusCode);
+
+        using var friendProfileResponse = await viewerClient.GetAsync($"/api/users/{owner.UserId}/profile");
+        using (var friendProfile = JsonDocument.Parse(await friendProfileResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, friendProfileResponse.StatusCode);
+            Assert.Equal("API integration test", friendProfile.RootElement.GetProperty("displayName").GetString());
+            Assert.Equal("Privacy test city", friendProfile.RootElement.GetProperty("residenceCity").GetString());
+        }
+
+        using var privateNameSettings = await ownerClient.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "private",
+            avatarVisibility = "private",
+            residenceCountryVisibility = "registered",
+            residenceCityVisibility = "friends"
+        });
+        Assert.Equal(HttpStatusCode.OK, privateNameSettings.StatusCode);
+
+        using var friendProfileWithPrivateName = await viewerClient.GetAsync($"/api/users/{owner.UserId}/profile");
+        using (var privateNameJson = JsonDocument.Parse(await friendProfileWithPrivateName.Content.ReadAsStringAsync()))
+            Assert.Equal(JsonValueKind.Null, privateNameJson.RootElement.GetProperty("displayName").ValueKind);
+
+        using var friendsResponse = await ownerClient.GetAsync("/api/me/friends");
+        using (var friendsJson = JsonDocument.Parse(await friendsResponse.Content.ReadAsStringAsync()))
+        {
+            var friendItems = friendsJson.RootElement.GetProperty("items");
+            Assert.Single(friendItems.EnumerateArray());
+            Assert.Equal(JsonValueKind.Null, friendItems[0].GetProperty("displayName").ValueKind);
+            Assert.Equal(JsonValueKind.Null, friendItems[0].GetProperty("hasAvatar").ValueKind);
+        }
+
+        using var block = await ownerClient.PostAsync($"/api/users/{viewer.UserId}/block", content: null);
+        Assert.Equal(HttpStatusCode.OK, block.StatusCode);
+
+        using var blockedProfile = await viewerClient.GetAsync($"/api/users/{owner.UserId}/profile");
+        Assert.Equal(HttpStatusCode.NotFound, blockedProfile.StatusCode);
+
+        using var friendsAfterBlock = await ownerClient.GetAsync("/api/me/friends");
+        using (var friendsJson = JsonDocument.Parse(await friendsAfterBlock.Content.ReadAsStringAsync()))
+            Assert.Empty(friendsJson.RootElement.GetProperty("items").EnumerateArray());
+
+        using var blockedList = await ownerClient.GetAsync("/api/me/blocks");
+        using (var blockedJson = JsonDocument.Parse(await blockedList.Content.ReadAsStringAsync()))
+        {
+            Assert.Contains(blockedJson.RootElement.GetProperty("items").EnumerateArray(),
+                item => item.GetProperty("userId").GetInt32() == viewer.UserId);
+            Assert.False(blockedJson.RootElement.GetProperty("items")[0].TryGetProperty("displayName", out _));
+        }
+
+        using var friendRequestWhileBlocked = await viewerClient.PostAsync(
+            $"/api/users/{owner.UserId}/friend-request", content: null);
+        Assert.Equal(HttpStatusCode.NotFound, friendRequestWhileBlocked.StatusCode);
+
+        using var unblock = await ownerClient.DeleteAsync($"/api/me/blocks/{viewer.UserId}");
+        Assert.Equal(HttpStatusCode.OK, unblock.StatusCode);
+
+        using var profileAfterUnblock = await viewerClient.GetAsync($"/api/users/{owner.UserId}/profile");
+        using (var unblockedJson = JsonDocument.Parse(await profileAfterUnblock.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, profileAfterUnblock.StatusCode);
+            Assert.Equal(JsonValueKind.Null, unblockedJson.RootElement.GetProperty("displayName").ValueKind);
+            Assert.Equal("Privacy test country", unblockedJson.RootElement.GetProperty("residenceCountry").GetString());
+        }
+
+        using var ownerSelfView = await ownerClient.GetAsync($"/api/users/{owner.UserId}/profile");
+        using (var selfJson = JsonDocument.Parse(await ownerSelfView.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal("API integration test", selfJson.RootElement.GetProperty("displayName").GetString());
+            Assert.Equal("Privacy test city", selfJson.RootElement.GetProperty("residenceCity").GetString());
+        }
+    }
+
     private async Task<TestAccount> RegisterAsync(HttpClient client)
     {
         var login = "api-test-" + Guid.NewGuid().ToString("N");
