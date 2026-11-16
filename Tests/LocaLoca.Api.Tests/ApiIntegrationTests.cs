@@ -1093,7 +1093,10 @@ public sealed class ApiIntegrationTests
 
         using var publicAvatar = await viewerClient.GetAsync($"/api/users/{owner.UserId}/avatar?size=thumbnail");
         Assert.Equal(HttpStatusCode.OK, publicAvatar.StatusCode);
-        Assert.Equal("private, no-store", publicAvatar.Headers.CacheControl?.ToString());
+        var avatarCacheControl = publicAvatar.Headers.CacheControl;
+        Assert.NotNull(avatarCacheControl);
+        Assert.True(avatarCacheControl.Private);
+        Assert.True(avatarCacheControl.NoStore);
 
         using var defaultsResponse = await ownerClient.GetAsync("/api/me/profile/privacy");
         Assert.Equal(HttpStatusCode.OK, defaultsResponse.StatusCode);
