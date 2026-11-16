@@ -1,4 +1,4 @@
--- Reconcile the reviewed LocaLoca runtime-role grants after schema migrations 014-020.
+-- Reconcile the reviewed LocaLoca runtime-role grants after schema migrations 014-021.
 -- Run as the database administrator. Safe to rerun; this does not grant BYPASSRLS or role membership.
 BEGIN;
 
@@ -22,7 +22,7 @@ REVOKE ALL ON TABLE
     public.visits, public.photos, public.wishlist, public.user_map_places,
     public.user_map_place_photos, public.user_sessions, public.auth_rate_limit_counters,
     public.user_avatars, public.birthday_contacts, public.user_profile_visibility,
-    public.user_friendships, public.user_blocks, public.localoca_schema_migrations,
+    public.user_friendships, public.user_blocks, public.personal_place_visits, public.localoca_schema_migrations,
     public.v_visit_details
 FROM PUBLIC, anon, authenticated, localoca_app;
 
@@ -59,13 +59,14 @@ GRANT SELECT, INSERT, DELETE ON TABLE public.photos, public.wishlist, public.use
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
     public.user_map_places, public.user_sessions, public.auth_rate_limit_counters,
     public.user_avatars, public.birthday_contacts, public.user_profile_visibility,
-    public.user_friendships, public.user_blocks
+    public.user_friendships, public.user_blocks, public.personal_place_visits
 TO localoca_app;
 
 GRANT USAGE ON SEQUENCE
     public.users_user_id_seq, public.visits_visit_id_seq, public.photos_photo_id_seq,
     public.user_map_places_user_map_place_id_seq, public.user_map_place_photos_photo_id_seq,
-    public.birthday_contacts_birthday_contact_id_seq
+    public.birthday_contacts_birthday_contact_id_seq,
+    public.personal_place_visits_personal_place_visit_id_seq
 TO localoca_app;
 
 ALTER TABLE public.localoca_schema_migrations ENABLE ROW LEVEL SECURITY;
@@ -77,7 +78,7 @@ BEGIN
     FOREACH relation_name IN ARRAY ARRAY[
         'users','visits','photos','wishlist','user_map_places','user_map_place_photos',
         'user_sessions','auth_rate_limit_counters','user_avatars','birthday_contacts',
-        'user_profile_visibility','user_friendships','user_blocks'
+        'user_profile_visibility','user_friendships','user_blocks','personal_place_visits'
     ] LOOP
         EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', relation_name);
         EXECUTE format('DROP POLICY IF EXISTS localoca_app_runtime_access ON public.%I', relation_name);
