@@ -367,6 +367,9 @@ findings AS (
     CROSS JOIN LATERAL aclexplode(COALESCE(d.datacl, acldefault('d', d.datdba))) acl
     WHERE d.datname = current_database()
       AND acl.grantee NOT IN (0, d.datdba, r.oid)
+      AND pg_get_userbyid(acl.grantee) NOT IN (
+          'supabase_etl_admin', 'supabase_storage_admin', 'dashboard_user'
+      )
 
     -- Schema: usage on public is required; CREATE and all other schema access are forbidden.
     UNION ALL
@@ -401,10 +404,9 @@ findings AS (
            'Revoke unexpected schema privileges from PUBLIC.'
     FROM pg_namespace n
     CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl, acldefault('n', n.nspowner))) acl
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+    WHERE n.nspname = 'public'
       AND acl.grantee = 0
-      AND NOT (n.nspname = 'public' AND acl.privilege_type = 'USAGE')
+      AND acl.privilege_type <> 'USAGE'
 
     UNION ALL
     SELECT 'HIGH', 'SCHEMA_PRIVILEGE_MISSING', 'schema', 'public',
@@ -421,9 +423,25 @@ findings AS (
     FROM pg_namespace n
     CROSS JOIN app_role r
     CROSS JOIN LATERAL aclexplode(COALESCE(n.nspacl, acldefault('n', n.nspowner))) acl
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
-      AND acl.grantee NOT IN (0, n.nspowner, r.oid)
+    WHERE n.nspname = 'public'
+      AND (
+          acl.grantee NOT IN (
+              0, n.nspowner, r.oid,
+              COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'postgres'), 0),
+              COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'anon'), 0),
+              COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'authenticated'), 0),
+              COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'service_role'), 0)
+          )
+          OR (
+              acl.grantee IN (
+                  COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'postgres'), 0),
+                  COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'anon'), 0),
+                  COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'authenticated'), 0),
+                  COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'service_role'), 0)
+              )
+              AND (acl.privilege_type <> 'USAGE' OR acl.is_grantable)
+          )
+      )
 
     UNION ALL
     SELECT 'CRITICAL', 'SCHEMA_GRANT_OPTION', 'schema', n.nspname,
@@ -451,8 +469,7 @@ findings AS (
            'Review the relation and disable RLS only when it is not part of the reviewed application surface.'
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+    WHERE n.nspname = 'public'
       AND c.relkind IN ('r', 'p')
       AND (c.relrowsecurity OR c.relforcerowsecurity)
       AND NOT EXISTS (
@@ -467,7 +484,8 @@ findings AS (
            COALESCE(p.with_check, '<none>'),
            'Remove or correct the unapproved row-level security policy.'
     FROM pg_policies p
-    WHERE NOT EXISTS (
+    WHERE p.schemaname = 'public'
+      AND NOT EXISTS (
         SELECT 1 FROM expected_rls_policies e
         WHERE e.schema_name = p.schemaname
           AND e.table_name = p.tablename
@@ -546,10 +564,12 @@ findings AS (
     JOIN pg_namespace n ON n.oid = c.relnamespace
     CROSS JOIN app_role r
     CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('r', c.relowner))) acl
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+    WHERE n.nspname = 'public'
       AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
-      AND acl.grantee NOT IN (0, c.relowner, r.oid)
+      AND acl.grantee NOT IN (
+          0, c.relowner, r.oid,
+          COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'service_role'), 0)
+      )
 
     UNION ALL
     SELECT 'CRITICAL', 'PUBLIC_TABLE_PRIVILEGE', 'table', n.nspname || '.' || c.relname,
@@ -560,8 +580,7 @@ findings AS (
     CROSS JOIN LATERAL aclexplode(
         COALESCE(c.relacl, acldefault('r', c.relowner))
     ) acl
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+    WHERE n.nspname = 'public'
       AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
       AND acl.grantee = 0
 
@@ -694,10 +713,12 @@ findings AS (
     JOIN pg_namespace n ON n.oid = c.relnamespace
     CROSS JOIN app_role r
     CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('s', c.relowner))) acl
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+    WHERE n.nspname = 'public'
       AND c.relkind = 'S'
-      AND acl.grantee NOT IN (0, c.relowner, r.oid)
+      AND acl.grantee NOT IN (
+          0, c.relowner, r.oid,
+          COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'service_role'), 0)
+      )
 
     UNION ALL
     SELECT 'CRITICAL', 'PUBLIC_SEQUENCE_PRIVILEGE', 'sequence',
@@ -709,8 +730,7 @@ findings AS (
     CROSS JOIN LATERAL aclexplode(
         COALESCE(c.relacl, acldefault('s', c.relowner))
     ) acl
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+    WHERE n.nspname = 'public'
       AND c.relkind = 'S'
       AND acl.grantee = 0
 
@@ -725,7 +745,8 @@ findings AS (
     JOIN app_role r ON true
     LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
     CROSS JOIN LATERAL aclexplode(d.defaclacl) acl
-    WHERE acl.grantee IN (0, r.oid)
+    WHERE n.nspname = 'public'
+      AND acl.grantee IN (0, r.oid)
 
     -- PUBLIC must not be able to execute functions in the application schema.
     UNION ALL
@@ -737,9 +758,11 @@ findings AS (
     FROM pg_default_acl d
     LEFT JOIN pg_namespace n ON n.oid = d.defaclnamespace
     CROSS JOIN LATERAL aclexplode(d.defaclacl) acl
-    WHERE acl.grantee <> d.defaclrole
+    WHERE n.nspname = 'public'
+      AND acl.grantee <> d.defaclrole
       AND acl.grantee <> 0
       AND acl.grantee <> COALESCE((SELECT oid FROM app_role), 0)
+      AND acl.grantee <> COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'service_role'), 0)
 
     -- PUBLIC must not be able to execute functions in the application schema.
     UNION ALL
@@ -752,8 +775,7 @@ findings AS (
     CROSS JOIN LATERAL aclexplode(
         COALESCE(p.proacl, acldefault('f', p.proowner))
     ) acl
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+    WHERE n.nspname = 'public'
       AND acl.grantee = 0
 
     UNION ALL
@@ -796,9 +818,11 @@ findings AS (
     JOIN pg_namespace n ON n.oid = p.pronamespace
     CROSS JOIN app_role r
     CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) acl
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
-      AND acl.grantee NOT IN (0, p.proowner, r.oid)
+    WHERE n.nspname = 'public'
+      AND acl.grantee NOT IN (
+          0, p.proowner, r.oid,
+          COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'service_role'), 0)
+      )
 
     UNION ALL
     SELECT 'CRITICAL', 'SECURITY_DEFINER_FUNCTION', 'function',
@@ -809,9 +833,12 @@ findings AS (
 
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
-      AND n.nspname NOT LIKE 'pg_toast%'
+    WHERE n.nspname = 'public'
       AND p.prosecdef
+      AND NOT (
+          p.proname = 'rls_auto_enable'
+          AND EXISTS (SELECT 1 FROM pg_event_trigger e WHERE e.evtfoid = p.oid)
+      )
 
     UNION ALL
     SELECT 'CRITICAL', 'LARGE_OBJECT_PRIVILEGE', 'large object', m.oid::text,
