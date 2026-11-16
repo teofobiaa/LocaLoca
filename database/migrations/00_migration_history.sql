@@ -117,18 +117,36 @@ WHERE EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='publi
  AND to_regclass('public.ix_birthday_contacts_user_birth_date') IS NOT NULL
 ON CONFLICT (version) DO NOTHING;
 
-INSERT INTO public.localoca_schema_migrations (version,name,source)
-SELECT 15,'profile_privacy_and_relationships','adopted'
-WHERE to_regclass('public.user_profile_visibility') IS NOT NULL
- AND to_regclass('public.user_friendships') IS NOT NULL
- AND to_regclass('public.user_blocks') IS NOT NULL
- AND to_regprocedure('public.create_default_user_profile_visibility()') IS NOT NULL
- AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid=to_regclass('public.users') AND tgname='trg_users_default_profile_visibility' AND NOT tgisinternal)
- AND to_regclass('public.ix_user_friendships_low_status') IS NOT NULL
- AND to_regclass('public.ix_user_friendships_high_status') IS NOT NULL
- AND to_regclass('public.ix_user_blocks_blocked') IS NOT NULL
- AND NOT EXISTS (SELECT 1 FROM public.users u LEFT JOIN public.user_profile_visibility v ON v.user_id=u.user_id WHERE v.user_id IS NULL)
-ON CONFLICT (version) DO NOTHING;
+DO $adopt_profile_privacy$
+BEGIN
+    -- Keep references to v015 tables inside the guarded branch. PostgreSQL resolves
+    -- relation names before evaluating a top-level WHERE condition.
+    IF to_regclass('public.user_profile_visibility') IS NOT NULL
+       AND to_regclass('public.user_friendships') IS NOT NULL
+       AND to_regclass('public.user_blocks') IS NOT NULL
+       AND to_regprocedure('public.create_default_user_profile_visibility()') IS NOT NULL
+       AND EXISTS (
+           SELECT 1 FROM pg_trigger
+           WHERE tgrelid = to_regclass('public.users')
+             AND tgname = 'trg_users_default_profile_visibility'
+             AND NOT tgisinternal
+       )
+       AND to_regclass('public.ix_user_friendships_low_status') IS NOT NULL
+       AND to_regclass('public.ix_user_friendships_high_status') IS NOT NULL
+       AND to_regclass('public.ix_user_blocks_blocked') IS NOT NULL
+    THEN
+        IF NOT EXISTS (
+            SELECT 1 FROM public.users u
+            LEFT JOIN public.user_profile_visibility v ON v.user_id = u.user_id
+            WHERE v.user_id IS NULL
+        ) THEN
+            INSERT INTO public.localoca_schema_migrations(version, name, source)
+            VALUES (15, 'profile_privacy_and_relationships', 'adopted')
+            ON CONFLICT (version) DO NOTHING;
+        END IF;
+    END IF;
+END
+$adopt_profile_privacy$;
 
 INSERT INTO public.localoca_schema_migrations (version,name,source)
 SELECT 16,'catalog_search_trigram_indexes','adopted'
@@ -162,3 +180,63 @@ INSERT INTO public.localoca_schema_migrations (version,name,source)
 SELECT 19,'restore_password_hash_update_permission','adopted'
 WHERE CASE WHEN to_regrole('localoca_app') IS NOT NULL THEN has_column_privilege('localoca_app','public.users','password_hash','UPDATE') ELSE false END
 ON CONFLICT (version) DO NOTHING;
+
+
+DO $adopt_runtime_sequence_privileges$
+DECLARE
+    app_role_oid oid;
+    anon_role_oid oid;
+    authenticated_role_oid oid;
+BEGIN
+    SELECT oid INTO app_role_oid FROM pg_roles WHERE rolname = 'localoca_app';
+    SELECT oid INTO anon_role_oid FROM pg_roles WHERE rolname = 'anon';
+    SELECT oid INTO authenticated_role_oid FROM pg_roles WHERE rolname = 'authenticated';
+
+    IF app_role_oid IS NOT NULL
+       AND to_regclass('public.users_user_id_seq') IS NOT NULL
+       AND to_regclass('public.visits_visit_id_seq') IS NOT NULL
+       AND to_regclass('public.photos_photo_id_seq') IS NOT NULL
+       AND to_regclass('public.user_map_places_user_map_place_id_seq') IS NOT NULL
+       AND to_regclass('public.user_map_place_photos_photo_id_seq') IS NOT NULL
+       AND to_regclass('public.birthday_contacts_birthday_contact_id_seq') IS NOT NULL
+       AND has_sequence_privilege(app_role_oid, 'public.users_user_id_seq', 'USAGE')
+       AND has_sequence_privilege(app_role_oid, 'public.visits_visit_id_seq', 'USAGE')
+       AND has_sequence_privilege(app_role_oid, 'public.photos_photo_id_seq', 'USAGE')
+       AND has_sequence_privilege(app_role_oid, 'public.user_map_places_user_map_place_id_seq', 'USAGE')
+       AND has_sequence_privilege(app_role_oid, 'public.user_map_place_photos_photo_id_seq', 'USAGE')
+       AND has_sequence_privilege(app_role_oid, 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE')
+       AND NOT EXISTS (
+           SELECT 1
+           FROM pg_class c
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           CROSS JOIN LATERAL aclexplode(COALESCE(c.relacl, acldefault('s', c.relowner))) acl
+           WHERE n.nspname = 'public'
+             AND c.relkind = 'S'
+             AND (
+                 acl.grantee = 0
+                 OR acl.grantee = anon_role_oid
+                 OR acl.grantee = authenticated_role_oid
+                 OR (
+                     acl.grantee = app_role_oid
+                     AND NOT (
+                         c.relname IN (
+                             'users_user_id_seq',
+                             'visits_visit_id_seq',
+                             'photos_photo_id_seq',
+                             'user_map_places_user_map_place_id_seq',
+                             'user_map_place_photos_photo_id_seq',
+                             'birthday_contacts_birthday_contact_id_seq'
+                         )
+                         AND acl.privilege_type = 'USAGE'
+                         AND NOT acl.is_grantable
+                     )
+                 )
+             )
+       )
+    THEN
+        INSERT INTO public.localoca_schema_migrations(version, name, source)
+        VALUES (20, 'restrict_runtime_sequence_privileges', 'adopted')
+        ON CONFLICT (version) DO NOTHING;
+    END IF;
+END
+$adopt_runtime_sequence_privileges$;

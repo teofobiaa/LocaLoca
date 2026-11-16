@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 19,
+  "currentSchemaVersion": 20,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -25,7 +25,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "a800ff49f4e5c46bf9d7a794857d5a0e806946a2610546ee4bd99254cd1ff05b"
+    "sha256": "e250e9421e40523b4d37a88e7992764be0859e7d4429eafb7c19c2b3ea97e6fe"
   },
   "schemaMigrations": [
     {
@@ -117,6 +117,12 @@
       "name": "restore_password_hash_update_permission",
       "path": "migrations/19_restore_password_hash_update_permission.sql",
       "sha256": "670f30e5f68378fed4332968000e245f3af03b04164d2a82ebb275747b7dcc51"
+    },
+    {
+      "version": 20,
+      "name": "restrict_runtime_sequence_privileges",
+      "path": "migrations/20_restrict_runtime_sequence_privileges.sql",
+      "sha256": "9e31279ad861b883da95080d0ae06c2cfc4efd5da0e1a8d7248887f520f3e820"
     }
   ],
   "securityScripts": [
@@ -132,7 +138,7 @@
       "name": "update_runtime_permissions",
       "path": "security/06_update_runtime_permissions.sql",
       "repeatable": true,
-      "sha256": "538756b4b7f0b96d3a8e84ace46f81b9582cdc540fe24c38c51691fd405dd376"
+      "sha256": "6241f74f95dd856370aa9e6f9d563014c44ffbb02e5c9125d7151d64fd4ed209"
     }
   ]
 }

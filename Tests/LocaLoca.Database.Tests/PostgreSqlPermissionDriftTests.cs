@@ -30,11 +30,71 @@ public sealed class PostgreSqlPermissionDriftFixture : IAsyncLifetime
     {
         await _postgres.StartAsync();
 
-        // The current schema baseline already contains migrations 003, 004,
-        // 007-013. Apply the same reviewed runtime-role scripts used in production.
+        // Reproduce the Supabase roles and extension schema in the isolated PostgreSQL container.
+        await using (var prerequisites = await OpenConnectionAsync())
+        await using (var command = new NpgsqlCommand(@"
+            DO $roles$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'postgres') THEN
+                    CREATE ROLE postgres SUPERUSER;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+                    CREATE ROLE anon NOLOGIN;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+                    CREATE ROLE authenticated NOLOGIN;
+                END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+                    CREATE ROLE service_role NOLOGIN BYPASSRLS;
+                END IF;
+            END
+            $roles$;
+            CREATE SCHEMA IF NOT EXISTS extensions;
+            CREATE OR REPLACE FUNCTION public.rls_auto_enable()
+            RETURNS event_trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
+            AS $function$
+            BEGIN
+                NULL;
+            END;
+            $function$;", prerequisites))
+        {
+            await command.ExecuteNonQueryAsync();
+        }
+
         await ExecuteSqlFileAsync("schema", "01_schema.sql");
         await ExecuteSqlFileAsync("security", "05_create_app_role.sql");
+        await ExecuteSqlFileAsync("migrations", "14_user_birthdays_and_age_filtering.sql");
+        await ExecuteSqlFileAsync("migrations", "15_profile_privacy_and_relationships.sql");
+        await ExecuteSqlFileAsync("migrations", "16_catalog_search_trigram_indexes.sql");
+        await ExecuteSqlFileAsync("migrations", "17_runtime_role_rls_and_grant_hardening.sql");
+        await ExecuteSqlFileAsync("migrations", "18_harden_profile_trigger_and_migration_ledger.sql");
+        await ExecuteSqlFileAsync("migrations", "19_restore_password_hash_update_permission.sql");
+        await ExecuteSqlFileAsync("migrations", "20_restrict_runtime_sequence_privileges.sql");
         await ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
+
+        // Mirror Supabase's provider-managed service role grants on the public schema.
+        // The drift audit permits this exact role, while still flagging unrelated principals.
+        await using (var providerAcl = await OpenConnectionAsync())
+        await using (var providerGrants = new NpgsqlCommand(@"
+            ALTER TABLE public.localoca_schema_migrations ENABLE ROW LEVEL SECURITY;
+            CREATE EVENT TRIGGER localoca_test_rls_auto_enable
+                ON ddl_command_end EXECUTE FUNCTION public.rls_auto_enable();
+            GRANT localoca_app TO postgres WITH ADMIN OPTION, INHERIT FALSE, SET FALSE;
+            GRANT USAGE ON SCHEMA public TO service_role;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO service_role;
+            GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role;
+            ALTER DEFAULT PRIVILEGES FOR ROLE localoca_test IN SCHEMA public
+                GRANT ALL ON TABLES TO service_role;
+            ALTER DEFAULT PRIVILEGES FOR ROLE localoca_test IN SCHEMA public
+                GRANT ALL ON SEQUENCES TO service_role;
+            ALTER DEFAULT PRIVILEGES FOR ROLE localoca_test IN SCHEMA public
+                GRANT EXECUTE ON FUNCTIONS TO service_role;", providerAcl))
+        {
+            await providerGrants.ExecuteNonQueryAsync();
+        }
     }
 
     public async Task<NpgsqlConnection> OpenConnectionAsync()
@@ -114,7 +174,7 @@ public sealed class PostgreSqlPermissionDriftTests
     [InlineData("CREATE ROLE drift_reader NOLOGIN; GRANT USAGE ON SCHEMA public TO drift_reader;", "UNAPPROVED_ROLE_PRIVILEGE")]
     [InlineData("CREATE SCHEMA drift_probe; GRANT CREATE ON SCHEMA drift_probe TO PUBLIC;", "PUBLIC_SCHEMA_PRIVILEGE")]
     [InlineData("GRANT USAGE ON SCHEMA public TO localoca_app WITH GRANT OPTION;", "SCHEMA_GRANT_OPTION")]
-    [InlineData("ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;", "ROW_LEVEL_SECURITY_DRIFT")]
+    [InlineData("ALTER TABLE public.localoca_schema_migrations DISABLE ROW LEVEL SECURITY;", "ROW_LEVEL_SECURITY_DRIFT")]
     [InlineData("CREATE POLICY permission_drift_policy ON public.users USING (true);", "RLS_POLICY_DRIFT")]
     [InlineData("ALTER TABLE public.users RENAME TO users_drift;", "EXPECTED_OBJECT_MISSING")]
     [InlineData("ALTER SEQUENCE public.users_user_id_seq RENAME TO users_user_id_seq_drift;", "EXPECTED_OBJECT_MISSING")]
@@ -169,7 +229,21 @@ public sealed class PostgreSqlPermissionDriftTests
     [InlineData(
         "SELECT lo_create(987654322); ALTER LARGE OBJECT 987654322 OWNER TO localoca_app;",
         "OBJECT_OWNERSHIP")]
-    [InlineData("DROP OWNED BY localoca_app; DROP ROLE localoca_app;", "ROLE_MISSING")]
+    [InlineData(@"DO $drop_policies$
+DECLARE policy_row record;
+BEGIN
+    FOR policy_row IN
+        SELECT schemaname, tablename, policyname
+        FROM pg_policies
+        WHERE 'localoca_app' = ANY (roles)
+    LOOP
+        EXECUTE format('DROP POLICY %I ON %I.%I', policy_row.policyname, policy_row.schemaname, policy_row.tablename);
+    END LOOP;
+END
+$drop_policies$;
+DROP OWNED BY localoca_app;
+REVOKE localoca_app FROM postgres;
+DROP ROLE localoca_app;", "ROLE_MISSING")]
     public async Task Audit_Detects_Individual_Permission_Drift(
         string mutationSql,
         string expectedFindingCode)

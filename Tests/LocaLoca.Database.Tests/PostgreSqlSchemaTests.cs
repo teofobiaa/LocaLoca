@@ -350,20 +350,13 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "18_harden_profile_trigger_and_migration_ledger.sql");
         await _database.ExecuteSqlFileAsync("migrations", "19_restore_password_hash_update_permission.sql");
         await _database.ExecuteSqlFileAsync("migrations", "19_restore_password_hash_update_permission.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "20_restrict_runtime_sequence_privileges.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "20_restrict_runtime_sequence_privileges.sql");
 
         // Reconcile the journal after the migration sequence.
         await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
 
-        // The repeatable security script runs only after the full schema has reached v019.
-        await using (var revokeSessionPermissions = new NpgsqlCommand(
-            "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
-            connection))
-        {
-            await revokeSessionPermissions.ExecuteNonQueryAsync();
-        }
-        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
-        await _database.ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
-
+        // The repeatable security script runs only after the full schema has reached v020.
         await using (var revokeSessionPermissions = new NpgsqlCommand(
             "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
             connection))
@@ -421,13 +414,23 @@ public sealed class PostgreSqlSchemaTests
                          FROM pg_roles WHERE rolname = 'localoca_app')
                 AND NOT has_schema_privilege('localoca_app', 'public', 'CREATE')
                 AND NOT has_table_privilege('localoca_app', 'public.users', 'DELETE')
+                AND has_sequence_privilege('localoca_app', 'public.users_user_id_seq', 'USAGE')
+                AND has_sequence_privilege('localoca_app', 'public.visits_visit_id_seq', 'USAGE')
+                AND has_sequence_privilege('localoca_app', 'public.photos_photo_id_seq', 'USAGE')
+                AND has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE')
+                AND has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE')
+                AND has_sequence_privilege('localoca_app', 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE')
+                AND NOT has_sequence_privilege('localoca_app', 'public.categories_category_id_seq', 'USAGE')
+                AND NOT has_sequence_privilege('localoca_app', 'public.countries_country_id_seq', 'USAGE')
+                AND NOT has_sequence_privilege('localoca_app', 'public.cities_city_id_seq', 'USAGE')
+                AND NOT has_sequence_privilege('localoca_app', 'public.attractions_attraction_id_seq', 'USAGE')
                 AND NOT pg_has_role('localoca_app', 'pg_read_all_data', 'MEMBER')",
             connection);
 
         Assert.True((bool)(await permissionCheck.ExecuteScalarAsync() ?? false));
 
         await using var versionCheck = new NpgsqlCommand(@"
-            SELECT count(*) = 15
+            SELECT count(*) = 16
                AND count(*) FILTER (WHERE name IN (
                    'migrate_wishlist', 'migrate_user_map_places', 'migrate_photo_storage',
                    'server_sessions', 'map_marker_viewport_indexes', 'map_marker_visit_lookup_index',
@@ -435,9 +438,9 @@ public sealed class PostgreSqlSchemaTests
                    'user_birthdays_and_age_filtering', 'profile_privacy_and_relationships',
                    'catalog_search_trigram_indexes', 'runtime_role_rls_policies_and_grant_hardening',
                    'harden_profile_trigger_and_migration_ledger',
-                   'restore_password_hash_update_permission')) = 15
+                   'restore_password_hash_update_permission', 'restrict_runtime_sequence_privileges')) = 16
             FROM public.localoca_schema_migrations
-            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19)", connection);
+            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)", connection);
         Assert.True((bool)(await versionCheck.ExecuteScalarAsync() ?? false));
     }
 

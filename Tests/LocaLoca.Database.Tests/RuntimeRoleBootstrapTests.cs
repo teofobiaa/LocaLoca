@@ -35,7 +35,7 @@ public sealed class RuntimeRoleBootstrapTests
         // Keep this test independent of execution order and leave the shared test database unchanged.
         await using var transaction = await connection.BeginTransactionAsync();
         await using (var resetRole = new NpgsqlCommand(@"
-            DO $
+            DO $$
             DECLARE policy_row record;
             BEGIN
                 IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'localoca_app') THEN
