@@ -65,21 +65,27 @@ public static class CatalogEndpoints
         
             var offset = ((long)currentPage - 1) * currentPageSize;
             var normalizedSearch = search?.Trim() ?? string.Empty;
-            const string filters = @"
+            var useTrigramSearch = CatalogSearchSqlBuilder.UsesTrigramSearch(normalizedSearch);
+            var searchCte = useTrigramSearch
+                ? CatalogSearchSqlBuilder.MatchingAttractionsCte
+                : string.Empty;
+            var filters = @"
         FROM attractions a
         JOIN categories cat ON cat.category_id = a.category_id
         JOIN cities ci ON ci.city_id = a.city_id
         JOIN countries co ON co.country_id = ci.country_id
-        WHERE (@q = '' OR a.name ILIKE '%' || @q || '%' OR ci.name ILIKE '%' || @q || '%' OR co.name ILIKE '%' || @q || '%')
-          AND (@cat IS NULL OR a.category_id = @cat)";
+        WHERE (@cat IS NULL OR a.category_id = @cat)"
+                + CatalogSearchSqlBuilder.BuildPredicate(normalizedSearch);
         
             await using var connection = await OpenAsync(connectionString, cancellationToken);
-            await using var countCommand = new NpgsqlCommand("SELECT count(*) " + filters, connection);
-            countCommand.Parameters.AddWithValue("q", NpgsqlDbType.Text, normalizedSearch);
+            await using var countCommand = new NpgsqlCommand(
+                searchCte + "SELECT count(*) " + filters, connection);
+            if (normalizedSearch.Length > 0)
+                countCommand.Parameters.AddWithValue("pattern", NpgsqlDbType.Text, "%" + normalizedSearch + "%");
             countCommand.Parameters.AddWithValue("cat", NpgsqlDbType.Integer, (object?)categoryId ?? DBNull.Value);
             var totalCount = Convert.ToInt64(await countCommand.ExecuteScalarAsync(cancellationToken));
         
-            var sql = @"
+            var sql = searchCte + @"
         SELECT a.attraction_id, a.name, a.description, COALESCE(a.history, ''),
                a.latitude, a.longitude, cat.name, ci.name, co.name
         " + filters + @"
@@ -87,7 +93,8 @@ public static class CatalogEndpoints
         LIMIT @limit OFFSET @offset";
             var items = new List<AttractionDto>();
             await using var command = new NpgsqlCommand(sql, connection);
-            command.Parameters.AddWithValue("q", NpgsqlDbType.Text, normalizedSearch);
+            if (normalizedSearch.Length > 0)
+                command.Parameters.AddWithValue("pattern", NpgsqlDbType.Text, "%" + normalizedSearch + "%");
             command.Parameters.AddWithValue("cat", NpgsqlDbType.Integer, (object?)categoryId ?? DBNull.Value);
             command.Parameters.AddWithValue("limit", NpgsqlDbType.Integer, currentPageSize);
             command.Parameters.AddWithValue("offset", NpgsqlDbType.Bigint, offset);
