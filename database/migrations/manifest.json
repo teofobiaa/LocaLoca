@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 20,
+  "currentSchemaVersion": 21,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -123,6 +123,12 @@
       "name": "restrict_runtime_sequence_privileges",
       "path": "migrations/20_restrict_runtime_sequence_privileges.sql",
       "sha256": "9e31279ad861b883da95080d0ae06c2cfc4efd5da0e1a8d7248887f520f3e820"
+    },
+    {
+      "version": 21,
+      "name": "personal_place_visit_events",
+      "path": "migrations/21_personal_place_visit_events.sql",
+      "sha256": "d708743f9cb919920f67636af8a8e6ce0f1a57df5802b945aa820a563981f740"
     }
   ],
   "securityScripts": [
