@@ -128,7 +128,7 @@ public static class ProfilePrivacyEndpoints
             if (!await reader.ReadAsync(cancellationToken))
                 return Results.NotFound(new ApiErrorResponse("Профиль не найден."));
 
-            context.Response.Headers.CacheControl = "private, no-store";
+            context.Response.Headers["Cache-Control"] = "private, no-store";
             return Results.Ok(new UserProfileViewDto(
                 reader.GetInt32(0),
                 reader.IsDBNull(1) ? null : reader.GetString(1),
@@ -178,7 +178,7 @@ public static class ProfilePrivacyEndpoints
             var image = await command.ExecuteScalarAsync(cancellationToken) as byte[];
             if (image is null) return Results.NotFound(new ApiErrorResponse("Аватар недоступен."));
 
-            context.Response.Headers.CacheControl = "private, no-store";
+            context.Response.Headers["Cache-Control"] = "private, no-store";
             return Results.File(image, "image/jpeg");
         });
     }
