@@ -128,6 +128,7 @@ public static class ProfilePrivacyEndpoints
             if (!await reader.ReadAsync(cancellationToken))
                 return Results.NotFound(new ApiErrorResponse("Профиль не найден."));
 
+            context.Response.Headers.CacheControl = "private, no-store";
             return Results.Ok(new UserProfileViewDto(
                 reader.GetInt32(0),
                 reader.IsDBNull(1) ? null : reader.GetString(1),
