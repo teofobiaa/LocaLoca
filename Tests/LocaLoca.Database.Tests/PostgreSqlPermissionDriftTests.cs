@@ -103,12 +103,16 @@ public sealed class PostgreSqlPermissionDriftTests
     [InlineData("ALTER ROLE localoca_app CONNECTION LIMIT 3;", "ROLE_ATTRIBUTE_DRIFT")]
     [InlineData("ALTER ROLE localoca_app VALID UNTIL '2030-01-01 00:00:00+00';", "ROLE_ATTRIBUTE_DRIFT")]
     [InlineData("ALTER ROLE localoca_app SET search_path = public;", "ROLE_CONFIGURATION_DRIFT")]
+    [InlineData("ALTER ROLE localoca_app SET statement_timeout = '0';", "ROLE_CONFIGURATION_DRIFT")]
+    [InlineData("ALTER ROLE localoca_app GRANT pg_read_all_data TO localoca_app;", "ROLE_MEMBERSHIP")]
     [InlineData("GRANT pg_read_all_data TO localoca_app;", "ROLE_MEMBERSHIP")]
     [InlineData("CREATE ROLE drift_reader NOLOGIN; GRANT localoca_app TO drift_reader;", "ROLE_MEMBERSHIP")]
     [InlineData("GRANT CREATE ON SCHEMA public TO localoca_app;", "SCHEMA_PRIVILEGE_EXTRA")]
     [InlineData("CREATE SCHEMA drift_probe; GRANT USAGE ON SCHEMA drift_probe TO localoca_app;", "SCHEMA_PRIVILEGE_EXTRA")]
     [InlineData("REVOKE USAGE ON SCHEMA public FROM localoca_app; REVOKE USAGE ON SCHEMA public FROM PUBLIC;", "SCHEMA_PRIVILEGE_MISSING")]
     [InlineData("GRANT CREATE ON SCHEMA public TO PUBLIC;", "PUBLIC_SCHEMA_PRIVILEGE")]
+    [InlineData("ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;", "ROW_LEVEL_SECURITY_DRIFT")]
+    [InlineData("CREATE POLICY permission_drift_policy ON public.users USING (true);", "RLS_POLICY_DRIFT")]
     [InlineData("GRANT DELETE ON TABLE public.categories TO localoca_app;", "TABLE_PRIVILEGE_EXTRA")]
     [InlineData("REVOKE SELECT ON TABLE public.categories FROM localoca_app;", "TABLE_PRIVILEGE_MISSING")]
     [InlineData("GRANT TRUNCATE ON TABLE public.visits TO localoca_app;", "TABLE_PRIVILEGE_EXTRA")]
@@ -132,6 +136,15 @@ public sealed class PostgreSqlPermissionDriftTests
     [InlineData(
         "CREATE FUNCTION public.permission_drift_probe() RETURNS integer LANGUAGE SQL AS 'SELECT 1';",
         "PUBLIC_FUNCTION_PRIVILEGE")]
+    [InlineData(
+        "CREATE FUNCTION public.permission_drift_probe() RETURNS integer LANGUAGE SQL SECURITY DEFINER AS 'SELECT 1';",
+        "SECURITY_DEFINER_FUNCTION")]
+    [InlineData(
+        "SELECT lo_create(987654321); GRANT SELECT ON LARGE OBJECT 987654321 TO localoca_app;",
+        "LARGE_OBJECT_PRIVILEGE")]
+    [InlineData(
+        "SELECT lo_create(987654322); ALTER LARGE OBJECT 987654322 OWNER TO localoca_app;",
+        "OBJECT_OWNERSHIP")]
     [InlineData("DROP OWNED BY localoca_app; DROP ROLE localoca_app;", "ROLE_MISSING")]
     public async Task Audit_Detects_Individual_Permission_Drift(
         string mutationSql,
