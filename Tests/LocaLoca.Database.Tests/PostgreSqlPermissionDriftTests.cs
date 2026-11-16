@@ -44,11 +44,16 @@ public sealed class PostgreSqlPermissionDriftFixture : IAsyncLifetime
                 IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
                     CREATE ROLE authenticated NOLOGIN;
                 END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+                    CREATE ROLE service_role NOLOGIN BYPASSRLS;
+                END IF;
             END
             $roles$;
             CREATE SCHEMA IF NOT EXISTS extensions;
             CREATE OR REPLACE FUNCTION public.rls_auto_enable()
-            RETURNS event_trigger LANGUAGE plpgsql
+            RETURNS event_trigger
+            LANGUAGE plpgsql
+            SECURITY DEFINER
             AS $function$
             BEGIN
                 NULL;
@@ -68,6 +73,27 @@ public sealed class PostgreSqlPermissionDriftFixture : IAsyncLifetime
         await ExecuteSqlFileAsync("migrations", "19_restore_password_hash_update_permission.sql");
         await ExecuteSqlFileAsync("migrations", "20_restrict_runtime_sequence_privileges.sql");
         await ExecuteSqlFileAsync("security", "06_update_runtime_permissions.sql");
+
+        // Mirror Supabase's provider-managed service role grants on the public schema.
+        // The drift audit permits this exact role, while still flagging unrelated principals.
+        await using (var providerAcl = await OpenConnectionAsync())
+        await using (var providerGrants = new NpgsqlCommand(@"
+            ALTER TABLE public.localoca_schema_migrations ENABLE ROW LEVEL SECURITY;
+            CREATE EVENT TRIGGER localoca_test_rls_auto_enable
+                ON ddl_command_end EXECUTE FUNCTION public.rls_auto_enable();
+            GRANT USAGE ON SCHEMA public TO service_role;
+            GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO service_role;
+            GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO service_role;
+            GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role;
+            ALTER DEFAULT PRIVILEGES FOR ROLE localoca_test IN SCHEMA public
+                GRANT ALL ON TABLES TO service_role;
+            ALTER DEFAULT PRIVILEGES FOR ROLE localoca_test IN SCHEMA public
+                GRANT ALL ON SEQUENCES TO service_role;
+            ALTER DEFAULT PRIVILEGES FOR ROLE localoca_test IN SCHEMA public
+                GRANT EXECUTE ON FUNCTIONS TO service_role;", providerAcl))
+        {
+            await providerGrants.ExecuteNonQueryAsync();
+        }
     }
 
     public async Task<NpgsqlConnection> OpenConnectionAsync()
