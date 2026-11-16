@@ -51,6 +51,61 @@ public sealed class CatalogPaginationTests(PostgreSqlApiFixture database)
     }
 
     [Fact]
+    public async Task Catalog_search_matches_attraction_city_and_country_names_without_duplicate_results()
+    {
+        var marker = "CatalogSearch" + Guid.NewGuid().ToString("N");
+        int cityId;
+
+        await using (var connection = new NpgsqlConnection(database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            int countryId;
+            await using (var country = new NpgsqlCommand(
+                "INSERT INTO countries(name) VALUES (@name) RETURNING country_id",
+                connection))
+            {
+                country.Parameters.AddWithValue("name", marker + " Country");
+                countryId = Convert.ToInt32(await country.ExecuteScalarAsync());
+            }
+
+            await using (var city = new NpgsqlCommand(
+                "INSERT INTO cities(country_id, name) VALUES (@country, @name) RETURNING city_id",
+                connection))
+            {
+                city.Parameters.AddWithValue("country", countryId);
+                city.Parameters.AddWithValue("name", marker + " City");
+                cityId = Convert.ToInt32(await city.ExecuteScalarAsync());
+            }
+
+            foreach (var suffix in new[] { "A", "B" })
+            {
+                await using var attraction = new NpgsqlCommand(@"
+INSERT INTO attractions(name, description, history, latitude, longitude, category_id, city_id)
+SELECT @name, 'Synthetic catalog search fixture', '', 12, 22, category_id, @city
+FROM categories
+WHERE name = 'API test category'
+RETURNING attraction_id", connection);
+                attraction.Parameters.AddWithValue("name", marker + " Attraction " + suffix);
+                attraction.Parameters.AddWithValue("city", cityId);
+                await attraction.ExecuteScalarAsync();
+            }
+        }
+
+        using var factory = database.CreateFactory();
+        using var client = factory.CreateClient();
+        using var response = await client.GetAsync("/api/catalog?search=" + Uri.EscapeDataString(marker));
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var root = document.RootElement;
+        var items = root.GetProperty("items").EnumerateArray().ToArray();
+        var ids = items.Select(item => item.GetProperty("id").GetInt32()).ToArray();
+        Assert.Equal(2, root.GetProperty("totalCount").GetInt32());
+        Assert.Equal(2, items.Length);
+        Assert.Equal(2, ids.Distinct().Count());
+    }
+
+    [Fact]
     public async Task Catalog_lookup_by_ids_returns_only_the_requested_attractions()
     {
         var secondId = await InsertAttractionAsync("Lookup-only API catalog attraction");
