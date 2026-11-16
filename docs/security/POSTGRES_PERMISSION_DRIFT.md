@@ -25,6 +25,9 @@ It checks:
   role-level GUC overrides.
 - Direct and reverse role memberships. NOINHERIT does not make an unexpected
   membership harmless because a member may still be able to SET ROLE.
+- Direct grants to any other login/group role on databases, schemas, tables,
+  columns, sequences, functions and large objects. The owner, the reviewed
+  runtime role and explicitly permitted PUBLIC defaults are treated separately.
 - Database CONNECT grants, unexpected database privileges and grant options.
 - Schema USAGE/CREATE grants, unexpected schema access and PUBLIC schema grants.
 - Exact table grants for catalog, account, visits, photos, wishlist, map,
@@ -38,8 +41,8 @@ It checks:
   SECURITY DEFINER functions.
 - Row-level security enablement and policies, which change the API/database
   authorization model and therefore require explicit review.
-- Ownership of databases, schemas, relations, functions, types, default ACLs
-  and large objects.
+- Ownership of databases, schemas, relations, functions, types, sequences,
+  default ACLs and large objects.
 - Large-object privileges. LocaLoca stores image payloads in `bytea` columns
   and should not need PostgreSQL large objects.
 
