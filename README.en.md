@@ -176,6 +176,8 @@ For test layers, environment boundaries, and additional details, see [Tests/READ
 
 ### Contributing
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full development, testing, and pull request guidelines.
+
 1. Create a separate branch for each logically related change.
 2. Do not commit secrets, real user data, local configuration files, or production database dumps.
 3. Add or update executable tests for API and database changes. A documentation change alone does not mean that a scenario has been tested.
@@ -184,7 +186,7 @@ For test layers, environment boundaries, and additional details, see [Tests/READ
 
 ## License
 
-No `LICENSE` file is currently present in the repository root. Until a license is published, the terms for reusing, modifying, and distributing this code are not explicitly defined. A public repository should not be assumed to be open-source licensed by default.
+The project is distributed under the [MIT License](LICENSE).
 
 ## Contact and issue reporting
 
