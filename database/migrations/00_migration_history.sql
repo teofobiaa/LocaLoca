@@ -105,3 +105,22 @@ WHERE (SELECT count(DISTINCT column_name)=5 FROM information_schema.columns
              WHERE conrelid=to_regclass('public.user_avatars')
                AND conname='ck_user_avatars_thumbnail_size')
 ON CONFLICT (version) DO NOTHING;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 14,'profile_privacy_and_relationships','adopted'
+WHERE to_regclass('public.user_profile_visibility') IS NOT NULL
+  AND to_regclass('public.user_friendships') IS NOT NULL
+  AND to_regclass('public.user_blocks') IS NOT NULL
+  AND to_regclass('public.trg_users_default_profile_visibility') IS NOT NULL
+  AND (SELECT count(DISTINCT column_name)=5 FROM information_schema.columns
+       WHERE table_schema='public' AND table_name='user_profile_visibility'
+         AND column_name IN (
+             'user_id', 'display_name_visibility', 'avatar_visibility',
+             'residence_country_visibility', 'residence_city_visibility'))
+  AND EXISTS (SELECT 1 FROM pg_constraint
+              WHERE conrelid=to_regclass('public.user_friendships')
+                AND conname='ck_user_friendships_order')
+  AND EXISTS (SELECT 1 FROM pg_constraint
+              WHERE conrelid=to_regclass('public.user_blocks')
+                AND conname='ck_user_blocks_not_self')
+ON CONFLICT (version) DO NOTHING;
