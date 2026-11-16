@@ -8,9 +8,50 @@ public sealed class SessionStore
 {
  private readonly byte[] _secret;
  private static readonly TimeSpan Lifetime=TimeSpan.FromDays(30);
+ private static readonly TimeSpan LastSeenUpdateInterval=TimeSpan.FromMinutes(3);
  public SessionStore(IConfiguration c){var s=c["LOCA_SESSION_SECRET"];_secret=string.IsNullOrWhiteSpace(s)?RandomNumberGenerator.GetBytes(32):Encoding.UTF8.GetBytes(s);if(_secret.Length<32)throw new InvalidOperationException("LOCA_SESSION_SECRET must contain at least 32 characters.");}
  public async Task<string> CreateAsync(int userId,string cs,CancellationToken ct=default){var id=Guid.NewGuid();var expiry=DateTimeOffset.UtcNow.Add(Lifetime);var payload=Encoding.UTF8.GetBytes($"{userId}:{expiry.ToUnixTimeSeconds()}:{id:N}");var encoded=Encode(payload);var token=$"{encoded}.{Encode(HMACSHA256.HashData(_secret,Encoding.ASCII.GetBytes(encoded)))}";await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("INSERT INTO user_sessions(session_id,user_id,token_hash,expires_at) VALUES (@id,@user,@hash,@expiry)",db);cmd.Parameters.AddWithValue("id",NpgsqlDbType.Uuid,id);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,userId);cmd.Parameters.AddWithValue("hash",NpgsqlDbType.Varchar,Fingerprint(token));cmd.Parameters.AddWithValue("expiry",NpgsqlDbType.TimestampTz,expiry);await cmd.ExecuteNonQueryAsync(ct);return token;}
- public async Task<int?> ValidateAsync(string token,string cs,CancellationToken ct=default){if(!TryParse(token,out var user,out var id))return null;await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("UPDATE user_sessions SET last_seen_at=now() WHERE session_id=@id AND user_id=@user AND token_hash=@hash AND revoked_at IS NULL AND expires_at>now() RETURNING user_id",db);cmd.Parameters.AddWithValue("id",NpgsqlDbType.Uuid,id);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,user);cmd.Parameters.AddWithValue("hash",NpgsqlDbType.Varchar,Fingerprint(token));var v=await cmd.ExecuteScalarAsync(ct);return v is null?null:Convert.ToInt32(v);}
+ public async Task<int?> ValidateAsync(string token,string cs,CancellationToken ct=default)
+ {
+  if(!TryParse(token,out var user,out var id))return null;
+  await using var db=new NpgsqlConnection(cs);
+  await db.OpenAsync(ct);
+  const string sql=@"
+WITH active_session AS MATERIALIZED (
+    SELECT user_id, last_seen_at
+    FROM user_sessions
+    WHERE session_id = @id
+      AND user_id = @user
+      AND token_hash = @hash
+      AND revoked_at IS NULL
+      AND expires_at > now()
+    FOR UPDATE
+),
+updated AS (
+    UPDATE user_sessions AS s
+    SET last_seen_at = now()
+    WHERE s.session_id = @id
+      AND EXISTS (
+          SELECT 1
+          FROM active_session AS active
+          WHERE active.user_id = s.user_id
+            AND active.last_seen_at <= now() - @lastSeenUpdateInterval
+      )
+    RETURNING s.user_id
+)
+SELECT user_id FROM updated
+UNION ALL
+SELECT user_id FROM active_session
+WHERE NOT EXISTS (SELECT 1 FROM updated)
+LIMIT 1";
+  await using var cmd=new NpgsqlCommand(sql,db);
+  cmd.Parameters.AddWithValue("id",NpgsqlDbType.Uuid,id);
+  cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,user);
+  cmd.Parameters.AddWithValue("hash",NpgsqlDbType.Varchar,Fingerprint(token));
+  cmd.Parameters.AddWithValue("lastSeenUpdateInterval",NpgsqlDbType.Interval,LastSeenUpdateInterval);
+  var v=await cmd.ExecuteScalarAsync(ct);
+  return v is null?null:Convert.ToInt32(v);
+ }
  public async Task<bool> RevokeAsync(string token,string cs,CancellationToken ct=default){if(!TryParse(token,out var user,out var id))return false;await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("UPDATE user_sessions SET revoked_at=now() WHERE session_id=@id AND user_id=@user AND token_hash=@hash AND revoked_at IS NULL AND expires_at>now()",db);cmd.Parameters.AddWithValue("id",NpgsqlDbType.Uuid,id);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,user);cmd.Parameters.AddWithValue("hash",NpgsqlDbType.Varchar,Fingerprint(token));return await cmd.ExecuteNonQueryAsync(ct)==1;}
  public async Task<IReadOnlyList<SessionDto>> GetActiveAsync(int user,string token,string cs,CancellationToken ct=default){await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("SELECT session_id,created_at,last_seen_at,expires_at,token_hash FROM user_sessions WHERE user_id=@user AND revoked_at IS NULL AND expires_at>now() ORDER BY last_seen_at DESC",db);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,user);var hash=Fingerprint(token);var list=new List<SessionDto>();await using var r=await cmd.ExecuteReaderAsync(ct);while(await r.ReadAsync(ct))list.Add(new SessionDto(r.GetGuid(0),r.GetFieldValue<DateTimeOffset>(1),r.GetFieldValue<DateTimeOffset>(2),r.GetFieldValue<DateTimeOffset>(3),r.GetString(4).Trim()==hash));return list;}
  public async Task<int> RevokeOthersAsync(int user,string token,string cs,CancellationToken ct=default){await using var db=new NpgsqlConnection(cs);await db.OpenAsync(ct);await using var cmd=new NpgsqlCommand("UPDATE user_sessions SET revoked_at=now() WHERE user_id=@user AND revoked_at IS NULL AND expires_at>now() AND token_hash<>@hash",db);cmd.Parameters.AddWithValue("user",NpgsqlDbType.Integer,user);cmd.Parameters.AddWithValue("hash",NpgsqlDbType.Varchar,Fingerprint(token));return await cmd.ExecuteNonQueryAsync(ct);}
