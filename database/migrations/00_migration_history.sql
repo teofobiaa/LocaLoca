@@ -111,7 +111,9 @@ SELECT 14,'profile_privacy_and_relationships','adopted'
 WHERE to_regclass('public.user_profile_visibility') IS NOT NULL
   AND to_regclass('public.user_friendships') IS NOT NULL
   AND to_regclass('public.user_blocks') IS NOT NULL
-  AND to_regclass('public.trg_users_default_profile_visibility') IS NOT NULL
+  AND EXISTS (SELECT 1 FROM pg_trigger
+              WHERE tgrelid=to_regclass('public.users')
+                AND tgname='trg_users_default_profile_visibility' AND NOT tgisinternal)
   AND (SELECT count(DISTINCT column_name)=5 FROM information_schema.columns
        WHERE table_schema='public' AND table_name='user_profile_visibility'
          AND column_name IN (
