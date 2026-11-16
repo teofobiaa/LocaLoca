@@ -72,7 +72,7 @@ public static class RelationshipEndpoints
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
-                SELECT u.user_id, u.display_name,
+                SELECT u.user_id,
                        f.requested_by_user_id <> @user AS is_incoming,
                        f.created_at
                 FROM public.user_friendships f
@@ -88,9 +88,8 @@ public static class RelationshipEndpoints
             while (await reader.ReadAsync(cancellationToken))
                 items.Add(new FriendRequestDto(
                     reader.GetInt32(0),
-                    reader.GetString(1),
-                    reader.GetBoolean(2),
-                    reader.GetDateTime(3)));
+                    reader.GetBoolean(1),
+                    reader.GetDateTime(2)));
 
             return Results.Ok(new ItemsResponse<FriendRequestDto>(items));
         });
@@ -152,20 +151,33 @@ public static class RelationshipEndpoints
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
-                SELECT u.user_id, u.display_name,
-                       EXISTS (SELECT 1 FROM public.user_avatars a WHERE a.user_id = u.user_id)
+                SELECT u.user_id,
+                       CASE WHEN COALESCE(v.display_name_visibility, 'registered') IN ('friends', 'registered')
+                            THEN u.display_name ELSE NULL END,
+                       CASE WHEN COALESCE(v.avatar_visibility, 'registered') IN ('friends', 'registered')
+                            THEN EXISTS (SELECT 1 FROM public.user_avatars a WHERE a.user_id = u.user_id)
+                            ELSE NULL END
                 FROM public.user_friendships f
                 JOIN public.users u ON u.user_id =
                     CASE WHEN f.user_low_id = @user THEN f.user_high_id ELSE f.user_low_id END
+                LEFT JOIN public.user_profile_visibility v ON v.user_id = u.user_id
                 WHERE f.status = 'accepted'
                   AND (f.user_low_id = @user OR f.user_high_id = @user)
-                ORDER BY u.display_name, u.user_id", connection);
+                  AND NOT EXISTS (
+                      SELECT 1 FROM public.user_blocks b
+                      WHERE (b.blocker_user_id = @user AND b.blocked_user_id = u.user_id)
+                         OR (b.blocker_user_id = u.user_id AND b.blocked_user_id = @user)
+                  )
+                ORDER BY COALESCE(v.display_name_visibility, 'registered'), u.user_id", connection);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
 
             var items = new List<UserRelationshipDto>();
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
-                items.Add(new UserRelationshipDto(reader.GetInt32(0), reader.GetString(1), reader.GetBoolean(2)));
+                items.Add(new UserRelationshipDto(
+                    reader.GetInt32(0),
+                    reader.IsDBNull(1) ? null : reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetBoolean(2)));
 
             return Results.Ok(new ItemsResponse<UserRelationshipDto>(items));
         });
@@ -240,17 +252,16 @@ public static class RelationshipEndpoints
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
-                SELECT u.user_id, u.display_name
+                SELECT b.blocked_user_id
                 FROM public.user_blocks b
-                JOIN public.users u ON u.user_id = b.blocked_user_id
                 WHERE b.blocker_user_id = @user
-                ORDER BY u.display_name, u.user_id", connection);
+                ORDER BY b.blocked_user_id", connection);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
 
             var items = new List<UserBlockDto>();
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
-                items.Add(new UserBlockDto(reader.GetInt32(0), reader.GetString(1)));
+                items.Add(new UserBlockDto(reader.GetInt32(0)));
 
             return Results.Ok(new ItemsResponse<UserBlockDto>(items));
         });
