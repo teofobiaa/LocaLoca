@@ -65,5 +65,8 @@
     <Content Include="../../database/migrations/15_profile_privacy_and_relationships.sql"
              Link="Database/migrations/15_profile_privacy_and_relationships.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/21_personal_place_visit_events.sql"
+             Link="Database/migrations/21_personal_place_visit_events.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

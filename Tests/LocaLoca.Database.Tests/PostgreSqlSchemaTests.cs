@@ -352,11 +352,13 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "19_restore_password_hash_update_permission.sql");
         await _database.ExecuteSqlFileAsync("migrations", "20_restrict_runtime_sequence_privileges.sql");
         await _database.ExecuteSqlFileAsync("migrations", "20_restrict_runtime_sequence_privileges.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "21_personal_place_visit_events.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "21_personal_place_visit_events.sql");
 
         // Reconcile the journal after the migration sequence.
         await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
 
-        // The repeatable security script runs only after the full schema has reached v020.
+        // The repeatable security script runs only after the full schema has reached v021.
         await using (var revokeSessionPermissions = new NpgsqlCommand(
             "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
             connection))
@@ -388,6 +390,12 @@ public sealed class PostgreSqlSchemaTests
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
+                AND has_table_privilege('localoca_app', 'public.personal_place_visits', 'SELECT')
+                AND has_table_privilege('localoca_app', 'public.personal_place_visits', 'INSERT')
+                AND has_table_privilege('localoca_app', 'public.personal_place_visits', 'UPDATE')
+                AND has_table_privilege('localoca_app', 'public.personal_place_visits', 'DELETE')
+                AND has_sequence_privilege('localoca_app', 'public.personal_place_visits_personal_place_visit_id_seq', 'USAGE')
+                AND EXISTS (SELECT 1 FROM pg_policy WHERE polrelid = 'public.personal_place_visits'::regclass AND polname = 'localoca_app_runtime_access')
                 AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_profile_visibility', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_friendships', 'SELECT')
@@ -430,7 +438,7 @@ public sealed class PostgreSqlSchemaTests
         Assert.True((bool)(await permissionCheck.ExecuteScalarAsync() ?? false));
 
         await using var versionCheck = new NpgsqlCommand(@"
-            SELECT count(*) = 16
+            SELECT count(*) = 17
                AND count(*) FILTER (WHERE name IN (
                    'migrate_wishlist', 'migrate_user_map_places', 'migrate_photo_storage',
                    'server_sessions', 'map_marker_viewport_indexes', 'map_marker_visit_lookup_index',
@@ -438,9 +446,10 @@ public sealed class PostgreSqlSchemaTests
                    'user_birthdays_and_age_filtering', 'profile_privacy_and_relationships',
                    'catalog_search_trigram_indexes', 'runtime_role_rls_policies_and_grant_hardening',
                    'harden_profile_trigger_and_migration_ledger',
-                   'restore_password_hash_update_permission', 'restrict_runtime_sequence_privileges')) = 16
+                   'restore_password_hash_update_permission', 'restrict_runtime_sequence_privileges',
+                   'personal_place_visit_events')) = 17
             FROM public.localoca_schema_migrations
-            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)", connection);
+            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21)", connection);
         Assert.True((bool)(await versionCheck.ExecuteScalarAsync() ?? false));
     }
 
@@ -476,7 +485,10 @@ public sealed class PostgreSqlSchemaTests
                 AND to_regclass('public.ix_photos_visit') IS NOT NULL
                 AND to_regclass('public.ix_wishlist_attraction') IS NOT NULL
                 AND to_regclass('public.ix_user_map_places_user') IS NOT NULL
-                AND to_regclass('public.ix_user_map_place_photos') IS NOT NULL",
+                AND to_regclass('public.ix_user_map_place_photos') IS NOT NULL
+                AND to_regclass('public.personal_place_visits') IS NOT NULL
+                AND to_regclass('public.ix_personal_place_visits_user_date') IS NOT NULL
+                AND to_regclass('public.ix_personal_place_visits_user_place_date') IS NOT NULL",
             connection);
 
         Assert.True((bool)(await command.ExecuteScalarAsync() ?? false));
