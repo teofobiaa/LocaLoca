@@ -130,7 +130,7 @@ public sealed class PostgreSqlPermissionDriftTests
     [InlineData("GRANT UPDATE (display_name) ON TABLE public.users TO localoca_app WITH GRANT OPTION;", "COLUMN_GRANT_OPTION")]
     [InlineData("GRANT USAGE ON SEQUENCE public.categories_category_id_seq TO localoca_app;", "SEQUENCE_PRIVILEGE_EXTRA")]
     [InlineData("CREATE ROLE drift_reader NOLOGIN; GRANT USAGE ON SEQUENCE public.users_user_id_seq TO drift_reader;", "UNAPPROVED_ROLE_PRIVILEGE")]
-    [InlineData("ALTER SEQUENCE public.users_user_id_seq OWNER TO localoca_app;", "OBJECT_OWNERSHIP")]
+    [InlineData("CREATE SEQUENCE public.permission_drift_sequence; ALTER SEQUENCE public.permission_drift_sequence OWNER TO localoca_app;", "OBJECT_OWNERSHIP")]
     [InlineData("GRANT USAGE ON SEQUENCE public.users_user_id_seq TO localoca_app WITH GRANT OPTION;", "SEQUENCE_GRANT_OPTION")]
     [InlineData("REVOKE USAGE ON SEQUENCE public.users_user_id_seq FROM localoca_app;", "SEQUENCE_PRIVILEGE_MISSING")]
     [InlineData("GRANT SELECT ON SEQUENCE public.users_user_id_seq TO PUBLIC;", "PUBLIC_SEQUENCE_PRIVILEGE")]
