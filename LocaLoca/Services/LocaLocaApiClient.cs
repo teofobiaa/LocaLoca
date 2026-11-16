@@ -81,8 +81,6 @@ public sealed class LocaLocaApiClient : IDisposable
         }
     }
 
-    public string? Token => _token;
-
     public async Task<UserDto?> TryRestoreSessionAsync(CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_token)) return null;
@@ -447,8 +445,14 @@ public sealed class LocaLocaApiClient : IDisposable
         if (string.IsNullOrWhiteSpace(_token)) throw new InvalidOperationException("Сначала выполни вход в аккаунт.");
         var theme = isDarkTheme ? "dark" : "light";
         var mode = startNewVisit ? "&mode=visit" : string.Empty;
-        return new Uri(_http.BaseAddress!, $"map?theme={theme}#token={Uri.EscapeDataString(_token)}{mode}");
+        return new Uri(_http.BaseAddress!, $"map?theme={theme}{mode}");
     }
+
+    internal string GetMapApiRequestFilter() =>
+        new Uri(_http.BaseAddress!, "api/me/map-*").AbsoluteUri;
+
+    internal string? GetMapAuthorizationHeader(Uri requestUri) =>
+        MapRequestAuthorization.CreateHeader(_http.BaseAddress!, _token, requestUri);
 
     public async Task LogoutAsync(CancellationToken cancellationToken = default)
     {

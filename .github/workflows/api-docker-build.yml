@@ -17,13 +17,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - "Server/LocaLoca.Api/**"
-      - "Tests/**"
-      - "database/**"
-      - "global.json"
-      - "render.yaml"
-      - ".github/workflows/api-docker-build.yml"
   workflow_dispatch:
 
 permissions:
