@@ -258,6 +258,12 @@ findings AS (
     FROM app_role r
     JOIN pg_auth_members m ON m.roleid = r.oid
     JOIN pg_roles member_role ON member_role.oid = m.member
+    WHERE NOT (
+        member_role.rolname = 'postgres'
+        AND m.admin_option
+        AND NOT m.inherit_option
+        AND NOT m.set_option
+    )
 
     -- The runtime role must never own database objects or default ACL definitions.
     UNION ALL
@@ -766,6 +772,8 @@ findings AS (
       AND acl.grantee <> 0
       AND acl.grantee <> COALESCE((SELECT oid FROM app_role), 0)
       AND acl.grantee <> COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'service_role'), 0)
+      -- Supabase owns this provider-level default ACL set; project roles cannot edit its grantor.
+      AND d.defaclrole <> COALESCE((SELECT oid FROM pg_roles WHERE rolname = 'supabase_admin'), 0)
 
     -- PUBLIC must not be able to execute functions in the application schema.
     UNION ALL
