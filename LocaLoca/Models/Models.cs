@@ -4,6 +4,27 @@ public sealed record HealthDto(bool ApiConfigured, bool DatabaseConnected, strin
 public sealed record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
 public sealed record UpdateDisplayNameRequest(string DisplayName);
 public sealed record UpdateResidenceRequest(string? ResidenceCountry, string? ResidenceCity);
+public sealed record UpdateBirthDateRequest(DateOnly? DateOfBirth);
+public sealed record PrivateBirthDateDto(DateOnly? DateOfBirth);
+public sealed record BirthdayContactWriteRequest(string DisplayName, DateOnly BirthDate);
+public sealed class BirthdayContactDto
+{
+    public int Id { get; set; }
+    public string DisplayName { get; set; } = string.Empty;
+    public DateOnly BirthDate { get; set; }
+    public DateOnly NextBirthdayDate { get; set; }
+    public int DaysUntilBirthday { get; set; }
+    public int AgeOnNextBirthday { get; set; }
+
+    public string ReminderText => DaysUntilBirthday switch
+    {
+        0 => "Сегодня день рождения",
+        1 => "Завтра день рождения",
+        _ => $"Через {DaysUntilBirthday} дн."
+    };
+
+    public string BirthdayDetails => $"{NextBirthdayDate:dd.MM.yyyy} · исполнится {AgeOnNextBirthday}";
+}
 public sealed record ProfilePrivacyDto(
     string DisplayNameVisibility,
     string AvatarVisibility,
