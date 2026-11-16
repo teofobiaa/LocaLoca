@@ -1,5 +1,5 @@
 -- Upgrade an existing LocaLoca runtime role to the current application schema.
--- Run as the database administrator after migrations/03, /04, /11 and /12; safe to rerun.
+-- Run this script as the database administrator after the latest schema migrations; safe to rerun.
 -- Safe to execute more than once; it does not change ownership or grant admin privileges.
 
 GRANT UPDATE (display_name, residence_country, residence_city) ON TABLE public.users TO localoca_app;
@@ -24,6 +24,20 @@ BEGIN
 END;
 $grant_avatar_permissions$;
 
+DO $grant_profile_privacy_permissions$
+BEGIN
+    IF to_regclass('public.user_profile_visibility') IS NOT NULL THEN
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_profile_visibility TO localoca_app';
+    END IF;
+    IF to_regclass('public.user_friendships') IS NOT NULL THEN
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_friendships TO localoca_app';
+    END IF;
+    IF to_regclass('public.user_blocks') IS NOT NULL THEN
+        EXECUTE 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_blocks TO localoca_app';
+    END IF;
+END;
+$grant_profile_privacy_permissions$;
+
 GRANT USAGE ON SEQUENCE
     public.user_map_places_user_map_place_id_seq,
     public.user_map_place_photos_photo_id_seq
@@ -47,6 +61,22 @@ SELECT
         AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
         AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
     ELSE false END AS user_avatars_permissions,
+    CASE WHEN to_regclass('public.user_profile_visibility') IS NOT NULL
+         AND to_regclass('public.user_friendships') IS NOT NULL
+         AND to_regclass('public.user_blocks') IS NOT NULL THEN
+        has_table_privilege('localoca_app', 'public.user_profile_visibility', 'SELECT')
+        AND has_table_privilege('localoca_app', 'public.user_profile_visibility', 'INSERT')
+        AND has_table_privilege('localoca_app', 'public.user_profile_visibility', 'UPDATE')
+        AND has_table_privilege('localoca_app', 'public.user_profile_visibility', 'DELETE')
+        AND has_table_privilege('localoca_app', 'public.user_friendships', 'SELECT')
+        AND has_table_privilege('localoca_app', 'public.user_friendships', 'INSERT')
+        AND has_table_privilege('localoca_app', 'public.user_friendships', 'UPDATE')
+        AND has_table_privilege('localoca_app', 'public.user_friendships', 'DELETE')
+        AND has_table_privilege('localoca_app', 'public.user_blocks', 'SELECT')
+        AND has_table_privilege('localoca_app', 'public.user_blocks', 'INSERT')
+        AND has_table_privilege('localoca_app', 'public.user_blocks', 'UPDATE')
+        AND has_table_privilege('localoca_app', 'public.user_blocks', 'DELETE')
+    ELSE false END AS profile_privacy_permissions,
     has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE') AS map_places_sequence,
     has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE') AS map_photos_sequence,
     has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'SELECT') AS auth_rate_limit_select,
@@ -54,8 +84,8 @@ SELECT
     has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'UPDATE') AS auth_rate_limit_update,
     has_table_privilege('localoca_app', 'public.auth_rate_limit_counters', 'DELETE') AS auth_rate_limit_delete;
 
--- Residence fields and the shared limiter are introduced by migrations 011 and 012.
--- Run this script after migration 012. Session access remains conditional for legacy installations.
+-- Profile residence and the shared limiter are introduced by migrations 011 and 012.
+-- Session access remains conditional for legacy installations.
 DO $grant_session_permissions$
 BEGIN
     IF to_regclass('public.user_sessions') IS NOT NULL THEN
