@@ -93,16 +93,27 @@ RETURNING attraction_id", connection);
 
         using var factory = database.CreateFactory();
         using var client = factory.CreateClient();
-        using var response = await client.GetAsync("/api/catalog?search=" + Uri.EscapeDataString(marker));
-        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var root = document.RootElement;
-        var items = root.GetProperty("items").EnumerateArray().ToArray();
-        var ids = items.Select(item => item.GetProperty("id").GetInt32()).ToArray();
-        Assert.Equal(2, root.GetProperty("totalCount").GetInt32());
-        Assert.Equal(2, items.Length);
-        Assert.Equal(2, ids.Distinct().Count());
+        foreach (var search in new[]
+        {
+            marker,
+            marker + " Attraction",
+            marker + " City",
+            marker + " Country"
+        })
+        {
+            using var response = await client.GetAsync(
+                "/api/catalog?search=" + Uri.EscapeDataString(search));
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var root = document.RootElement;
+            var items = root.GetProperty("items").EnumerateArray().ToArray();
+            var ids = items.Select(item => item.GetProperty("id").GetInt32()).ToArray();
+            Assert.Equal(2, root.GetProperty("totalCount").GetInt32());
+            Assert.Equal(2, items.Length);
+            Assert.Equal(2, ids.Distinct().Count());
+        }
     }
 
     [Fact]
