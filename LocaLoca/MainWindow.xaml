@@ -418,6 +418,55 @@
                                         <Button x:Name="ProfileResidenceSaveButton" Content="Сохранить место проживания" Style="{StaticResource PrimaryButtonStyle}" Click="SaveResidence_Click" HorizontalAlignment="Left" />
                                         <TextBlock x:Name="ProfileResidenceStatusText" Text="" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource MutedBrush}" />
                                     </StackPanel>
+
+                                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                    <StackPanel Spacing="14">
+                                        <StackPanel Spacing="5">
+                                            <TextBlock Text="Видимость профиля" FontSize="17" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
+                                            <TextBlock Text="Настраивай доступ к каждому полю отдельно. «Друзья» — только взаимно подтверждённые друзья. Заблокированные аккаунты не видят профиль независимо от этих настроек."
+                                                       FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="18" RowSpacing="12">
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="Отображаемое имя" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                                <ComboBox x:Name="ProfileDisplayNameVisibilityBox" SelectedValuePath="Tag" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="Только я" Tag="private" />
+                                                    <ComboBoxItem Content="Друзья" Tag="friends" />
+                                                    <ComboBoxItem Content="Все зарегистрированные" Tag="registered" />
+                                                </ComboBox>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Spacing="6">
+                                                <TextBlock Text="Аватар" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                                <ComboBox x:Name="ProfileAvatarVisibilityBox" SelectedValuePath="Tag" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="Только я" Tag="private" />
+                                                    <ComboBoxItem Content="Друзья" Tag="friends" />
+                                                    <ComboBoxItem Content="Все зарегистрированные" Tag="registered" />
+                                                </ComboBox>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="1" Spacing="6">
+                                                <TextBlock Text="Страна проживания" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                                <ComboBox x:Name="ProfileResidenceCountryVisibilityBox" SelectedValuePath="Tag" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="Только я" Tag="private" />
+                                                    <ComboBoxItem Content="Друзья" Tag="friends" />
+                                                    <ComboBoxItem Content="Все зарегистрированные" Tag="registered" />
+                                                </ComboBox>
+                                            </StackPanel>
+                                            <StackPanel Grid.Row="1" Grid.Column="1" Spacing="6">
+                                                <TextBlock Text="Город проживания" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                                <ComboBox x:Name="ProfileResidenceCityVisibilityBox" SelectedValuePath="Tag" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="Только я" Tag="private" />
+                                                    <ComboBoxItem Content="Друзья" Tag="friends" />
+                                                    <ComboBoxItem Content="Все зарегистрированные" Tag="registered" />
+                                                </ComboBox>
+                                            </StackPanel>
+                                        </Grid>
+                                        <Button x:Name="ProfilePrivacySaveButton" Content="Сохранить настройки видимости"
+                                                Style="{StaticResource PrimaryButtonStyle}" Click="SaveProfilePrivacy_Click"
+                                                HorizontalAlignment="Left" />
+                                        <TextBlock x:Name="ProfilePrivacyStatusText" Text="" FontSize="12" TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource MutedBrush}" />
+                                    </StackPanel>
+                                </Border>
                                 </Border>
                             </StackPanel>
                         </ScrollViewer>
