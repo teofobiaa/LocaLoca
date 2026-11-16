@@ -66,7 +66,7 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
         await using (var avatarsCommand = new NpgsqlCommand(avatarsSql, connection))
             await avatarsCommand.ExecuteNonQueryAsync();
 
-        var profilePrivacySql = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Database", "migrations", "14_profile_privacy_and_relationships.sql"));
+        var profilePrivacySql = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Database", "migrations", "15_profile_privacy_and_relationships.sql"));
         await using (var profilePrivacyCommand = new NpgsqlCommand(profilePrivacySql, connection))
             await profilePrivacyCommand.ExecuteNonQueryAsync();
 
