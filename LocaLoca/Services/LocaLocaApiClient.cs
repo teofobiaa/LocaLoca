@@ -213,6 +213,30 @@ public sealed class LocaLocaApiClient : IDisposable
     }
 
 
+    public async Task<ProfilePrivacyDto> GetProfilePrivacyAsync(CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, "api/me/profile/privacy");
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<ProfilePrivacyDto>(JsonOptions, cancellationToken))
+            ?? throw new InvalidOperationException("Сервер вернул пустые настройки приватности.");
+    }
+
+    public async Task<ProfilePrivacyDto> UpdateProfilePrivacyAsync(
+        UpdateProfilePrivacyRequest settings, CancellationToken cancellationToken = default)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Put, "api/me/profile/privacy")
+        {
+            Content = JsonContent.Create(settings, options: JsonOptions)
+        };
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(request, cancellationToken);
+        await EnsureSuccessAsync(response, cancellationToken);
+        return (await response.Content.ReadFromJsonAsync<ProfilePrivacyDto>(JsonOptions, cancellationToken))
+            ?? throw new InvalidOperationException("Сервер вернул пустые настройки приватности.");
+    }
+
     public async Task UploadAvatarAsync(StorageFile file, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(file);
