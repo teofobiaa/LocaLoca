@@ -25,7 +25,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "c51b2aec0098c8bfedc2490c4512de66b116a9edc1201f9344c171478d96a83c"
+    "sha256": "a800ff49f4e5c46bf9d7a794857d5a0e806946a2610546ee4bd99254cd1ff05b"
   },
   "schemaMigrations": [
     {
@@ -125,14 +125,14 @@
       "name": "create_app_role",
       "path": "security/05_create_app_role.sql",
       "repeatable": false,
-      "sha256": "da89e3f6daeedacb41067576d362d2ce065c515e71940ddfe21d5126ab9fca54"
+      "sha256": "2e5682458c0b380b0c36fe7fd50439a3e7b7fc8a7c1944fd4130b61e75703ee6"
     },
     {
       "version": 6,
       "name": "update_runtime_permissions",
       "path": "security/06_update_runtime_permissions.sql",
       "repeatable": true,
-      "sha256": "fce7688f8f5ac96bd0c1492b7c7c9c2500e0e3df1241d611944e31c394908cdb"
+      "sha256": "538756b4b7f0b96d3a8e84ace46f81b9582cdc540fe24c38c51691fd405dd376"
     }
   ]
 }
