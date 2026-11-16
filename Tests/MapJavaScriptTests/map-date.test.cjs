@@ -35,6 +35,7 @@ test('map.js executes and supplies the local date to both map forms', async () =
 
   const mapHandlers = {};
   const markers = [];
+  const popups = [];
   const hint = { textContent: '' };
   const map = {
     setView() { return this; },
@@ -62,11 +63,15 @@ test('map.js executes and supplies the local date to both map forms', async () =
       markers.push(marker);
       return marker;
     },
-    popup: () => ({
-      setLatLng() { return this; },
-      setContent(html) { this.popupHtml = html; return this; },
-      openOn() { return this; }
-    })
+    popup: () => {
+      const popup = {
+        setLatLng() { return this; },
+        setContent(html) { this.popupHtml = html; return this; },
+        openOn() { return this; }
+      };
+      popups.push(popup);
+      return popup;
+    }
   };
   const context = vm.createContext({
     Date: FixedDate,
@@ -111,9 +116,9 @@ test('map.js executes and supplies the local date to both map forms', async () =
   assert.match(markers[0].popupHtml, /value="2025-12-31"/);
 
   mapHandlers.click({ latlng: { lat: 10, lng: 20 } });
-  const newVisitPopup = context.L.popup; // Keep the map execution assertion explicit below.
-  assert.equal(typeof newVisitPopup, 'function');
-  assert.equal(context.getLocalDateString(new Date('2026-01-01T01:30:00.000Z')), '2025-12-31');
+  assert.equal(popups.length, 1);
+  assert.match(popups[0].popupHtml, /max="2025-12-31"/);
+  assert.match(popups[0].popupHtml, /value="2025-12-31"/);
 });
 
 test('map page loads the date helper before map.js', () => {
