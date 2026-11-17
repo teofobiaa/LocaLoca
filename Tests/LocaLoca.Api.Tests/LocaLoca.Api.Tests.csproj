@@ -7,6 +7,9 @@
     <Content Include="../../database/migrations/21_user_login_prefix_search.sql"
              Link="Database/migrations/21_user_login_prefix_search.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/22_profile_birthday_visibility_and_remove_contacts.sql"
+             Link="Database/migrations/22_profile_birthday_visibility_and_remove_contacts.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
