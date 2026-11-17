@@ -68,6 +68,33 @@
                     </Grid>
                 </Border>
             </DataTemplate>
+            <DataTemplate x:Key="FriendTemplate" x:DataType="models:FriendListItemViewModel">
+                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="16" Padding="15" Margin="0,0,0,10" BorderBrush="{ThemeResource Palette_E9ECE6}" BorderThickness="1">
+                    <Grid ColumnDefinitions="58,*,Auto" ColumnSpacing="13">
+                        <Grid Width="58" Height="58" VerticalAlignment="Center">
+                            <Ellipse Fill="{ThemeResource Palette_EAF0E2}" />
+                            <TextBlock Text="{x:Bind Initials}" FontSize="18" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource Palette_688A43}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Ellipse>
+                                <Ellipse.Fill>
+                                    <ImageBrush ImageSource="{x:Bind AvatarSource}" Stretch="UniformToFill" />
+                                </Ellipse.Fill>
+                            </Ellipse>
+                        </Grid>
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind DisplayText}" FontSize="15" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource Palette_1B2A25}" TextWrapping="Wrap" />
+                            <TextBlock Text="{x:Bind LoginLabel}" FontSize="12" Foreground="{ThemeResource Palette_819087}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button Content="Профиль" Tag="{x:Bind UserId}" Style="{StaticResource QuietButtonStyle}"
+                                    Click="OpenFriendProfile_Click" />
+                            <Button Content="Удалить" Tag="{x:Bind UserId}" Style="{StaticResource QuietButtonStyle}"
+                                    Click="RemoveFriend_Click" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </DataTemplate>
         </Grid.Resources>
         <!-- Authentication -->
         <Grid x:Name="AuthPage" Visibility="Visible" ColumnDefinitions="1.15*,0.85*">
@@ -164,6 +191,9 @@
                     </Button>
                     <Button Style="{StaticResource NavButtonStyle}" Click="MapNav_Click">
                         <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE81D;" FontSize="17" /><TextBlock Text="Карта" VerticalAlignment="Center" /></StackPanel>
+                    </Button>
+                    <Button x:Name="FriendsNavButton" Style="{StaticResource NavButtonStyle}" Click="FriendsNav_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE716;" FontSize="17" /><TextBlock Text="Друзья" VerticalAlignment="Center" /></StackPanel>
                     </Button>
                     <Button x:Name="SupportNavButton" Style="{StaticResource NavButtonStyle}" Click="SupportNav_Click">
                         <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE897;" FontSize="17" /><TextBlock Text="Поддержка" VerticalAlignment="Center" /></StackPanel>
@@ -341,6 +371,37 @@
                         <Border Grid.Row="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                             <controls:WebView2 x:Name="MapWebView" />
                         </Border>
+                    </Grid>
+
+                    <!-- Friends -->
+                    <Grid x:Name="FriendsPage" Visibility="Collapsed" RowDefinitions="Auto,*">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="0,0,0,15">
+                            <StackPanel Spacing="4" VerticalAlignment="Center">
+                                <TextBlock Text="Твои друзья в Loca Loca" FontSize="14" Foreground="{ThemeResource Palette_839188}" />
+                                <TextBlock x:Name="FriendsStatusText" Text="Список ещё не загружен." FontSize="12"
+                                           Foreground="{ThemeResource Palette_87948C}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button x:Name="FriendsRefreshButton" Grid.Column="1" Content="Обновить"
+                                    Style="{StaticResource QuietButtonStyle}" Click="RefreshFriends_Click" />
+                        </Grid>
+                        <Grid Grid.Row="1">
+                            <ListView x:Name="FriendsList" ItemsSource="{x:Bind Friends, Mode=OneWay}"
+                                      ItemTemplate="{StaticResource FriendTemplate}" SelectionMode="None"
+                                      Background="Transparent" BorderThickness="0" Visibility="Collapsed" />
+                            <StackPanel x:Name="FriendsEmptyState" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        MaxWidth="420" Spacing="10" Visibility="Visible">
+                                <Border Width="70" Height="70" CornerRadius="35" Background="{ThemeResource Palette_EAF0E2}"
+                                        HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xE716;" FontSize="30" Foreground="{ThemeResource Palette_688A43}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock Text="Пока нет друзей" FontSize="21" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource Palette_1B2A25}" TextAlignment="Center" />
+                                <TextBlock Text="После подтверждения заявок друзья появятся в этом списке."
+                                           FontSize="13" Foreground="{ThemeResource Palette_819087}"
+                                           TextWrapping="Wrap" TextAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
                     </Grid>
 
                     <!-- Profile settings -->
