@@ -295,16 +295,18 @@ public static class RelationshipEndpoints
 
             var (lowId, highId) = OrderedPair(userId, otherUserId);
             await using var connection = await OpenAsync(connectionString, cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            await LockRelationshipPairAsync(connection, transaction, lowId, highId, cancellationToken);
             await using var command = new NpgsqlCommand(@"
                 DELETE FROM public.user_friendships
-                WHERE user_low_id = @low AND user_high_id = @high AND status = 'accepted'", connection);
+                WHERE user_low_id = @low AND user_high_id = @high AND status = 'accepted'", connection, transaction);
             command.Parameters.AddWithValue("low", NpgsqlDbType.Integer, lowId);
             command.Parameters.AddWithValue("high", NpgsqlDbType.Integer, highId);
 
+            var deleted = await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+            await transaction.CommitAsync(cancellationToken);
             return Results.Ok(new MessageDto(
-                await command.ExecuteNonQueryAsync(cancellationToken) == 1
-                    ? "Пользователь удалён из друзей."
-                    : "Дружеская связь не найдена."));
+                deleted ? "Пользователь удалён из друзей." : "Дружеская связь не найдена."));
         });
 
         app.MapPost("/api/users/{targetUserId:int}/block", async Task<IResult> (
