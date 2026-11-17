@@ -164,6 +164,10 @@ def _fetch_event_window(start, end, event, stats, depth=0):
 
     stats["reported_count_by_event"][event] += total_count
     if total_count == 0:
+        stats["completed_windows_by_event"][event].append({
+            "since_utc": github_timestamp(start),
+            "until_utc_exclusive": github_timestamp(end),
+        })
         return []
 
     expected_pages = math.ceil(total_count / PAGE_SIZE)
@@ -190,6 +194,11 @@ def _fetch_event_window(start, end, event, stats, depth=0):
             reported_count=total_count,
             fetched_unique_count=len(unique),
         )
+    else:
+        stats["completed_windows_by_event"][event].append({
+            "since_utc": github_timestamp(start),
+            "until_utc_exclusive": github_timestamp(end),
+        })
 
     return list(unique.values())
 
@@ -211,6 +220,7 @@ def fetch_workflow_runs(since, until):
         "pages_fetched": 0,
         "time_windows_split": 0,
         "incomplete_windows": [],
+        "completed_windows_by_event": {event: [] for event in WORKFLOW_EVENTS},
         "reported_count_by_event": collections.Counter(),
     }
     by_id = {}
@@ -241,6 +251,7 @@ def fetch_workflow_runs(since, until):
         "pagination_pages_fetched": stats["pages_fetched"],
         "pagination_time_windows_split": stats["time_windows_split"],
         "pagination_incomplete_windows": stats["incomplete_windows"],
+        "pagination_completed_windows_by_event": stats["completed_windows_by_event"],
     }
     return runs, coverage
 
@@ -479,6 +490,8 @@ def main():
         "",
         f"- Pagination complete: {coverage['pagination_complete']}.",
         f"- Eligible runs fetched by event: {json.dumps(coverage['workflow_runs_fetched_by_event'], sort_keys=True)}.",
+        f"- Fully covered intervals by event are recorded in metrics.json: "
+        f"{json.dumps({event: len(windows) for event, windows in coverage['pagination_completed_windows_by_event'].items()}, sort_keys=True)}.",
         f"- API requests/retries: {API_REQUESTS}/{API_RETRIES}.",
         f"- Flaky-test detection complete: {flaky_detection_complete}. Missing or unreadable TRX artifacts reduce detection coverage.",
         "- Failed-job details are requested only for completed workflows with a failure-like conclusion to reduce API traffic.",
