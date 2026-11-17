@@ -813,6 +813,7 @@ public sealed partial class MainWindow : Window
         MapPage.Visibility = page == "map" ? Visibility.Visible : Visibility.Collapsed;
         ProfilePage.Visibility = page == "profile" ? Visibility.Visible : Visibility.Collapsed;
         SupportPage.Visibility = page == "support" ? Visibility.Visible : Visibility.Collapsed;
+        FriendsPage.Visibility = page == "friends" ? Visibility.Visible : Visibility.Collapsed;
 
         (PageEyebrow.Text, PageTitle.Text) = page switch
         {
@@ -822,11 +823,397 @@ public sealed partial class MainWindow : Window
             "wishlist" => ("Идеи для следующей поездки", "Хочу посетить"),
             "map" => ("Исследуй мир", "Карта открытий"),
             "profile" => ("Личные данные и оформление", "Профиль и настройки"),
+            "friends" => ("Общение и совместные открытия", "Друзья"),
             "support" => ("Контакты и полезные ссылки", "Поддержка"),
             _ => ("Исследуй мир", "Карта открытий")
         };
         HomeNavButton.Background = page == "home" ? Brush("#29443D") : Brush("Transparent");
         SupportNavButton.Background = page == "support" ? Brush("#29443D") : Brush("Transparent");
+        FriendsNavButton.Background = page == "friends" ? Brush("#29443D") : Brush("Transparent");
+    }
+
+
+    private async void FriendsNav_Click(object sender, RoutedEventArgs e)
+    {
+        ShowPage("friends");
+        await LoadFriendsPageAsync();
+    }
+
+    private async void FriendsRefresh_Click(object sender, RoutedEventArgs e) =>
+        await LoadFriendsPageAsync();
+
+    private async void FriendsSearch_Click(object sender, RoutedEventArgs e) =>
+        await SearchFriendsAsync();
+
+    private async void FriendsSearchBox_KeyDown(
+        object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Enter) return;
+        e.Handled = true;
+        await SearchFriendsAsync();
+    }
+
+    private async Task LoadFriendsPageAsync()
+    {
+        if (_currentUser is null) return;
+
+        FriendsRefreshButton.IsEnabled = false;
+        FriendsListStatusText.Text = "Загружаем список друзей…";
+        FriendsListPanel.Children.Clear();
+
+        try
+        {
+            var friends = await _api.GetFriendsAsync();
+            FriendsCountText.Text = friends.Count.ToString();
+
+            if (friends.Count == 0)
+            {
+                FriendsListStatusText.Text = "Пока здесь пусто. Найди пользователя по логину выше, чтобы отправить заявку.";
+                return;
+            }
+
+            FriendsListStatusText.Text = $"В списке {friends.Count} {GetRussianCountWord(friends.Count, "друг", "друга", "друзей")}.";
+            foreach (var friend in friends)
+            {
+                var actions = new UIElement[]
+                {
+                    CreateSocialButton("Профиль", friend.UserId, friend.Login, OpenFriendProfile_Click),
+                    CreateSocialButton("Удалить", friend.UserId, friend.Login, RemoveFriend_Click)
+                };
+                var card = CreateSocialCard(friend.UserId, friend.Login, friend.DisplayName, friend.HasAvatar, actions);
+                FriendsListPanel.Children.Add(card);
+            }
+        }
+        catch (Exception ex)
+        {
+            FriendsListStatusText.Text = "Не удалось загрузить список друзей: " + ex.Message;
+        }
+        finally
+        {
+            FriendsRefreshButton.IsEnabled = true;
+        }
+    }
+
+    private async Task SearchFriendsAsync()
+    {
+        var loginPrefix = FriendsSearchBox.Text.Trim();
+        FriendsSearchResultsPanel.Children.Clear();
+
+        if (loginPrefix.Length < 3)
+        {
+            FriendsSearchStatusText.Text = "Для поиска введи не менее трёх символов.";
+            return;
+        }
+
+        if (loginPrefix.Length > 50)
+        {
+            FriendsSearchStatusText.Text = "Логин для поиска не должен быть длиннее 50 символов.";
+            return;
+        }
+
+        FriendsSearchButton.IsEnabled = false;
+        FriendsSearchStatusText.Text = "Ищем пользователей…";
+
+        try
+        {
+            var users = await _api.SearchUsersAsync(loginPrefix);
+            if (users.Count == 0)
+            {
+                FriendsSearchStatusText.Text = "Пользователи с таким началом логина не найдены.";
+                return;
+            }
+
+            FriendsSearchStatusText.Text = $"Найдено пользователей: {users.Count}.";
+            foreach (var user in users)
+            {
+                var actions = new List<UIElement>
+                {
+                    CreateSocialButton("Профиль", user.UserId, user.Login, OpenFriendProfile_Click)
+                };
+
+                switch (user.RelationshipStatus)
+                {
+                    case "none":
+                        actions.Add(CreateSocialButton("Добавить", user.UserId, user.Login, SendFriendRequest_Click, primary: true));
+                        break;
+                    case "outgoing_pending":
+                        actions.Add(CreateSocialButton("Заявка отправлена", user.UserId, user.Login, null, enabled: false));
+                        break;
+                    case "incoming_pending":
+                        actions.Add(CreateSocialButton("Входящая заявка", user.UserId, user.Login, null, enabled: false));
+                        break;
+                    case "friends":
+                        actions.Add(CreateSocialButton("Уже друзья", user.UserId, user.Login, null, enabled: false));
+                        break;
+                    default:
+                        actions.Add(CreateSocialButton("Недоступно", user.UserId, user.Login, null, enabled: false));
+                        break;
+                }
+
+                FriendsSearchResultsPanel.Children.Add(
+                    CreateSocialCard(user.UserId, user.Login, user.DisplayName, user.HasAvatar, actions));
+            }
+        }
+        catch (Exception ex)
+        {
+            FriendsSearchStatusText.Text = "Не удалось выполнить поиск: " + ex.Message;
+        }
+        finally
+        {
+            FriendsSearchButton.IsEnabled = true;
+        }
+    }
+
+    private Border CreateSocialCard(
+        int userId, string login, string? displayName, bool? hasAvatar, IEnumerable<UIElement> actions)
+    {
+        var card = new Border
+        {
+            Background = Brush("#FFFFFF"),
+            BorderBrush = Brush("#E7EBE5"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(15),
+            Padding = new Thickness(13)
+        };
+
+        var layout = new Grid { ColumnSpacing = 13 };
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(56) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var avatar = CreateSocialAvatar(userId, login, displayName, hasAvatar);
+        Grid.SetColumn(avatar, 0);
+        layout.Children.Add(avatar);
+
+        var identity = new StackPanel
+        {
+            Spacing = 4,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        identity.Children.Add(new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(displayName) ? login : displayName,
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = Brush("#1B2A25"),
+            TextWrapping = TextWrapping.Wrap
+        });
+        identity.Children.Add(new TextBlock
+        {
+            Text = "@" + login,
+            FontSize = 12,
+            Foreground = Brush("#819087")
+        });
+        Grid.SetColumn(identity, 1);
+        layout.Children.Add(identity);
+
+        var actionPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 7,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        foreach (var action in actions)
+            actionPanel.Children.Add(action);
+        Grid.SetColumn(actionPanel, 2);
+        layout.Children.Add(actionPanel);
+
+        card.Child = layout;
+        return card;
+    }
+
+    private Grid CreateSocialAvatar(int userId, string login, string? displayName, bool? hasAvatar)
+    {
+        var avatar = new Ellipse
+        {
+            Width = 52,
+            Height = 52,
+            Fill = Brush("#DDEBCB")
+        };
+        var fallback = new TextBlock
+        {
+            Text = GetInitials(displayName, login),
+            FontSize = 17,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = Brush("#5F7844"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var container = new Grid { Width = 52, Height = 52 };
+        container.Children.Add(avatar);
+        container.Children.Add(fallback);
+
+        if (hasAvatar == true)
+            _ = LoadSocialAvatarAsync(userId, avatar, fallback);
+
+        return container;
+    }
+
+    private async Task LoadSocialAvatarAsync(int userId, Ellipse avatar, TextBlock fallback)
+    {
+        try
+        {
+            var bytes = await _api.GetUserAvatarBytesAsync(userId, thumbnail: true);
+            if (bytes is null || bytes.Length == 0) return;
+
+            using var imageStream = new InMemoryRandomAccessStream();
+            using (var writer = new DataWriter(imageStream))
+            {
+                writer.WriteBytes(bytes);
+                await writer.StoreAsync();
+                await writer.FlushAsync();
+            }
+
+            imageStream.Seek(0);
+            var bitmap = new BitmapImage();
+            await bitmap.SetSourceAsync(imageStream);
+            avatar.Fill = new ImageBrush
+            {
+                ImageSource = bitmap,
+                Stretch = Stretch.UniformToFill
+            };
+            fallback.Visibility = Visibility.Collapsed;
+        }
+        catch
+        {
+            // Keep the initials fallback when an avatar is unavailable or cannot be decoded.
+        }
+    }
+
+    private static string GetInitials(string? displayName, string login)
+    {
+        var value = string.IsNullOrWhiteSpace(displayName) ? login.Trim() : displayName.Trim();
+        if (value.Length == 0) return "??";
+        return value.Length == 1
+            ? value.ToUpperInvariant()
+            : string.Concat(char.ToUpperInvariant(value[0]), char.ToUpperInvariant(value[1]));
+    }
+
+    private Button CreateSocialButton(
+        string caption, int userId, string login, RoutedEventHandler? handler,
+        bool primary = false, bool enabled = true)
+    {
+        var button = new Button
+        {
+            Content = caption,
+            Tag = (userId, login),
+            IsEnabled = enabled,
+            Style = (Style)Root.Resources[primary ? "PrimaryButtonStyle" : "QuietButtonStyle"]
+        };
+        if (handler is not null)
+            button.Click += handler;
+        return button;
+    }
+
+    private static bool TryGetSocialUser(object sender, out int userId, out string login)
+    {
+        if (sender is Button button && button.Tag is ValueTuple<int, string> value)
+        {
+            userId = value.Item1;
+            login = value.Item2;
+            return userId > 0;
+        }
+
+        userId = 0;
+        login = string.Empty;
+        return false;
+    }
+
+    private async void SendFriendRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        try
+        {
+            await _api.SendFriendRequestAsync(userId);
+            FriendsSearchStatusText.Text = $"Заявка для @{login} отправлена.";
+            await LoadFriendsPageAsync();
+            await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            FriendsSearchStatusText.Text = "Не удалось отправить заявку: " + ex.Message;
+        }
+    }
+
+    private async void RemoveFriend_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        if (await ConfirmAsync("Удалить из друзей?", $"Пользователь @{login} будет удалён из списка друзей.") != ContentDialogResult.Primary)
+            return;
+
+        try
+        {
+            await _api.RemoveFriendAsync(userId);
+            FriendsListStatusText.Text = $"Пользователь @{login} удалён из друзей.";
+            await LoadFriendsPageAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            FriendsListStatusText.Text = "Не удалось удалить друга: " + ex.Message;
+        }
+    }
+
+    private async void OpenFriendProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        try
+        {
+            var profile = await _api.GetUserProfileAsync(userId);
+            var content = new StackPanel { Spacing = 12, MinWidth = 300 };
+            content.Children.Add(CreateSocialAvatar(userId, login, profile.DisplayName, profile.HasAvatar));
+            content.Children.Add(new TextBlock
+            {
+                Text = "@" + login,
+                FontSize = 12,
+                Foreground = Brush("#819087")
+            });
+
+            if (!string.IsNullOrWhiteSpace(profile.ResidenceCity))
+                content.Children.Add(new TextBlock
+                {
+                    Text = "Город: " + profile.ResidenceCity,
+                    FontSize = 13,
+                    Foreground = Brush("#53645B"),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+            if (!string.IsNullOrWhiteSpace(profile.ResidenceCountry))
+                content.Children.Add(new TextBlock
+                {
+                    Text = "Страна: " + profile.ResidenceCountry,
+                    FontSize = 13,
+                    Foreground = Brush("#53645B"),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+            var dialog = new ContentDialog
+            {
+                Title = profile.DisplayName ?? login,
+                Content = content,
+                CloseButtonText = "Закрыть",
+                RequestedTheme = Root.RequestedTheme,
+                XamlRoot = Root.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось открыть профиль", ex.Message);
+        }
+    }
+
+    private static string GetRussianCountWord(int count, string one, string few, string many)
+    {
+        var remainder100 = count % 100;
+        if (remainder100 is >= 11 and <= 14) return many;
+        return count % 10 switch
+        {
+            1 => one,
+            2 or 3 or 4 => few,
+            _ => many
+        };
     }
 
     private void SupportNav_Click(object sender, RoutedEventArgs e) => ShowPage("support");
