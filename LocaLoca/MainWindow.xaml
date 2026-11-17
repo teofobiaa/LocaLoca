@@ -91,6 +91,8 @@
                                     Click="OpenFriendProfile_Click" />
                             <Button Content="Удалить" Tag="{x:Bind UserId}" Style="{StaticResource QuietButtonStyle}"
                                     Click="RemoveFriend_Click" />
+                            <Button Content="Блокировать" Tag="{x:Bind UserId}" Style="{StaticResource QuietButtonStyle}"
+                                    Click="BlockFriend_Click" />
                         </StackPanel>
                     </Grid>
                 </Border>
