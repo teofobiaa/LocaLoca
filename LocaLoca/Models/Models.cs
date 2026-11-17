@@ -1,3 +1,5 @@
+using Microsoft.UI.Xaml.Media.Imaging;
+
 namespace LocaLoca.Models;
 
 public sealed record HealthDto(bool ApiConfigured, bool DatabaseConnected, string Message);
@@ -8,6 +10,17 @@ public sealed record FriendRequestDto(
     int UserId, string Login, string? DisplayName, bool? HasAvatar, bool IsIncoming, DateTime CreatedAt);
 public sealed record UserRelationshipDto(
     int UserId, string Login, string? DisplayName, bool? HasAvatar);
+
+public sealed record FriendListItemViewModel(
+    int UserId,
+    string Login,
+    string? DisplayName,
+    string Initials,
+    BitmapImage? AvatarSource)
+{
+    public string DisplayText => string.IsNullOrWhiteSpace(DisplayName) ? Login : DisplayName;
+    public string LoginLabel => "@" + Login;
+}
 public sealed record UserBlockDto(int UserId, string Login);
 public sealed record UserProfileViewDto(
     int Id, string? DisplayName, string? ResidenceCountry, string? ResidenceCity, bool? HasAvatar);
