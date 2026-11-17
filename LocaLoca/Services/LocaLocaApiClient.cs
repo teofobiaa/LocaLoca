@@ -412,6 +412,30 @@ public sealed class LocaLocaApiClient : IDisposable
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
 
+    public async Task<UserProfileViewDto> GetUserProfileAsync(
+        int userId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(userId);
+        return await GetJsonAsync<UserProfileViewDto>(
+            $"api/users/{userId}/profile", cancellationToken);
+    }
+
+    public async Task<byte[]?> GetUserAvatarBytesAsync(
+        int userId, bool thumbnail = true, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(userId);
+        var size = thumbnail ? "thumbnail" : "full";
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, $"api/users/{userId}/avatar?size={size}");
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(
+            request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
+
     public async Task DeleteAvatarAsync(CancellationToken cancellationToken = default)
     {
         await SendForMessageAsync(HttpMethod.Delete, "api/me/avatar", null, cancellationToken);
