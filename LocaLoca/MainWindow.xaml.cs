@@ -130,6 +130,12 @@ public sealed partial class MainWindow : Window
             AuthResponse result;
             if (_isRegisterMode)
             {
+                if (password.Length is < 12 or > 128)
+                {
+                    SetAuthStatus("Пароль должен содержать от 12 до 128 символов.", "error");
+                    return;
+                }
+
                 result = await _api.RegisterAsync(login, password, DisplayNameBox.Text.Trim());
             }
             else
@@ -163,6 +169,8 @@ public sealed partial class MainWindow : Window
         AuthSubtitle.Text = _isRegisterMode ? "Сохраняй места, фотографии и впечатления." : "Войди, чтобы продолжить свою историю.";
         AuthSubmitButton.Content = _isRegisterMode ? "Создать аккаунт" : "Войти в аккаунт";
         AuthModeButton.Content = _isRegisterMode ? "У меня уже есть аккаунт" : "Создать новый аккаунт";
+        PasswordBox.PlaceholderText = _isRegisterMode ? "От 12 до 128 символов" : "Введите пароль";
+        PasswordBox.MaxLength = _isRegisterMode ? 128 : 0;
         SetAuthStatus(string.Empty, "muted");
     }
 
