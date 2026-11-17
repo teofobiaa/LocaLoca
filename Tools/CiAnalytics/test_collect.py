@@ -3,6 +3,8 @@
 import datetime as dt
 import email.message
 import json
+import os
+import tempfile
 import urllib.error
 import unittest
 from unittest import mock
@@ -28,6 +30,7 @@ def make_run(run_id, event, created_at):
 class WorkflowPaginationTests(unittest.TestCase):
     def setUp(self):
         collect.REPO = "example/loca"
+        collect.TOKEN = "test-token"
         collect.API_REQUESTS = 0
         collect.API_RETRIES = 0
         collect.TRX_DIAGNOSTICS.clear()
@@ -188,6 +191,63 @@ class WorkflowPaginationTests(unittest.TestCase):
             coverage["pagination_incomplete_windows"][0]["reported_count"],
         )
         self.assertEqual(1, len(coverage["pagination_completed_windows_by_event"]["push"]))
+
+    def test_partial_collection_writes_diagnostic_report_and_fails(self):
+        since = dt.datetime(2026, 10, 1, tzinfo=UTC)
+        until = since + dt.timedelta(days=30)
+        coverage = {
+            "requested_since_utc": collect.github_timestamp(since),
+            "requested_until_utc": collect.github_timestamp(until),
+            "coverage_status": "partial",
+            "pagination_complete": False,
+            "coverage_start_utc": None,
+            "coverage_end_utc": None,
+            "workflow_runs_fetched": 0,
+            "workflow_runs_reported_by_event": {},
+            "workflow_runs_fetched_by_event": {},
+            "pagination_search_queries": 4,
+            "pagination_pages_fetched": 4,
+            "pagination_time_windows_split": 1,
+            "pagination_incomplete_windows": [{
+                "event": "push",
+                "since_utc": collect.github_timestamp(since),
+                "until_utc_exclusive": collect.github_timestamp(since + dt.timedelta(seconds=1)),
+                "reason": "Synthetic over-cap test window.",
+                "reported_count": 1_001,
+            }],
+            "pagination_completed_windows_by_event": {
+                "push": [],
+                "pull_request": [],
+                "merge_group": [],
+            },
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            original_directory = os.getcwd()
+            try:
+                os.chdir(temp_dir)
+                with mock.patch.object(
+                    collect,
+                    "fetch_workflow_runs",
+                    return_value=([], coverage),
+                ):
+                    with self.assertRaises(SystemExit) as raised:
+                        collect.main()
+
+                self.assertEqual(2, raised.exception.code)
+                metrics_path = os.path.join(temp_dir, "ci-analytics", "metrics.json")
+                report_path = os.path.join(temp_dir, "ci-analytics", "report.md")
+                with open(metrics_path, encoding="utf-8") as source:
+                    metrics = json.load(source)
+                with open(report_path, encoding="utf-8") as source:
+                    report = source.read()
+
+                self.assertFalse(metrics["pagination_complete"])
+                self.assertEqual("partial", metrics["coverage_status"])
+                self.assertIn("PARTIAL", report)
+                self.assertIn("Synthetic over-cap test window.", report)
+            finally:
+                os.chdir(original_directory)
 
     def test_retries_transient_api_response(self):
         headers = email.message.Message()
