@@ -1067,6 +1067,7 @@ public sealed class ApiIntegrationTests
     [Fact]
     public async Task User_Search_Matches_Login_Prefix_Respects_Privacy_Relationships_And_Blocks()
     {
+        await ResetUserSearchRateLimitAsync();
         using var factory = _database.CreateFactory();
         using var requesterClient = factory.CreateClient();
         using var targetClient = factory.CreateClient();
@@ -1182,6 +1183,7 @@ public sealed class ApiIntegrationTests
     [Fact]
     public async Task User_Search_Is_Rate_Limited_To_Thirty_Requests_Per_Window()
     {
+        await ResetUserSearchRateLimitAsync();
         using var factory = _database.CreateFactory();
         using var client = factory.CreateClient();
         var account = await RegisterAsync(client);
@@ -1366,6 +1368,18 @@ public sealed class ApiIntegrationTests
             Assert.Equal("API integration test", selfJson.RootElement.GetProperty("displayName").GetString());
             Assert.Equal("Privacy test city", selfJson.RootElement.GetProperty("residenceCity").GetString());
         }
+    }
+
+    private async Task ResetUserSearchRateLimitAsync()
+    {
+        // The fixture is shared by the non-parallel API test collection. Clear only
+        // the isolated test database's search counter so tests do not depend on order.
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM public.auth_rate_limit_counters WHERE policy_key = 'user-search'",
+            connection);
+        await command.ExecuteNonQueryAsync();
     }
 
     private async Task<TestAccount> RegisterAsync(HttpClient client, string? requestedLogin = null)
