@@ -84,7 +84,7 @@ ORDER BY version;
 | 012 | [migrations/12_distributed_auth_rate_limits.sql](migrations/12_distributed_auth_rate_limits.sql) | Общие PostgreSQL-счётчики попыток входа, регистрации и выхода для всех экземпляров API |
 | 013 | [migrations/13_user_avatars.sql](migrations/13_user_avatars.sql) | Хранение одного оптимизированного аватара и миниатюры на пользователя с ограничением размера |
 
-| 014 | [migrations/14_user_birthdays_and_age_filtering.sql](migrations/14_user_birthdays_and_age_filtering.sql) | Приватная дата рождения пользователя, личный список дней рождения и возрастные диапазоны достопримечательностей |
+| 014 | [migrations/14_user_birthdays_and_age_filtering.sql](migrations/14_user_birthdays_and_age_filtering.sql) | Исторически добавила приватную дату рождения, таблицу ручных контактов и возрастные диапазоны; таблица ручных контактов удалена миграцией 022 |
 | 015 | [migrations/15_profile_privacy_and_relationships.sql](migrations/15_profile_privacy_and_relationships.sql) | Полевые настройки видимости профиля, дружба, блокировки и значения приватности по умолчанию для существующих аккаунтов |
 | 016 | [migrations/16_catalog_search_trigram_indexes.sql](migrations/16_catalog_search_trigram_indexes.sql) | Расширение `pg_trgm` и GIN-индексы подстрочного поиска по достопримечательностям, городам и странам |
 | 017 | [migrations/17_runtime_role_rls_and_grant_hardening.sql](migrations/17_runtime_role_rls_and_grant_hardening.sql) | RLS только для выделенной backend-роли, минимальные табличные/sequence-права и закрытие прямого Data API-доступа к прикладным данным |
@@ -92,6 +92,7 @@ ORDER BY version;
 | 019 | [migrations/19_restore_password_hash_update_permission.sql](migrations/19_restore_password_hash_update_permission.sql) | Разрешение backend-роли обновлять только `users.password_hash` для безопасной постепенной миграции хешей |
 | 020 | [migrations/20_restrict_runtime_sequence_privileges.sql](migrations/20_restrict_runtime_sequence_privileges.sql) | Отзыв лишних sequence-привилегий и оставление `USAGE` только на шести последовательностях, нужных INSERT-операциям API |
 | 021 | [migrations/21_user_login_prefix_search.sql](migrations/21_user_login_prefix_search.sql) | B-tree expression index для поиска по префиксу логина без учёта регистра |
+| 022 | [migrations/22_profile_birthday_visibility_and_remove_contacts.sql](migrations/22_profile_birthday_visibility_and_remove_contacts.sql) | Видимость дня рождения в профиле (`private`/`friends`/`registered`), раскрытие только дня и месяца и удаление таблицы ручных birthday-контактов |
 
 Исторические миграции 003/004/007/008/009/010 сохранены неизменными: журнал версий добавлен поверх них, а не встроен переписыванием старых SQL-файлов. После выполнения всех отсутствующих миграций повторно запусти `00_migration_history.sql`: он обнаружит полностью созданные объекты и зарегистрирует версии как `adopted`. Запускай bootstrap до и после серии миграций. Если проверка объекта не прошла, версия не будет зарегистрирована.
 
@@ -100,8 +101,8 @@ ORDER BY version;
 Версии 005 и 006 — **операции безопасности**, а не изменения структуры таблиц, поэтому они не попадают в `localoca_schema_migrations`.
 
 - [security/05_create_app_role.sql](security/05_create_app_role.sql) запускается только если роли `localoca_app` ещё нет. Выполняй его после создания полного снимка схемы 013 или после применения всех необходимых миграций существующей базы, включая 013. Выдача прав на `user_sessions`, `auth_rate_limit_counters` и `user_avatars` условная: она выполняется, только если соответствующие таблицы уже существуют.
-- [security/06_update_runtime_permissions.sql](security/06_update_runtime_permissions.sql) запускается после миграции 020, если роль уже существует и ей нужно привести права к текущей схеме. Миграция 021 не меняет grants и не требует повторного запуска скрипта прав. Скрипт повторяемый: он пересоздаёт утверждённые RLS-политики, отзывает лишние grants и возвращает только разрешённые табличные, sequence- и column-level права.
-- Миграции 014 и 015 создают приватные таблицы и выдают права `localoca_app`, если роль уже существует. Миграция 017 пересобирает RLS-политики и grants по принципу минимальных привилегий; `BYPASSRLS` не используется. Миграция 019 отдельно возвращает column-level `UPDATE` только для `users.password_hash`, необходимый для постепенного обновления хешей паролей.
+- [security/06_update_runtime_permissions.sql](security/06_update_runtime_permissions.sql) запускается после миграции 022, если роль уже существует и ей нужно привести права к текущей схеме. Миграции 021 и 022 требуют актуализировать manifest; после применения 022 повторно выполни скрипт, чтобы отозвать права на удалённую таблицу. Скрипт повторяемый: он пересоздаёт утверждённые RLS-политики, отзывает лишние grants и возвращает только разрешённые табличные, sequence- и column-level права.
+- Миграции 014 и 015 создают приватные таблицы и выдают права `localoca_app`, если роль уже существует. Миграция 022 удаляет устаревшую таблицу `birthday_contacts`; в актуальной схеме день рождения берётся из аккаунта и имеет собственную настройку видимости. Миграция 017 пересобирает RLS-политики и grants по принципу минимальных привилегий; `BYPASSRLS` не используется. Миграция 019 отдельно возвращает column-level `UPDATE` только для `users.password_hash`, необходимый для постепенного обновления хешей паролей.
 
 ### Неизменяемость и контроль версий
 
