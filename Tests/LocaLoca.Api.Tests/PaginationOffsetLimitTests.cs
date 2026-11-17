@@ -73,7 +73,7 @@ public sealed class PaginationOffsetLimitTests
             await next();
         });
 
-        const string? noDatabaseConnection = null;
+        string? noDatabaseConnection = null;
         app.MapCatalogEndpoints(noDatabaseConnection);
         app.MapPersonalEndpoints(noDatabaseConnection, Path.GetTempPath());
         app.MapUserMapEndpoints(noDatabaseConnection, Path.GetTempPath());
