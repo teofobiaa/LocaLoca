@@ -98,6 +98,13 @@ class WorkflowPaginationTests(unittest.TestCase):
         self.assertNotIn("schedule-ignored", {run["id"] for run in runs})
         self.assertEqual(3, coverage["pagination_search_queries"])
         self.assertEqual(13, coverage["pagination_pages_fetched"])
+        self.assertEqual(
+            {"push": 1, "pull_request": 1, "merge_group": 1},
+            {
+                event: len(windows)
+                for event, windows in coverage["pagination_completed_windows_by_event"].items()
+            },
+        )
 
     def test_90_day_window_is_not_silently_truncated(self):
         since = dt.datetime(2026, 1, 1, tzinfo=UTC)
@@ -158,6 +165,7 @@ class WorkflowPaginationTests(unittest.TestCase):
         self.assertEqual(1_201, coverage["workflow_runs_reported_by_event"]["push"])
         self.assertIn("dense-left-0", {run["id"] for run in runs})
         self.assertIn("dense-right-600", {run["id"] for run in runs})
+        self.assertEqual(2, len(coverage["pagination_completed_windows_by_event"]["push"]))
 
     def test_marks_irreducibly_dense_one_second_window_as_partial(self):
         since = dt.datetime(2026, 10, 1, tzinfo=UTC)
@@ -179,6 +187,7 @@ class WorkflowPaginationTests(unittest.TestCase):
             1_001,
             coverage["pagination_incomplete_windows"][0]["reported_count"],
         )
+        self.assertEqual(1, len(coverage["pagination_completed_windows_by_event"]["push"]))
 
     def test_retries_transient_api_response(self):
         headers = email.message.Message()
