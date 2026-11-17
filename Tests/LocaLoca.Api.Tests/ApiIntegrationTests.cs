@@ -1394,6 +1394,17 @@ public sealed class ApiIntegrationTests
             Assert.Equal("Privacy test city", friendProfile.RootElement.GetProperty("residenceCity").GetString());
         }
 
+        using var visibleFriendsResponse = await viewerClient.GetAsync("/api/me/friends");
+        Assert.True(visibleFriendsResponse.Headers.CacheControl?.Private);
+        Assert.True(visibleFriendsResponse.Headers.CacheControl?.NoStore);
+        using (var visibleFriendsJson = JsonDocument.Parse(await visibleFriendsResponse.Content.ReadAsStringAsync()))
+        {
+            var friend = Assert.Single(visibleFriendsJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal(owner.Login, friend.GetProperty("login").GetString());
+            Assert.Equal("API integration test", friend.GetProperty("displayName").GetString());
+            Assert.Equal(JsonValueKind.Null, friend.GetProperty("hasAvatar").ValueKind);
+        }
+
         using var privateNameSettings = await ownerClient.PutAsJsonAsync("/api/me/profile/privacy", new
         {
             displayNameVisibility = "private",
