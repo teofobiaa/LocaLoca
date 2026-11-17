@@ -1427,6 +1427,8 @@ public sealed partial class MainWindow : Window
             await _api.CancelOrRejectFriendRequestAsync(userId);
             FriendsSearchStatusText.Text = $"Заявка от @{login} отклонена.";
             await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
         }
         catch (Exception ex)
         {
