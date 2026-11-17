@@ -6,6 +6,9 @@ namespace LocaLoca.Api;
 
 internal static class ApiEndpointHelpers
 {
+    /// <summary>Maximum number of rows a paginated API request may skip.</summary>
+    internal const long MaxPageOffset = 100_000;
+
     internal static async Task<NpgsqlConnection> OpenAsync(string? connectionString, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
