@@ -186,6 +186,15 @@ public sealed class LocaLocaApiClient : IDisposable
         return result;
     }
 
+    public async Task<List<UserSearchResultDto>> SearchUsersAsync(
+        string login, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(login);
+        var path = "api/users/search?login=" + Uri.EscapeDataString(login.Trim());
+        var result = await GetJsonAsync<ItemsResponse<UserSearchResultDto>>(path, cancellationToken);
+        return result.Items;
+    }
+
     public async Task<UserDto> UpdateDisplayNameAsync(string displayName, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, "api/me/profile/display-name")
