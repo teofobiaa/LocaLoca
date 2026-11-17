@@ -18,7 +18,7 @@ public sealed class UserLocalDateTests
             CultureInfo.InvariantCulture,
             DateTimeStyles.AssumeUniversal);
 
-        var today = Api.ApiEndpointHelpers.GetUserToday(context, utcNow);
+        var today = ApiEndpointHelpers.GetUserToday(context, utcNow);
 
         Assert.Equal(DateOnly.Parse(expectedDate, CultureInfo.InvariantCulture), today);
         Assert.True(DateOnly.Parse(expectedDate, CultureInfo.InvariantCulture) <= today);
@@ -34,9 +34,9 @@ public sealed class UserLocalDateTests
             CultureInfo.InvariantCulture,
             DateTimeStyles.AssumeUniversal);
 
-        Assert.Equal(new DateOnly(2026, 1, 1), Api.ApiEndpointHelpers.GetUserToday(context, utcNow));
+        Assert.Equal(new DateOnly(2026, 1, 1), ApiEndpointHelpers.GetUserToday(context, utcNow));
 
         context.Request.Headers["X-Time-Zone"] = "Not/A_Real_Time_Zone";
-        Assert.Equal(new DateOnly(2026, 1, 1), Api.ApiEndpointHelpers.GetUserToday(context, utcNow));
+        Assert.Equal(new DateOnly(2026, 1, 1), ApiEndpointHelpers.GetUserToday(context, utcNow));
     }
 }
