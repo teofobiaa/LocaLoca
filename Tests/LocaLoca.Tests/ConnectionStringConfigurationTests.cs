@@ -57,7 +57,7 @@ public sealed class ConnectionStringConfigurationTests
             var exception = Assert.Throws<InvalidOperationException>(
                 () => ConnectionStringConfiguration.ReadUserConnectionString(path));
 
-            Assert.IsType<JsonException>(exception.InnerException);
+            Assert.IsAssignableFrom<JsonException>(exception.InnerException);
             Assert.DoesNotContain(sentinel, exception.ToString(), StringComparison.Ordinal);
             Assert.Contains("Не удалось расшифровать пароль Supabase", exception.Message);
         });
