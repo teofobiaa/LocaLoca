@@ -977,8 +977,8 @@ public sealed partial class MainWindow : Window
                     user.Login,
                     displayName: null,
                     hasAvatar: null,
-                    actions,
-                    "Пользователь заблокирован"));
+                    actions: actions,
+                    detail: "Пользователь заблокирован"));
             }
         }
         catch (Exception ex)
