@@ -1200,6 +1200,89 @@ public sealed class ApiIntegrationTests
     }
 
     [Fact]
+    public async Task Friend_Requests_Are_Rate_Limited_To_Ten_Per_Window()
+    {
+        await ResetFriendRequestRateLimitAsync();
+        using var factory = _database.CreateFactory();
+        using var senderClient = factory.CreateClient();
+        var sender = await RegisterAsync(senderClient);
+        SetBearer(senderClient, sender.Token);
+
+        var targetIds = new List<int>();
+        await using (var connection = new NpgsqlConnection(_database.ConnectionString))
+        {
+            await connection.OpenAsync();
+            for (var index = 0; index < 11; index++)
+            {
+                await using var insert = new NpgsqlCommand(@"
+                    INSERT INTO public.users(login, password_hash, display_name)
+                    VALUES (@login, 'integration-test-hash', 'Friend request rate target')
+                    RETURNING user_id", connection);
+                insert.Parameters.AddWithValue("login", "frreq" + Guid.NewGuid().ToString("N"));
+                targetIds.Add(Convert.ToInt32(await insert.ExecuteScalarAsync()));
+            }
+        }
+
+        for (var index = 0; index < 10; index++)
+        {
+            using var response = await senderClient.PostAsync(
+                $"/api/users/{targetIds[index]}/friend-request", content: null);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        using var limited = await senderClient.PostAsync(
+            $"/api/users/{targetIds[10]}/friend-request", content: null);
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+    }
+
+    [Fact]
+    public async Task Concurrent_Friend_Request_And_Block_Leave_No_Relationship_For_Blocked_Users()
+    {
+        await ResetFriendRequestRateLimitAsync();
+        using var factory = _database.CreateFactory();
+        using var ownerClient = factory.CreateClient();
+        using var requesterClient = factory.CreateClient();
+
+        var owner = await RegisterAsync(ownerClient);
+        var requester = await RegisterAsync(requesterClient);
+        SetBearer(ownerClient, owner.Token);
+        SetBearer(requesterClient, requester.Token);
+
+        var requests = Enumerable.Range(0, 6)
+            .Select(_ => requesterClient.PostAsync(
+                $"/api/users/{owner.UserId}/friend-request", content: null))
+            .ToArray();
+        var blockTask = ownerClient.PostAsync($"/api/users/{requester.UserId}/block", content: null);
+
+        var requestResponses = await Task.WhenAll(requests);
+        using var block = await blockTask;
+        Assert.Equal(HttpStatusCode.OK, block.StatusCode);
+
+        foreach (var response in requestResponses)
+        {
+            using (response)
+                Assert.Contains(response.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.NotFound });
+        }
+
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var state = new NpgsqlCommand(@"
+            SELECT
+                NOT EXISTS (
+                    SELECT 1 FROM public.user_friendships
+                    WHERE user_low_id = LEAST(@owner, @requester)
+                      AND user_high_id = GREATEST(@owner, @requester)
+                )
+                AND EXISTS (
+                    SELECT 1 FROM public.user_blocks
+                    WHERE blocker_user_id = @owner AND blocked_user_id = @requester
+                )", connection);
+        state.Parameters.AddWithValue("owner", owner.UserId);
+        state.Parameters.AddWithValue("requester", requester.UserId);
+        Assert.True((bool)(await state.ExecuteScalarAsync() ?? false));
+    }
+
+    [Fact]
     public async Task Profile_Privacy_Is_Field_Specific_And_Blocks_Override_Friendship()
     {
         using var factory = _database.CreateFactory();
@@ -1292,8 +1375,10 @@ public sealed class ApiIntegrationTests
             var items = incomingJson.RootElement.GetProperty("items");
             Assert.Single(items.EnumerateArray());
             Assert.Equal(viewer.UserId, items[0].GetProperty("userId").GetInt32());
+            Assert.Equal(viewer.Login, items[0].GetProperty("login").GetString());
             Assert.True(items[0].GetProperty("isIncoming").GetBoolean());
-            Assert.False(items[0].TryGetProperty("displayName", out _));
+            Assert.Equal(JsonValueKind.Null, items[0].GetProperty("displayName").ValueKind);
+            Assert.Equal(JsonValueKind.Null, items[0].GetProperty("hasAvatar").ValueKind);
         }
 
         using var accept = await ownerClient.PostAsync($"/api/me/friend-requests/{viewer.UserId}/accept", content: null);
@@ -1325,6 +1410,7 @@ public sealed class ApiIntegrationTests
         {
             var friendItems = friendsJson.RootElement.GetProperty("items");
             Assert.Single(friendItems.EnumerateArray());
+            Assert.Equal(owner.Login, friendItems[0].GetProperty("login").GetString());
             Assert.Equal(JsonValueKind.Null, friendItems[0].GetProperty("displayName").ValueKind);
             Assert.Equal(JsonValueKind.Null, friendItems[0].GetProperty("hasAvatar").ValueKind);
         }
@@ -1343,8 +1429,8 @@ public sealed class ApiIntegrationTests
         using (var blockedJson = JsonDocument.Parse(await blockedList.Content.ReadAsStringAsync()))
         {
             Assert.Contains(blockedJson.RootElement.GetProperty("items").EnumerateArray(),
-                item => item.GetProperty("userId").GetInt32() == viewer.UserId);
-            Assert.False(blockedJson.RootElement.GetProperty("items")[0].TryGetProperty("displayName", out _));
+                item => item.GetProperty("userId").GetInt32() == viewer.UserId
+                    && item.GetProperty("login").GetString() == viewer.Login);
         }
 
         using var friendRequestWhileBlocked = await viewerClient.PostAsync(
@@ -1368,6 +1454,16 @@ public sealed class ApiIntegrationTests
             Assert.Equal("API integration test", selfJson.RootElement.GetProperty("displayName").GetString());
             Assert.Equal("Privacy test city", selfJson.RootElement.GetProperty("residenceCity").GetString());
         }
+    }
+
+    private async Task ResetFriendRequestRateLimitAsync()
+    {
+        await using var connection = new NpgsqlConnection(_database.ConnectionString);
+        await connection.OpenAsync();
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM public.auth_rate_limit_counters WHERE policy_key = 'friend-request'",
+            connection);
+        await command.ExecuteNonQueryAsync();
     }
 
     private async Task ResetUserSearchRateLimitAsync()
