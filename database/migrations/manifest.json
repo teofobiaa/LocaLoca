@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 20,
+  "currentSchemaVersion": 21,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -123,6 +123,12 @@
       "name": "restrict_runtime_sequence_privileges",
       "path": "migrations/20_restrict_runtime_sequence_privileges.sql",
       "sha256": "9e31279ad861b883da95080d0ae06c2cfc4efd5da0e1a8d7248887f520f3e820"
+    },
+    {
+      "version": 21,
+      "name": "user_login_prefix_search",
+      "path": "migrations/21_user_login_prefix_search.sql",
+      "sha256": "43da744eee282614526a816cc331f42304385a7be86638d5f394ddbaecf4304d"
     }
   ],
   "securityScripts": [
