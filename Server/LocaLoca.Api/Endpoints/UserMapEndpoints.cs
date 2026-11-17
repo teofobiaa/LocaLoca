@@ -298,10 +298,10 @@ public static class UserMapEndpoints
         
         app.MapGet("/map", async Task<IResult> (HttpContext context, CancellationToken cancellationToken) =>
         {
-            context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob: https://*.tile.openstreetmap.org; connect-src 'self'; font-src 'self' data:";
+            context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; base-uri 'none'; object-src 'none'; frame-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org; connect-src 'self'; font-src 'self' data:";
             context.Response.Headers["X-Content-Type-Options"] = "nosniff";
             context.Response.Headers["X-Frame-Options"] = "DENY";
-            context.Response.Headers["Referrer-Policy"] = "no-referrer";
+            context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
             context.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
             context.Response.Headers["Cache-Control"] = "no-cache";
 
@@ -346,7 +346,7 @@ public static class UserMapEndpoints
         IResult ServeMapAsset(HttpContext context, string relativePath, string contentType)
         {
             context.Response.Headers["X-Content-Type-Options"] = "nosniff";
-            context.Response.Headers["Referrer-Policy"] = "no-referrer";
+            context.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
             context.Response.Headers["Cache-Control"] = "no-cache";
             var assetPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot", relativePath);
             return System.IO.File.Exists(assetPath)

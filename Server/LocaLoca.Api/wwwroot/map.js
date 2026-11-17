@@ -3,7 +3,7 @@ const params = new URLSearchParams(location.search);
 document.documentElement.dataset.theme = params.get('theme') === 'dark' ? 'dark' : 'light';
 const startNewVisit = params.get('mode') === 'visit';
 const map = L.map('map').setView([48, 16], 4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 }).addTo(map);
 const palette = { visited:'#26966f', wished:'#d59b2a', normal:'#4777c8' };
