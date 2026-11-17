@@ -50,7 +50,8 @@ public sealed record UpdateProfilePrivacyRequest(
     string DisplayNameVisibility,
     string AvatarVisibility,
     string ResidenceCountryVisibility,
-    string ResidenceCityVisibility);
+    string ResidenceCityVisibility,
+    string DateOfBirthVisibility);
 public sealed record AuthResponse(UserDto User, string Token);
 public sealed record ErrorDto(string Error);
 public sealed record MessageDto(string Message);
