@@ -139,23 +139,19 @@ public sealed class FreshSchemaV20Tests
                      FROM pg_roles WHERE rolname = 'localoca_app')
                 AND NOT pg_has_role('localoca_app', 'postgres', 'MEMBER')
                 AND EXISTS (SELECT 1 FROM pg_proc
-                            WHERE oid = 'public.rls_auto_enable()'::regprocedure)",
+                            WHERE oid = 'public.rls_auto_enable()'::regprocedure)
+                AND NOT has_function_privilege('anon', 'public.rls_auto_enable()', 'EXECUTE')
+                AND NOT has_function_privilege('authenticated', 'public.rls_auto_enable()', 'EXECUTE')
+                AND NOT has_function_privilege('localoca_app', 'public.rls_auto_enable()', 'EXECUTE')",
             connection);
 
         Assert.True((bool)(await schemaCheck.ExecuteScalarAsync() ?? false));
 
         // Prove that the ALTER DEFAULT PRIVILEGES statements in the bootstrap
         // script apply to objects subsequently created by the postgres owner.
-        await using (var createDefaultPrivilegeProbes = new NpgsqlCommand(@"
-            CREATE TABLE public.runtime_default_privilege_probe (id integer);
-            CREATE SEQUENCE public.runtime_default_privilege_probe_seq;
-            CREATE FUNCTION public.runtime_default_privilege_probe_fn()
-                RETURNS integer LANGUAGE sql AS $$ SELECT 1 $$;",
-            connection))
-        {
-            await createDefaultPrivilegeProbes.ExecuteNonQueryAsync();
-        }
-
+        // PostgreSQL's default PUBLIC EXECUTE grant is global and cannot be
+        // subtracted by a per-schema default-privilege REVOKE. Verify instead
+        // that the platform function's explicit REVOKE in script 06 is effective.
         await using var defaultPrivilegesCheck = new NpgsqlCommand(@"
             SELECT
                 NOT has_table_privilege('anon', 'public.runtime_default_privilege_probe', 'SELECT')
@@ -164,9 +160,7 @@ public sealed class FreshSchemaV20Tests
                 AND NOT has_sequence_privilege('anon', 'public.runtime_default_privilege_probe_seq', 'USAGE')
                 AND NOT has_sequence_privilege('authenticated', 'public.runtime_default_privilege_probe_seq', 'USAGE')
                 AND NOT has_sequence_privilege('localoca_app', 'public.runtime_default_privilege_probe_seq', 'USAGE')
-                AND NOT has_function_privilege('anon', 'public.runtime_default_privilege_probe_fn()', 'EXECUTE')
-                AND NOT has_function_privilege('authenticated', 'public.runtime_default_privilege_probe_fn()', 'EXECUTE')
-                AND NOT has_function_privilege('localoca_app', 'public.runtime_default_privilege_probe_fn()', 'EXECUTE')",
+                AND NOT has_sequence_privilege('localoca_app', 'public.runtime_default_privilege_probe_seq', 'USAGE')",
             connection);
         Assert.True((bool)(await defaultPrivilegesCheck.ExecuteScalarAsync() ?? false));
 
