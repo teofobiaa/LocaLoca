@@ -830,7 +830,13 @@ public sealed partial class MainWindow : Window
                         }
 
                         if (index >= 0)
-                            _friends[index] = _friends[index] with { AvatarSource = avatar };
+                            var currentFriend = _friends[index];
+                            _friends[index] = new FriendListItemViewModel(
+                                currentFriend.UserId,
+                                currentFriend.Login,
+                                currentFriend.DisplayName,
+                                currentFriend.Initials,
+                                avatar);
                     }
                     catch (Exception ex)
                     {
