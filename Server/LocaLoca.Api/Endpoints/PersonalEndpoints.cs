@@ -137,7 +137,7 @@ public static class PersonalEndpoints
                 return Results.BadRequest(new ApiErrorResponse("Выберите достопримечательность."));
             if (!int.TryParse(form["rating"], out var rating) || rating is < 1 or > 5)
                 return Results.BadRequest(new ApiErrorResponse("Оценка должна быть от 1 до 5."));
-            if (!DateOnly.TryParse(form["visitDate"], out var visitDate) || visitDate > DateOnly.FromDateTime(DateTime.Today))
+            if (!DateOnly.TryParse(form["visitDate"], out var visitDate) || visitDate > GetUserToday(context))
                 return Results.BadRequest(new ApiErrorResponse("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
             int? visitId = int.TryParse(form["visitId"], out var parsedVisitId) && parsedVisitId > 0 ? parsedVisitId : null;
             var files = form.Files.GetFiles("photos");
@@ -210,13 +210,13 @@ public static class PersonalEndpoints
         app.MapPost("/api/me/visits", async Task<IResult> (VisitWriteRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-            return await SaveVisitAsync(connectionString!, request, userId, null, cancellationToken);
+            return await SaveVisitAsync(connectionString!, request, userId, null, context, cancellationToken);
         });
         
         app.MapPut("/api/me/visits/{visitId:int}", async Task<IResult> (int visitId, VisitWriteRequest request, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
-            return await SaveVisitAsync(connectionString!, request, userId, visitId, cancellationToken);
+            return await SaveVisitAsync(connectionString!, request, userId, visitId, context, cancellationToken);
         });
         
         app.MapDelete("/api/me/visits/{visitId:int}", async Task<IResult> (int visitId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
