@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Npgsql;
 using Testcontainers.PostgreSql;
 using Xunit;
@@ -61,12 +62,50 @@ public sealed class FreshSchemaV20Tests
 
         await ExecuteFileAsync(connection, "security", "06_update_runtime_permissions.sql");
 
+        // The manifest lists structural migrations only. Ledger version 1 is the
+        // separate initial_schema marker and is validated independently.
+        var manifestPath = Path.Combine(AppContext.BaseDirectory, "Database", "migrations", "manifest.json");
+        using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(manifestPath));
+        var expectedMigrationVersions = manifest.RootElement
+            .GetProperty("freshInstallBaseline")
+            .GetProperty("includesSchemaMigrations")
+            .EnumerateArray()
+            .Select(version => version.GetInt32())
+            .ToArray();
+
+        Assert.DoesNotContain(1, expectedMigrationVersions);
+
+        var actualMigrationVersions = new List<int>();
+        await using (var ledgerVersions = new NpgsqlCommand(
+            "SELECT version FROM public.localoca_schema_migrations WHERE version <> 1 ORDER BY version",
+            connection))
+        await using (var reader = await ledgerVersions.ExecuteReaderAsync())
+        {
+            while (await reader.ReadAsync())
+            {
+                actualMigrationVersions.Add(reader.GetInt32(0));
+            }
+        }
+
+        Assert.Equal(expectedMigrationVersions, actualMigrationVersions);
+
+        await using var ledgerCountCheck = new NpgsqlCommand(@"
+            SELECT count(*) = @expectedLedgerCount
+                AND count(*) FILTER (
+                    WHERE version = 1
+                      AND name = 'initial_schema'
+                      AND source = 'baseline') = 1
+            FROM public.localoca_schema_migrations",
+            connection);
+        ledgerCountCheck.Parameters.AddWithValue("expectedLedgerCount", expectedMigrationVersions.Length + 1);
+        Assert.True((bool)(await ledgerCountCheck.ExecuteScalarAsync() ?? false),
+            "The fresh-install ledger must contain every manifest migration plus one initial_schema marker.");
+
         await using var schemaCheck = new NpgsqlCommand(@"
             SELECT
                 current_user = 'postgres'
                 AND (SELECT rolsuper AND NOT rolcanlogin
                      FROM pg_roles WHERE rolname = 'postgres')
-                AND (SELECT count(*) = 16 FROM public.localoca_schema_migrations)
                 AND (SELECT count(*) = 17 FROM pg_policies
                      WHERE schemaname = 'public'
                        AND policyname IN ('localoca_app_runtime_access', 'localoca_app_catalog_read'))
