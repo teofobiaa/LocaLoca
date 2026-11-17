@@ -113,10 +113,12 @@ public static class ConnectionStringConfiguration
             var secretBytes = Dpapi.Unprotect(encrypted);
             try
             {
-                var secret = Encoding.UTF8.GetString(secretBytes);
-                if (secret.Length < 32)
+                // The first-start path returns the key as Base64. Re-encode the
+                // persisted raw key bytes the same way so the signing secret remains
+                // byte-for-byte stable when the local API process restarts.
+                if (secretBytes.Length < 32)
                     throw new InvalidDataException("The local session signing key is invalid.");
-                return secret;
+                return Convert.ToBase64String(secretBytes);
             }
             finally
             {
