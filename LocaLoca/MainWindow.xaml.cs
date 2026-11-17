@@ -971,6 +971,8 @@ public sealed partial class MainWindow : Window
         {
             await _api.RemoveFriendAsync(userId);
             await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
         }
         catch (Exception ex)
         {
@@ -1049,18 +1051,9 @@ public sealed partial class MainWindow : Window
         HomeNavButton.Background = page == "home" ? Brush("#29443D") : Brush("Transparent");
         FriendsNavButton.Background = page == "friends" ? Brush("#29443D") : Brush("Transparent");
         SupportNavButton.Background = page == "support" ? Brush("#29443D") : Brush("Transparent");
-        FriendsNavButton.Background = page == "friends" ? Brush("#29443D") : Brush("Transparent");
+
     }
 
-
-    private async void FriendsNav_Click(object sender, RoutedEventArgs e)
-    {
-        ShowPage("friends");
-        await LoadFriendsPageAsync();
-    }
-
-    private async void FriendsRefresh_Click(object sender, RoutedEventArgs e) =>
-        await LoadFriendsPageAsync();
 
     private async void FriendsSearch_Click(object sender, RoutedEventArgs e) =>
         await SearchFriendsAsync();
@@ -1148,7 +1141,7 @@ public sealed partial class MainWindow : Window
             {
                 var actions = new List<UIElement>
                 {
-                    CreateSocialButton("Профиль", user.UserId, user.Login, OpenFriendProfile_Click)
+                    CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click)
                 };
 
                 switch (user.RelationshipStatus)
@@ -1346,7 +1339,7 @@ public sealed partial class MainWindow : Window
         {
             await _api.SendFriendRequestAsync(userId);
             FriendsSearchStatusText.Text = $"Заявка для @{login} отправлена.";
-            await LoadFriendsPageAsync();
+            await LoadFriendsAsync();
             await SearchFriendsAsync();
         }
         catch (Exception ex)
@@ -1355,29 +1348,10 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void RemoveFriend_Click(object sender, RoutedEventArgs e)
+    private async void OpenSearchedUserProfile_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetSocialUser(sender, out var userId, out var login)) return;
-        if (await ConfirmAsync("Удалить из друзей?", $"Пользователь @{login} будет удалён из списка друзей.") != ContentDialogResult.Primary)
-            return;
 
-        try
-        {
-            await _api.RemoveFriendAsync(userId);
-            FriendsListStatusText.Text = $"Пользователь @{login} удалён из друзей.";
-            await LoadFriendsPageAsync();
-            if (FriendsSearchBox.Text.Trim().Length >= 3)
-                await SearchFriendsAsync();
-        }
-        catch (Exception ex)
-        {
-            FriendsListStatusText.Text = "Не удалось удалить друга: " + ex.Message;
-        }
-    }
-
-    private async void OpenFriendProfile_Click(object sender, RoutedEventArgs e)
-    {
-        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
         try
         {
             var profile = await _api.GetUserProfileAsync(userId);
