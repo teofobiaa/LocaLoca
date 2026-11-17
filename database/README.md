@@ -53,7 +53,7 @@
 | 2 | [seed/02_seed.sql](seed/02_seed.sql) | Добавляет справочные категории, страны, города и достопримечательности. |
 | 3 | [migrations/21_user_login_prefix_search.sql](migrations/21_user_login_prefix_search.sql) | Добавляет индекс префиксного поиска по нормализованному логину. |
 | 4 | [security/05_create_app_role.sql](security/05_create_app_role.sql) | Создаёт отдельную runtime-роль. Пароль-заглушку нужно заменить на уникальный случайный пароль. |
-| 5 | [security/06_update_runtime_permissions.sql](security/06_update_runtime_permissions.sql) | Настраивает актуальные RLS-политики и минимальные права runtime-роли для схемы v020. |
+| 5 | [security/06_update_runtime_permissions.sql](security/06_update_runtime_permissions.sql) | Настраивает актуальные RLS-политики и минимальные права runtime-роли для актуальной схемы v022. |
 
 Для новой базы **не запускай** миграции 003–020: их итоговое состояние уже включено в baseline 020. После baseline и seed выполни миграцию 021, затем создай runtime-роль и обязательно запусти повторяемый `06_update_runtime_permissions.sql`: он применяет RLS и grants, соответствующие версиям 017–020. Миграция 021 создаёт только индекс и не меняет права runtime-роли. Скрипт 05 использует `CREATE ROLE` и предназначен для однократного запуска.
 
