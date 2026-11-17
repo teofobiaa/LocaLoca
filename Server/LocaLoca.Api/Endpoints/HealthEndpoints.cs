@@ -107,7 +107,7 @@ public static class HealthEndpoints
                     var privacySchemaReady = Equals(await privacySchemaCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!privacySchemaReady)
                         return Results.Json(new HealthDto(true, false,
-                            "Не применена миграция настроек приватности и отношений пользователей. Выполните database/migrations/15_profile_privacy_and_relationships.sql в Supabase SQL Editor."),
+                            "Не применены миграции настроек приватности и отношений пользователей (015 и 022). Выполните database/migrations/15_profile_privacy_and_relationships.sql и database/migrations/22_profile_birthday_visibility_and_remove_contacts.sql в Supabase SQL Editor."),
                             statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
 
