@@ -1065,6 +1065,137 @@ public sealed class ApiIntegrationTests
     }
 
     [Fact]
+    public async Task User_Search_Matches_Login_Prefix_Respects_Privacy_Relationships_And_Blocks()
+    {
+        using var factory = _database.CreateFactory();
+        using var requesterClient = factory.CreateClient();
+        using var targetClient = factory.CreateClient();
+
+        var requester = await RegisterAsync(requesterClient);
+        var suffix = Guid.NewGuid().ToString("N");
+        var target = await RegisterAsync(targetClient, "friend_lookup_" + suffix);
+        _ = await RegisterAsync(targetClient, "friendXlookup_" + suffix);
+        SetBearer(requesterClient, requester.Token);
+        SetBearer(targetClient, target.Token);
+
+        using var anonymousClient = factory.CreateClient();
+        using var anonymousSearch = await anonymousClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(target.Login));
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousSearch.StatusCode);
+
+        using var tooShort = await requesterClient.GetAsync("/api/users/search?login=ab");
+        Assert.Equal(HttpStatusCode.BadRequest, tooShort.StatusCode);
+
+        using var invalidCharacters = await requesterClient.GetAsync("/api/users/search?login=abc%25");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidCharacters.StatusCode);
+
+        using var privateSettings = await targetClient.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "private",
+            avatarVisibility = "private",
+            residenceCountryVisibility = "private",
+            residenceCityVisibility = "private"
+        });
+        Assert.Equal(HttpStatusCode.OK, privateSettings.StatusCode);
+
+        var searchPrefix = "FRIEND_LOOKUP_" + suffix[..8];
+        using var initialSearch = await requesterClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(searchPrefix));
+        Assert.Equal(HttpStatusCode.OK, initialSearch.StatusCode);
+        using (var initialJson = JsonDocument.Parse(await initialSearch.Content.ReadAsStringAsync()))
+        {
+            var items = initialJson.RootElement.GetProperty("items");
+            Assert.Single(items.EnumerateArray());
+            var result = items[0];
+            Assert.Equal(target.UserId, result.GetProperty("userId").GetInt32());
+            Assert.Equal(target.Login, result.GetProperty("login").GetString());
+            Assert.Equal(JsonValueKind.Null, result.GetProperty("displayName").ValueKind);
+            Assert.Equal(JsonValueKind.Null, result.GetProperty("hasAvatar").ValueKind);
+            Assert.Equal("none", result.GetProperty("relationshipStatus").GetString());
+        }
+
+        using var selfSearch = await requesterClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(requester.Login));
+        using (var selfJson = JsonDocument.Parse(await selfSearch.Content.ReadAsStringAsync()))
+            Assert.Empty(selfJson.RootElement.GetProperty("items").EnumerateArray());
+
+        using var request = await requesterClient.PostAsync(
+            $"/api/users/{target.UserId}/friend-request", content: null);
+        Assert.Equal(HttpStatusCode.OK, request.StatusCode);
+
+        using var outgoingSearch = await requesterClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(target.Login));
+        using (var outgoingJson = JsonDocument.Parse(await outgoingSearch.Content.ReadAsStringAsync()))
+        {
+            var result = Assert.Single(outgoingJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal("outgoing_pending", result.GetProperty("relationshipStatus").GetString());
+            Assert.Equal(JsonValueKind.Null, result.GetProperty("displayName").ValueKind);
+        }
+
+        using var incomingSearch = await targetClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(requester.Login));
+        using (var incomingJson = JsonDocument.Parse(await incomingSearch.Content.ReadAsStringAsync()))
+        {
+            var result = Assert.Single(incomingJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal("incoming_pending", result.GetProperty("relationshipStatus").GetString());
+        }
+
+        using var accept = await targetClient.PostAsync(
+            $"/api/me/friend-requests/{requester.UserId}/accept", content: null);
+        Assert.Equal(HttpStatusCode.OK, accept.StatusCode);
+
+        using var friendSettings = await targetClient.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "friends",
+            avatarVisibility = "friends",
+            residenceCountryVisibility = "private",
+            residenceCityVisibility = "private"
+        });
+        Assert.Equal(HttpStatusCode.OK, friendSettings.StatusCode);
+
+        using var friendsSearch = await requesterClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(target.Login));
+        using (var friendsJson = JsonDocument.Parse(await friendsSearch.Content.ReadAsStringAsync()))
+        {
+            var result = Assert.Single(friendsJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal("friends", result.GetProperty("relationshipStatus").GetString());
+            Assert.Equal("API integration test", result.GetProperty("displayName").GetString());
+            Assert.False(result.GetProperty("hasAvatar").GetBoolean());
+        }
+
+        using var block = await targetClient.PostAsync($"/api/users/{requester.UserId}/block", content: null);
+        Assert.Equal(HttpStatusCode.OK, block.StatusCode);
+
+        using var searchAfterBlock = await requesterClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(target.Login));
+        using (var blockedJson = JsonDocument.Parse(await searchAfterBlock.Content.ReadAsStringAsync()))
+            Assert.Empty(blockedJson.RootElement.GetProperty("items").EnumerateArray());
+
+        using var reverseSearchAfterBlock = await targetClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(requester.Login));
+        using (var reverseBlockedJson = JsonDocument.Parse(await reverseSearchAfterBlock.Content.ReadAsStringAsync()))
+            Assert.Empty(reverseBlockedJson.RootElement.GetProperty("items").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task User_Search_Is_Rate_Limited_To_Thirty_Requests_Per_Window()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+        var account = await RegisterAsync(client);
+        SetBearer(client, account.Token);
+
+        for (var requestIndex = 0; requestIndex < 30; requestIndex++)
+        {
+            using var response = await client.GetAsync("/api/users/search?login=rate");
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        using var limited = await client.GetAsync("/api/users/search?login=rate");
+        Assert.Equal(HttpStatusCode.TooManyRequests, limited.StatusCode);
+    }
+
+    [Fact]
     public async Task Profile_Privacy_Is_Field_Specific_And_Blocks_Override_Friendship()
     {
         using var factory = _database.CreateFactory();
@@ -1235,9 +1366,9 @@ public sealed class ApiIntegrationTests
         }
     }
 
-    private async Task<TestAccount> RegisterAsync(HttpClient client)
+    private async Task<TestAccount> RegisterAsync(HttpClient client, string? requestedLogin = null)
     {
-        var login = "api-test-" + Guid.NewGuid().ToString("N");
+        var login = requestedLogin ?? ("api-test-" + Guid.NewGuid().ToString("N"));
         var password = CreateTestPassword();
 
         using var response = await client.PostAsJsonAsync("/api/auth/register", new
