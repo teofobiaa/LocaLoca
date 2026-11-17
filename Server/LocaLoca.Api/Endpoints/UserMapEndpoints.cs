@@ -91,7 +91,7 @@ public static class UserMapEndpoints
             int? rating = null;
             if (status == "visited")
             {
-                if (!DateOnly.TryParse(request.VisitDate, out var parsedDate) || parsedDate > DateOnly.FromDateTime(DateTime.Today))
+                if (!DateOnly.TryParse(request.VisitDate, out var parsedDate) || parsedDate > GetUserToday(context))
                     return Results.BadRequest(new ApiErrorResponse("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
                 if (request.Rating is < 1 or > 5) return Results.BadRequest(new ApiErrorResponse("Оценка должна быть от 1 до 5."));
                 visitDate = parsedDate;
@@ -124,7 +124,7 @@ public static class UserMapEndpoints
             int? rating = null;
             if (status == "visited")
             {
-                if (!DateOnly.TryParse(request.VisitDate, out var parsedDate) || parsedDate > DateOnly.FromDateTime(DateTime.Today))
+                if (!DateOnly.TryParse(request.VisitDate, out var parsedDate) || parsedDate > GetUserToday(context))
                     return Results.BadRequest(new ApiErrorResponse("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
                 if (request.Rating is < 1 or > 5) return Results.BadRequest(new ApiErrorResponse("Оценка должна быть от 1 до 5."));
                 visitDate = parsedDate;
