@@ -45,7 +45,7 @@ public static class ProfilePrivacyEndpoints
                 !IsAllowed(request.AvatarVisibility) ||
                 !IsAllowed(request.ResidenceCountryVisibility) ||
                 !IsAllowed(request.ResidenceCityVisibility) ||
-                !IsAllowed(request.DateOfBirthVisibility))
+                (request.DateOfBirthVisibility is not null && !IsAllowed(request.DateOfBirthVisibility)))
             {
                 return Results.BadRequest(new ApiErrorResponse(
                     "Для каждого поля выбери один из вариантов: private, friends или registered."));
@@ -59,7 +59,7 @@ public static class ProfilePrivacyEndpoints
                     avatar_visibility = @avatar,
                     residence_country_visibility = @country,
                     residence_city_visibility = @city,
-                    date_of_birth_visibility = @date_of_birth,
+                    date_of_birth_visibility = COALESCE(@date_of_birth, date_of_birth_visibility),
                     updated_at = now()
                 WHERE user_id = @user
                 RETURNING display_name_visibility, avatar_visibility,
@@ -69,7 +69,8 @@ public static class ProfilePrivacyEndpoints
             command.Parameters.AddWithValue("avatar", NpgsqlDbType.Varchar, request.AvatarVisibility!);
             command.Parameters.AddWithValue("country", NpgsqlDbType.Varchar, request.ResidenceCountryVisibility!);
             command.Parameters.AddWithValue("city", NpgsqlDbType.Varchar, request.ResidenceCityVisibility!);
-            command.Parameters.AddWithValue("date_of_birth", NpgsqlDbType.Varchar, request.DateOfBirthVisibility!);
+            command.Parameters.Add("date_of_birth", NpgsqlDbType.Varchar).Value =
+                request.DateOfBirthVisibility is { } birthdayVisibility ? birthdayVisibility : DBNull.Value;
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
