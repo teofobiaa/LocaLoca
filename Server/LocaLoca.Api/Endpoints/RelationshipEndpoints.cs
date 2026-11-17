@@ -395,6 +395,20 @@ public static class RelationshipEndpoints
         });
     }
 
+    private static async Task LockRelationshipPairAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        int lowId,
+        int highId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT pg_advisory_xact_lock(@low, @high)", connection, transaction);
+        command.Parameters.AddWithValue("low", NpgsqlDbType.Integer, lowId);
+        command.Parameters.AddWithValue("high", NpgsqlDbType.Integer, highId);
+        await command.ExecuteScalarAsync(cancellationToken);
+    }
+
     private static (int LowId, int HighId) OrderedPair(int first, int second) =>
         first < second ? (first, second) : (second, first);
 }
