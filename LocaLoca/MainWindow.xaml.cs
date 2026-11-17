@@ -898,7 +898,6 @@ public sealed partial class MainWindow : Window
             {
                 var actions = new List<UIElement>
                 {
-                    CreateSocialButton("Профиль", request.UserId, request.Login, OpenSearchedUserProfile_Click),
                     CreateSocialButton("Принять", request.UserId, request.Login, AcceptFriendRequest_Click, primary: true),
                     CreateSocialButton("Отклонить", request.UserId, request.Login, RejectFriendRequest_Click)
                 };
@@ -915,7 +914,6 @@ public sealed partial class MainWindow : Window
             {
                 var actions = new List<UIElement>
                 {
-                    CreateSocialButton("Профиль", request.UserId, request.Login, OpenSearchedUserProfile_Click),
                     CreateSocialButton("Отменить", request.UserId, request.Login, CancelFriendRequest_Click)
                 };
                 OutgoingFriendRequestsPanel.Children.Add(CreateSocialCard(
