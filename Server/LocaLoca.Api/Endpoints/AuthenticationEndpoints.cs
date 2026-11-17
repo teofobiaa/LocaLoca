@@ -15,8 +15,8 @@ public static class AuthenticationEndpoints
             var displayName = (request.DisplayName ?? string.Empty).Trim();
             if (login.Length is < 3 or > 50 || login.Any(c => !(char.IsLetterOrDigit(c) || c is '_' or '-' or '.')))
                 return Results.BadRequest(new ApiErrorResponse("Логин должен содержать 3–50 символов: буквы, цифры, точку, дефис или подчёркивание."));
-            if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 6)
-                return Results.BadRequest(new ApiErrorResponse("Пароль должен содержать не менее 6 символов."));
+            if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 12 || request.Password.Length > 128)
+                return Results.BadRequest(new ApiErrorResponse("Пароль должен содержать от 12 до 128 символов."));
             if (displayName.Length > 100) return Results.BadRequest(new ApiErrorResponse("Имя слишком длинное."));
             if (string.IsNullOrWhiteSpace(displayName)) displayName = login;
         
