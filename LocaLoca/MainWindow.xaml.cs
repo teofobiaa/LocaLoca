@@ -792,7 +792,7 @@ public sealed partial class MainWindow : Window
                     friend.Login,
                     friend.DisplayName,
                     CreateInitials(friend.DisplayName, friend.Login),
-                    AvatarSource: null));
+                    avatarSource: null));
             }
 
             var hasFriends = _friends.Count > 0;
@@ -830,6 +830,7 @@ public sealed partial class MainWindow : Window
                         }
 
                         if (index >= 0)
+                        {
                             var currentFriend = _friends[index];
                             _friends[index] = new FriendListItemViewModel(
                                 currentFriend.UserId,
@@ -837,6 +838,7 @@ public sealed partial class MainWindow : Window
                                 currentFriend.DisplayName,
                                 currentFriend.Initials,
                                 avatar);
+                        }
                     }
                     catch (Exception ex)
                     {
