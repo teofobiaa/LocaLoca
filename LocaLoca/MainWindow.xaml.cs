@@ -1033,7 +1033,6 @@ public sealed partial class MainWindow : Window
         FriendsPage.Visibility = page == "friends" ? Visibility.Visible : Visibility.Collapsed;
         ProfilePage.Visibility = page == "profile" ? Visibility.Visible : Visibility.Collapsed;
         SupportPage.Visibility = page == "support" ? Visibility.Visible : Visibility.Collapsed;
-        FriendsPage.Visibility = page == "friends" ? Visibility.Visible : Visibility.Collapsed;
 
         (PageEyebrow.Text, PageTitle.Text) = page switch
         {
@@ -1044,7 +1043,6 @@ public sealed partial class MainWindow : Window
             "map" => ("Исследуй мир", "Карта открытий"),
             "friends" => ("Люди и совместные открытия", "Мои друзья"),
             "profile" => ("Личные данные и оформление", "Профиль и настройки"),
-            "friends" => ("Общение и совместные открытия", "Друзья"),
             "support" => ("Контакты и полезные ссылки", "Поддержка"),
             _ => ("Исследуй мир", "Карта открытий")
         };
