@@ -195,6 +195,69 @@ public sealed class LocaLocaApiClient : IDisposable
         return result.Items;
     }
 
+    public Task SendFriendRequestAsync(int targetUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(targetUserId);
+        return SendForMessageAsync(
+            HttpMethod.Post, $"api/users/{targetUserId}/friend-request", null, cancellationToken);
+    }
+
+    public async Task<List<FriendRequestDto>> GetFriendRequestsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await GetJsonAsync<ItemsResponse<FriendRequestDto>>(
+            "api/me/friend-requests", cancellationToken);
+        return result.Items;
+    }
+
+    public Task AcceptFriendRequestAsync(int otherUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(otherUserId);
+        return SendForMessageAsync(
+            HttpMethod.Post, $"api/me/friend-requests/{otherUserId}/accept", null, cancellationToken);
+    }
+
+    public Task CancelOrRejectFriendRequestAsync(int otherUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(otherUserId);
+        return SendForMessageAsync(
+            HttpMethod.Delete, $"api/me/friend-requests/{otherUserId}", null, cancellationToken);
+    }
+
+    public async Task<List<UserRelationshipDto>> GetFriendsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await GetJsonAsync<ItemsResponse<UserRelationshipDto>>(
+            "api/me/friends", cancellationToken);
+        return result.Items;
+    }
+
+    public Task RemoveFriendAsync(int otherUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(otherUserId);
+        return SendForMessageAsync(
+            HttpMethod.Delete, $"api/me/friends/{otherUserId}", null, cancellationToken);
+    }
+
+    public Task BlockUserAsync(int targetUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(targetUserId);
+        return SendForMessageAsync(
+            HttpMethod.Post, $"api/users/{targetUserId}/block", null, cancellationToken);
+    }
+
+    public async Task<List<UserBlockDto>> GetBlockedUsersAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await GetJsonAsync<ItemsResponse<UserBlockDto>>(
+            "api/me/blocks", cancellationToken);
+        return result.Items;
+    }
+
+    public Task UnblockUserAsync(int blockedUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(blockedUserId);
+        return SendForMessageAsync(
+            HttpMethod.Delete, $"api/me/blocks/{blockedUserId}", null, cancellationToken);
+    }
+
     public async Task<UserDto> UpdateDisplayNameAsync(string displayName, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, "api/me/profile/display-name")
@@ -640,6 +703,12 @@ public sealed class LocaLocaApiClient : IDisposable
             if (!result.HasMore)
                 return items;
         }
+    }
+
+    private static void ValidateRelationshipUserId(int userId)
+    {
+        if (userId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(userId), "Идентификатор пользователя должен быть положительным.");
     }
 
     private async Task<T> GetJsonAsync<T>(string path, CancellationToken cancellationToken)
