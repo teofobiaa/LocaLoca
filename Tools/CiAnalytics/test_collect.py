@@ -99,6 +99,37 @@ class WorkflowPaginationTests(unittest.TestCase):
         self.assertEqual(3, coverage["pagination_search_queries"])
         self.assertEqual(13, coverage["pagination_pages_fetched"])
 
+    def test_90_day_window_is_not_silently_truncated(self):
+        since = dt.datetime(2026, 1, 1, tzinfo=UTC)
+        until = since + dt.timedelta(days=90)
+        dataset = []
+
+        for index in range(600):
+            dataset.append(make_run(
+                f"quarter-push-{index}",
+                "push",
+                since + dt.timedelta(hours=index * 3),
+            ))
+        for index in range(500):
+            dataset.append(make_run(
+                f"quarter-pr-{index}",
+                "pull_request",
+                since + dt.timedelta(hours=12 + index * 4),
+            ))
+        dataset.append(make_run("quarter-merge", "merge_group", since + dt.timedelta(days=89)))
+
+        with mock.patch.object(collect, "get", side_effect=self.api_stub_for(dataset)):
+            runs, coverage = collect.fetch_workflow_runs(since, until)
+
+        self.assertEqual(1_101, len(runs))
+        self.assertTrue(coverage["pagination_complete"])
+        self.assertEqual(collect.github_timestamp(since), coverage["coverage_start_utc"])
+        self.assertEqual(collect.github_timestamp(until), coverage["coverage_end_utc"])
+        self.assertEqual(
+            {"push": 600, "pull_request": 500, "merge_group": 1},
+            coverage["workflow_runs_fetched_by_event"],
+        )
+
     def test_splits_a_single_event_window_above_github_search_limit(self):
         since = dt.datetime(2026, 10, 1, tzinfo=UTC)
         until = since + dt.timedelta(days=2)
