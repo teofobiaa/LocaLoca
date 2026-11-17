@@ -74,8 +74,7 @@ expected_sequence_privileges(schema_name, sequence_name, privilege_type) AS (
         ('public', 'visits_visit_id_seq', 'USAGE'),
         ('public', 'photos_photo_id_seq', 'USAGE'),
         ('public', 'user_map_places_user_map_place_id_seq', 'USAGE'),
-        ('public', 'user_map_place_photos_photo_id_seq', 'USAGE'),
-
+        ('public', 'user_map_place_photos_photo_id_seq', 'USAGE')
 ),
 expected_sequences AS (
     SELECT DISTINCT schema_name, sequence_name
