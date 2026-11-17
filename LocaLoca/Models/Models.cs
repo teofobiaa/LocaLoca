@@ -11,15 +11,26 @@ public sealed record FriendRequestDto(
 public sealed record UserRelationshipDto(
     int UserId, string Login, string? DisplayName, bool? HasAvatar);
 
-public sealed record FriendListItemViewModel(
-    int UserId,
-    string Login,
-    string? DisplayName,
-    string Initials,
-    BitmapImage? AvatarSource)
+public sealed class FriendListItemViewModel
 {
+    public int UserId { get; set; }
+    public string Login { get; set; }
+    public string? DisplayName { get; set; }
+    public string Initials { get; set; }
+    public BitmapImage? AvatarSource { get; set; }
+
     public string DisplayText => string.IsNullOrWhiteSpace(DisplayName) ? Login : DisplayName;
     public string LoginLabel => "@" + Login;
+
+    public FriendListItemViewModel(
+        int userId, string login, string? displayName, string initials, BitmapImage? avatarSource)
+    {
+        UserId = userId;
+        Login = login;
+        DisplayName = displayName;
+        Initials = initials;
+        AvatarSource = avatarSource;
+    }
 }
 public sealed record UserBlockDto(int UserId, string Login);
 public sealed record UserProfileViewDto(
