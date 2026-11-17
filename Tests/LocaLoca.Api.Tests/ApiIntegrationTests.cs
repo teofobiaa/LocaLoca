@@ -1370,6 +1370,8 @@ public sealed class ApiIntegrationTests
         Assert.Equal(HttpStatusCode.OK, friendRequest.StatusCode);
 
         using var incomingRequests = await ownerClient.GetAsync("/api/me/friend-requests");
+        Assert.True(incomingRequests.Headers.CacheControl?.Private);
+        Assert.True(incomingRequests.Headers.CacheControl?.NoStore);
         using (var incomingJson = JsonDocument.Parse(await incomingRequests.Content.ReadAsStringAsync()))
         {
             var items = incomingJson.RootElement.GetProperty("items");
@@ -1406,6 +1408,8 @@ public sealed class ApiIntegrationTests
             Assert.Equal(JsonValueKind.Null, privateNameJson.RootElement.GetProperty("displayName").ValueKind);
 
         using var friendsResponse = await viewerClient.GetAsync("/api/me/friends");
+        Assert.True(friendsResponse.Headers.CacheControl?.Private);
+        Assert.True(friendsResponse.Headers.CacheControl?.NoStore);
         using (var friendsJson = JsonDocument.Parse(await friendsResponse.Content.ReadAsStringAsync()))
         {
             var friendItems = friendsJson.RootElement.GetProperty("items");
@@ -1426,6 +1430,8 @@ public sealed class ApiIntegrationTests
             Assert.Empty(friendsJson.RootElement.GetProperty("items").EnumerateArray());
 
         using var blockedList = await ownerClient.GetAsync("/api/me/blocks");
+        Assert.True(blockedList.Headers.CacheControl?.Private);
+        Assert.True(blockedList.Headers.CacheControl?.NoStore);
         using (var blockedJson = JsonDocument.Parse(await blockedList.Content.ReadAsStringAsync()))
         {
             Assert.Contains(blockedJson.RootElement.GetProperty("items").EnumerateArray(),
