@@ -10,6 +10,84 @@ public static class RelationshipEndpoints
 {
     public static void MapRelationshipEndpoints(this WebApplication app, string? connectionString)
     {
+        app.MapGet("/api/users/search", async Task<IResult> (
+            string? login, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
+        {
+            if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+
+            var normalizedLogin = (login ?? string.Empty).Trim().ToLowerInvariant();
+            if (normalizedLogin.Length is < 3 or > 50 ||
+                normalizedLogin.Any(c => !(char.IsLetterOrDigit(c) || c is '_' or '-' or '.')))
+            {
+                return Results.BadRequest(new ApiErrorResponse(
+                    "Поисковый логин должен содержать 3–50 символов: буквы, цифры, точку, дефис или подчёркивание."));
+            }
+
+            // Escape SQL LIKE metacharacters so '_' in a valid login is treated literally.
+            var pattern = normalizedLogin
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("%", "\\%", StringComparison.Ordinal)
+                .Replace("_", "\\_", StringComparison.Ordinal) + "%";
+
+            await using var connection = await OpenAsync(connectionString, cancellationToken);
+            await using var command = new NpgsqlCommand("""
+                SELECT u.user_id,
+                       u.login,
+                       CASE
+                           WHEN COALESCE(v.display_name_visibility, 'registered') = 'registered'
+                             OR (COALESCE(v.display_name_visibility, 'registered') = 'friends'
+                                 AND f.status = 'accepted')
+                           THEN u.display_name
+                           ELSE NULL
+                       END AS display_name,
+                       CASE
+                           WHEN COALESCE(v.avatar_visibility, 'registered') = 'registered'
+                             OR (COALESCE(v.avatar_visibility, 'registered') = 'friends'
+                                 AND f.status = 'accepted')
+                           THEN EXISTS (
+                               SELECT 1 FROM public.user_avatars a WHERE a.user_id = u.user_id
+                           )
+                           ELSE NULL
+                       END AS has_avatar,
+                       CASE
+                           WHEN f.status = 'accepted' THEN 'friends'
+                           WHEN f.status = 'pending' AND f.requested_by_user_id = @user THEN 'outgoing_pending'
+                           WHEN f.status = 'pending' THEN 'incoming_pending'
+                           ELSE 'none'
+                       END AS relationship_status
+                FROM public.users u
+                LEFT JOIN public.user_profile_visibility v ON v.user_id = u.user_id
+                LEFT JOIN public.user_friendships f
+                    ON f.user_low_id = LEAST(u.user_id, @user)
+                   AND f.user_high_id = GREATEST(u.user_id, @user)
+                WHERE lower(u.login) LIKE @pattern ESCAPE E'\\'
+                  AND u.user_id <> @user
+                  AND NOT EXISTS (
+                      SELECT 1 FROM public.user_blocks b
+                      WHERE (b.blocker_user_id = @user AND b.blocked_user_id = u.user_id)
+                         OR (b.blocker_user_id = u.user_id AND b.blocked_user_id = @user)
+                  )
+                ORDER BY u.login
+                LIMIT 20
+                """, connection);
+            command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
+            command.Parameters.AddWithValue("pattern", NpgsqlDbType.Varchar, pattern);
+
+            var items = new List<UserSearchResultDto>();
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                items.Add(new UserSearchResultDto(
+                    reader.GetInt32(0),
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetBoolean(3),
+                    reader.GetString(4)));
+            }
+
+            return Results.Ok(new ItemsResponse<UserSearchResultDto>(items));
+        });
+
         app.MapPost("/api/users/{targetUserId:int}/friend-request", async Task<IResult> (
             int targetUserId, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
         {
