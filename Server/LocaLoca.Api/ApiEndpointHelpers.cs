@@ -77,6 +77,7 @@ internal static class ApiEndpointHelpers
             }
             catch (TimeZoneNotFoundException) { }
             catch (InvalidTimeZoneException) { }
+            catch (ArgumentException) { }
         }
 
         // Older clients without timezone metadata retain deterministic UTC behavior.
