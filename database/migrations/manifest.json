@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 21,
+  "currentSchemaVersion": 22,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -129,6 +129,12 @@
       "name": "user_login_prefix_search",
       "path": "migrations/21_user_login_prefix_search.sql",
       "sha256": "43da744eee282614526a816cc331f42304385a7be86638d5f394ddbaecf4304d"
+    },
+    {
+      "version": 22,
+      "name": "profile_birthday_visibility_and_remove_contacts",
+      "path": "migrations/22_profile_birthday_visibility_and_remove_contacts.sql",
+      "sha256": "e81bdf417d628ab6510f509e1ad7a24e1e9709ed74c56d3762301028dd5ed1e3"
     }
   ],
   "securityScripts": [
