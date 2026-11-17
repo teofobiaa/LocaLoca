@@ -40,6 +40,7 @@ public sealed partial class MainWindow : Window
     private bool _isRegisterMode;
     private bool _initialized;
     private bool _friendsLoading;
+    private bool _friendRequestsLoading;
     private bool _mapInitialized;
     private bool _isDarkTheme;
     private string _authStatusTone = "muted";
@@ -802,57 +803,58 @@ public sealed partial class MainWindow : Window
             if (!hasFriends)
             {
                 FriendsStatusText.Text = "У тебя пока нет добавленных друзей.";
-                return;
             }
+            else
+            {
+                FriendsStatusText.Text = $"Друзей: {_friends.Count}";
 
-            FriendsStatusText.Text = $"Друзей: {_friends.Count}";
-
-            // Load several avatars in parallel, but keep the number of concurrent
-            // requests bounded so a large friends list cannot flood the API.
-            using var concurrencyLimit = new SemaphoreSlim(4);
-            var avatarTasks = friends
-                .Where(friend => friend.HasAvatar == true)
-                .Select(async friend =>
-                {
-                    await concurrencyLimit.WaitAsync();
-                    try
+                // Load several avatars in parallel, but keep the number of concurrent
+                // requests bounded so a large friends list cannot flood the API.
+                using var concurrencyLimit = new SemaphoreSlim(4);
+                var avatarTasks = friends
+                    .Where(friend => friend.HasAvatar == true)
+                    .Select(async friend =>
                     {
-                        var bytes = await _api.GetUserAvatarBytesAsync(friend.UserId, thumbnail: true);
-                        if (bytes is null) return;
-
-                        var avatar = await CreateBitmapImageAsync(bytes);
-                        var index = -1;
-                        for (var i = 0; i < _friends.Count; i++)
+                        await concurrencyLimit.WaitAsync();
+                        try
                         {
-                            if (_friends[i].UserId != friend.UserId) continue;
-                            index = i;
-                            break;
-                        }
+                            var bytes = await _api.GetUserAvatarBytesAsync(friend.UserId, thumbnail: true);
+                            if (bytes is null) return;
 
-                        if (index >= 0)
+                            var avatar = await CreateBitmapImageAsync(bytes);
+                            var index = -1;
+                            for (var i = 0; i < _friends.Count; i++)
+                            {
+                                if (_friends[i].UserId != friend.UserId) continue;
+                                index = i;
+                                break;
+                            }
+
+                            if (index >= 0)
+                            {
+                                var currentFriend = _friends[index];
+                                _friends[index] = new FriendListItemViewModel(
+                                    currentFriend.UserId,
+                                    currentFriend.Login,
+                                    currentFriend.DisplayName,
+                                    currentFriend.Initials,
+                                    avatar);
+                            }
+                        }
+                        catch (Exception ex)
                         {
-                            var currentFriend = _friends[index];
-                            _friends[index] = new FriendListItemViewModel(
-                                currentFriend.UserId,
-                                currentFriend.Login,
-                                currentFriend.DisplayName,
-                                currentFriend.Initials,
-                                avatar);
+                            // An unavailable or newly restricted avatar should not hide
+                            // the rest of the friend list; the initials remain visible.
+                            Debug.WriteLine($"Could not load avatar for friend {friend.UserId}: {ex.Message}");
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        // An unavailable or newly restricted avatar should not hide
-                        // the rest of the friend list; the initials remain visible.
-                        Debug.WriteLine($"Could not load avatar for friend {friend.UserId}: {ex.Message}");
-                    }
-                    finally
-                    {
-                        concurrencyLimit.Release();
-                    }
-                });
+                        finally
+                        {
+                            concurrencyLimit.Release();
+                        }
+                    });
 
-            await Task.WhenAll(avatarTasks);
+                await Task.WhenAll(avatarTasks);
+            }
         }
         catch (Exception ex)
         {
@@ -863,6 +865,77 @@ public sealed partial class MainWindow : Window
         {
             _friendsLoading = false;
             FriendsRefreshButton.IsEnabled = true;
+        }
+
+        await LoadFriendRequestsAsync();
+    }
+
+    private async Task LoadFriendRequestsAsync()
+    {
+        if (_friendRequestsLoading) return;
+
+        _friendRequestsLoading = true;
+        IncomingRequestsStatusText.Text = "Загружаем заявки…";
+        OutgoingRequestsStatusText.Text = "Загружаем заявки…";
+
+        try
+        {
+            var requests = await _api.GetFriendRequestsAsync();
+            var incoming = requests.Where(request => request.IsIncoming).ToList();
+            var outgoing = requests.Where(request => !request.IsIncoming).ToList();
+
+            IncomingFriendRequestsPanel.Children.Clear();
+            OutgoingFriendRequestsPanel.Children.Clear();
+
+            IncomingRequestsStatusText.Text = incoming.Count == 0
+                ? "Нет входящих заявок."
+                : $"Входящих: {incoming.Count}";
+            OutgoingRequestsStatusText.Text = outgoing.Count == 0
+                ? "Нет исходящих заявок."
+                : $"Исходящих: {outgoing.Count}";
+
+            foreach (var request in incoming)
+            {
+                var actions = new List<UIElement>
+                {
+                    CreateSocialButton("Профиль", request.UserId, request.Login, OpenSearchedUserProfile_Click),
+                    CreateSocialButton("Принять", request.UserId, request.Login, AcceptFriendRequest_Click, primary: true),
+                    CreateSocialButton("Отклонить", request.UserId, request.Login, RejectFriendRequest_Click)
+                };
+                IncomingFriendRequestsPanel.Children.Add(CreateSocialCard(
+                    request.UserId,
+                    request.Login,
+                    request.DisplayName,
+                    request.HasAvatar,
+                    actions,
+                    $"Получена {request.CreatedAt.ToLocalTime():dd.MM.yyyy HH:mm}"));
+            }
+
+            foreach (var request in outgoing)
+            {
+                var actions = new List<UIElement>
+                {
+                    CreateSocialButton("Профиль", request.UserId, request.Login, OpenSearchedUserProfile_Click),
+                    CreateSocialButton("Отменить", request.UserId, request.Login, CancelFriendRequest_Click)
+                };
+                OutgoingFriendRequestsPanel.Children.Add(CreateSocialCard(
+                    request.UserId,
+                    request.Login,
+                    request.DisplayName,
+                    request.HasAvatar,
+                    actions,
+                    $"Отправлена {request.CreatedAt.ToLocalTime():dd.MM.yyyy HH:mm}"));
+            }
+        }
+        catch (Exception ex)
+        {
+            IncomingRequestsStatusText.Text = "Не удалось загрузить заявки.";
+            OutgoingRequestsStatusText.Text = "Не удалось загрузить заявки.";
+            await ShowMessageAsync("Не удалось загрузить заявки", ex.Message);
+        }
+        finally
+        {
+            _friendRequestsLoading = false;
         }
     }
 
@@ -1118,10 +1191,10 @@ public sealed partial class MainWindow : Window
                         actions.Add(CreateSocialButton("Добавить", user.UserId, user.Login, SendFriendRequest_Click, primary: true));
                         break;
                     case "outgoing_pending":
-                        actions.Add(CreateSocialButton("Заявка отправлена", user.UserId, user.Login, null, enabled: false));
+                        actions.Add(CreateSocialButton("Отменить заявку", user.UserId, user.Login, CancelFriendRequest_Click));
                         break;
                     case "incoming_pending":
-                        actions.Add(CreateSocialButton("Входящая заявка", user.UserId, user.Login, null, enabled: false));
+                        actions.Add(CreateSocialButton("Принять", user.UserId, user.Login, AcceptFriendRequest_Click, primary: true));
                         break;
                     case "friends":
                         actions.Add(CreateSocialButton("Уже друзья", user.UserId, user.Login, null, enabled: false));
@@ -1146,7 +1219,8 @@ public sealed partial class MainWindow : Window
     }
 
     private Border CreateSocialCard(
-        int userId, string login, string? displayName, bool? hasAvatar, IEnumerable<UIElement> actions)
+        int userId, string login, string? displayName, bool? hasAvatar,
+        IEnumerable<UIElement> actions, string? detail = null)
     {
         var card = new Border
         {
@@ -1185,6 +1259,15 @@ public sealed partial class MainWindow : Window
             FontSize = 12,
             Foreground = Brush("#819087")
         });
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            identity.Children.Add(new TextBlock
+            {
+                Text = detail,
+                FontSize = 11,
+                Foreground = Brush("#819087")
+            });
+        }
         Grid.SetColumn(identity, 1);
         layout.Children.Add(identity);
 
@@ -1313,6 +1396,65 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             FriendsSearchStatusText.Text = "Не удалось отправить заявку: " + ex.Message;
+        }
+    }
+
+    private async void AcceptFriendRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        try
+        {
+            await _api.AcceptFriendRequestAsync(userId);
+            FriendsSearchStatusText.Text = $"Заявка от @{login} принята. Теперь вы друзья.";
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось принять заявку", ex.Message);
+        }
+    }
+
+    private async void RejectFriendRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        var result = await ConfirmAsync(
+            "Отклонить заявку?",
+            $"Заявка от @{login} будет удалена.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.CancelOrRejectFriendRequestAsync(userId);
+            FriendsSearchStatusText.Text = $"Заявка от @{login} отклонена.";
+            await LoadFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось отклонить заявку", ex.Message);
+        }
+    }
+
+    private async void CancelFriendRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        var result = await ConfirmAsync(
+            "Отменить заявку?",
+            $"Запрос на добавление @{login} в друзья будет отменён.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.CancelOrRejectFriendRequestAsync(userId);
+            FriendsSearchStatusText.Text = $"Заявка для @{login} отменена.";
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось отменить заявку", ex.Message);
         }
     }
 
