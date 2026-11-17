@@ -41,52 +41,127 @@ public sealed class BirthdayEndpointTests
     }
 
     [Fact]
-    public async Task Birthday_Contacts_Are_Owner_Scoped_And_Calendar_Uid_Is_Stable()
+    public async Task Manual_Birthday_Contacts_Api_Is_Retired()
     {
         using var factory = _database.CreateFactory(rateLimitClientIp: IPAddress.Parse("192.0.2.102"));
+        using var client = factory.CreateClient();
+        await RegisterAsync(client);
+
+        using var list = await client.GetAsync("/api/me/birthday-contacts");
+        using var create = await client.PostAsJsonAsync("/api/me/birthday-contacts",
+            new { displayName = "Not a profile user", birthDate = "1999-04-06" });
+        using var update = await client.PutAsJsonAsync("/api/me/birthday-contacts/1",
+            new { displayName = "Not a profile user", birthDate = "1999-04-06" });
+        using var delete = await client.DeleteAsync("/api/me/birthday-contacts/1");
+        using var calendar = await client.GetAsync("/api/me/birthday-contacts/1/calendar.ics");
+
+        Assert.Equal(HttpStatusCode.NotFound, list.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, create.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, update.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, delete.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, calendar.StatusCode);
+    }
+
+    [Fact]
+    public async Task Birthday_Visibility_Respects_Private_Friends_And_Registered_Audiences_Without_Exposing_Year()
+    {
+        using var factory = _database.CreateFactory(rateLimitClientIp: IPAddress.Parse("192.0.2.104"));
         using var owner = factory.CreateClient();
-        using var other = factory.CreateClient();
+        using var friend = factory.CreateClient();
+        using var registeredViewer = factory.CreateClient();
         await RegisterAsync(owner);
-        await RegisterAsync(other);
+        await RegisterAsync(friend);
+        await RegisterAsync(registeredViewer);
 
-        using var create = await owner.PostAsJsonAsync("/api/me/birthday-contacts",
-            new { displayName = "Friend One", birthDate = "1999-04-06" });
-        Assert.Equal(HttpStatusCode.OK, create.StatusCode);
-        using var createdJson = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
-        var contactId = createdJson.RootElement.GetProperty("id").GetInt32();
+        var ownerId = await GetUserIdAsync(owner);
+        var friendId = await GetUserIdAsync(friend);
 
-        using var ownerListResponse = await owner.GetAsync("/api/me/birthday-contacts");
-        Assert.Equal(HttpStatusCode.OK, ownerListResponse.StatusCode);
-        Assert.True(ownerListResponse.Headers.CacheControl?.NoStore == true);
-        using var ownerList = JsonDocument.Parse(await ownerListResponse.Content.ReadAsStringAsync());
-        Assert.Single(ownerList.RootElement.GetProperty("items").EnumerateArray());
+        using var birthDate = await owner.PutAsJsonAsync("/api/me/profile/birthday",
+            new { dateOfBirth = "1990-04-06" });
+        Assert.Equal(HttpStatusCode.OK, birthDate.StatusCode);
 
-        using var otherListResponse = await other.GetAsync("/api/me/birthday-contacts");
-        Assert.Equal(HttpStatusCode.OK, otherListResponse.StatusCode);
-        using var otherList = JsonDocument.Parse(await otherListResponse.Content.ReadAsStringAsync());
-        Assert.Empty(otherList.RootElement.GetProperty("items").EnumerateArray());
+        using var defaultsResponse = await owner.GetAsync("/api/me/profile/privacy");
+        Assert.Equal(HttpStatusCode.OK, defaultsResponse.StatusCode);
+        using var defaults = JsonDocument.Parse(await defaultsResponse.Content.ReadAsStringAsync());
+        Assert.Equal("private", defaults.RootElement.GetProperty("dateOfBirthVisibility").GetString());
 
-        using var deniedCalendar = await other.GetAsync($"/api/me/birthday-contacts/{contactId}/calendar.ics");
-        Assert.Equal(HttpStatusCode.NotFound, deniedCalendar.StatusCode);
+        using var privateProfileResponse = await registeredViewer.GetAsync($"/api/users/{ownerId}/profile");
+        using (var privateProfile = JsonDocument.Parse(await privateProfileResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, privateProfileResponse.StatusCode);
+            Assert.Equal(JsonValueKind.Null, privateProfile.RootElement.GetProperty("birthdayMonth").ValueKind);
+            Assert.Equal(JsonValueKind.Null, privateProfile.RootElement.GetProperty("birthdayDay").ValueKind);
+            Assert.False(privateProfile.RootElement.TryGetProperty("dateOfBirth", out _));
+        }
 
-        using var firstCalendar = await owner.GetAsync($"/api/me/birthday-contacts/{contactId}/calendar.ics");
-        using var secondCalendar = await owner.GetAsync($"/api/me/birthday-contacts/{contactId}/calendar.ics");
-        Assert.Equal(HttpStatusCode.OK, firstCalendar.StatusCode);
-        Assert.True(firstCalendar.Headers.CacheControl?.NoStore == true);
-        var firstText = await firstCalendar.Content.ReadAsStringAsync();
-        var secondText = await secondCalendar.Content.ReadAsStringAsync();
-        var expectedUid = $"UID:localoca-birthday-contact-{contactId}@localoca";
-        Assert.Contains(expectedUid, firstText, StringComparison.Ordinal);
-        Assert.Contains(expectedUid, secondText, StringComparison.Ordinal);
-        Assert.Contains("RRULE:FREQ=YEARLY", firstText, StringComparison.Ordinal);
-        Assert.Contains("BEGIN:VALARM", firstText, StringComparison.Ordinal);
-        Assert.Equal(1, firstText.Split(expectedUid, StringSplitOptions.None).Length - 1);
+        using var friendsOnly = await owner.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "registered",
+            avatarVisibility = "registered",
+            residenceCountryVisibility = "private",
+            residenceCityVisibility = "private",
+            dateOfBirthVisibility = "friends"
+        });
+        Assert.Equal(HttpStatusCode.OK, friendsOnly.StatusCode);
 
-        using var deniedDelete = await other.DeleteAsync($"/api/me/birthday-contacts/{contactId}");
-        Assert.Equal(HttpStatusCode.NotFound, deniedDelete.StatusCode);
-        using var ownerListAfterDeniedDelete = await owner.GetAsync("/api/me/birthday-contacts");
-        using var ownerListAfterDeniedDeleteJson = JsonDocument.Parse(await ownerListAfterDeniedDelete.Content.ReadAsStringAsync());
-        Assert.Single(ownerListAfterDeniedDeleteJson.RootElement.GetProperty("items").EnumerateArray());
+        using var pendingRequest = await friend.PostAsync($"/api/users/{ownerId}/friend-request", content: null);
+        Assert.Equal(HttpStatusCode.OK, pendingRequest.StatusCode);
+        using var pendingProfileResponse = await friend.GetAsync($"/api/users/{ownerId}/profile");
+        using (var pendingProfile = JsonDocument.Parse(await pendingProfileResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(HttpStatusCode.OK, pendingProfileResponse.StatusCode);
+            Assert.Equal(JsonValueKind.Null, pendingProfile.RootElement.GetProperty("birthdayMonth").ValueKind);
+            Assert.Equal(JsonValueKind.Null, pendingProfile.RootElement.GetProperty("birthdayDay").ValueKind);
+        }
+
+        using var accept = await owner.PostAsync($"/api/me/friend-requests/{friendId}/accept", content: null);
+        Assert.Equal(HttpStatusCode.OK, accept.StatusCode);
+        using var friendProfileResponse = await friend.GetAsync($"/api/users/{ownerId}/profile");
+        using (var friendProfile = JsonDocument.Parse(await friendProfileResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(4, friendProfile.RootElement.GetProperty("birthdayMonth").GetInt32());
+            Assert.Equal(6, friendProfile.RootElement.GetProperty("birthdayDay").GetInt32());
+            Assert.False(friendProfile.RootElement.TryGetProperty("dateOfBirth", out _));
+            Assert.False(friendProfile.RootElement.TryGetProperty("birthYear", out _));
+        }
+
+        using var registeredVisibility = await owner.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "registered",
+            avatarVisibility = "registered",
+            residenceCountryVisibility = "private",
+            residenceCityVisibility = "private",
+            dateOfBirthVisibility = "registered"
+        });
+        Assert.Equal(HttpStatusCode.OK, registeredVisibility.StatusCode);
+        using var registeredProfileResponse = await registeredViewer.GetAsync($"/api/users/{ownerId}/profile");
+        using (var registeredProfile = JsonDocument.Parse(await registeredProfileResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(4, registeredProfile.RootElement.GetProperty("birthdayMonth").GetInt32());
+            Assert.Equal(6, registeredProfile.RootElement.GetProperty("birthdayDay").GetInt32());
+            Assert.False(registeredProfile.RootElement.TryGetProperty("dateOfBirth", out _));
+        }
+
+        using var privateAgain = await owner.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "registered",
+            avatarVisibility = "registered",
+            residenceCountryVisibility = "private",
+            residenceCityVisibility = "private",
+            dateOfBirthVisibility = "private"
+        });
+        Assert.Equal(HttpStatusCode.OK, privateAgain.StatusCode);
+
+        using var hiddenFriendResponse = await friend.GetAsync($"/api/users/{ownerId}/profile");
+        using (var hiddenFriend = JsonDocument.Parse(await hiddenFriendResponse.Content.ReadAsStringAsync()))
+            Assert.Equal(JsonValueKind.Null, hiddenFriend.RootElement.GetProperty("birthdayMonth").ValueKind);
+
+        using var ownerProfileResponse = await owner.GetAsync($"/api/users/{ownerId}/profile");
+        using (var ownerProfile = JsonDocument.Parse(await ownerProfileResponse.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal(4, ownerProfile.RootElement.GetProperty("birthdayMonth").GetInt32());
+            Assert.Equal(6, ownerProfile.RootElement.GetProperty("birthdayDay").GetInt32());
+        }
     }
 
     [Fact]
@@ -160,6 +235,14 @@ public sealed class BirthdayEndpointTests
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         return json.RootElement.GetProperty("items").EnumerateArray()
             .Select(item => item.GetProperty("name").GetString() ?? string.Empty).ToList();
+    }
+
+    private static async Task<int> GetUserIdAsync(HttpClient client)
+    {
+        using var response = await client.GetAsync("/api/me/profile");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        return json.RootElement.GetProperty("id").GetInt32();
     }
 
     private static async Task RegisterAsync(HttpClient client)
