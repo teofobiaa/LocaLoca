@@ -14,6 +14,7 @@ public static class RelationshipEndpoints
             string? login, HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
 
             var normalizedLogin = (login ?? string.Empty).Trim().ToLowerInvariant();
             if (normalizedLogin.Length is < 3 or > 50 ||
