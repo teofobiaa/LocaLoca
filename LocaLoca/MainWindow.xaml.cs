@@ -1066,47 +1066,6 @@ public sealed partial class MainWindow : Window
         await SearchFriendsAsync();
     }
 
-    private async Task LoadFriendsPageAsync()
-    {
-        if (_currentUser is null) return;
-
-        FriendsRefreshButton.IsEnabled = false;
-        FriendsListStatusText.Text = "Загружаем список друзей…";
-        FriendsListPanel.Children.Clear();
-
-        try
-        {
-            var friends = await _api.GetFriendsAsync();
-            FriendsCountText.Text = friends.Count.ToString();
-
-            if (friends.Count == 0)
-            {
-                FriendsListStatusText.Text = "Пока здесь пусто. Найди пользователя по логину выше, чтобы отправить заявку.";
-                return;
-            }
-
-            FriendsListStatusText.Text = $"В списке {friends.Count} {GetRussianCountWord(friends.Count, "друг", "друга", "друзей")}.";
-            foreach (var friend in friends)
-            {
-                var actions = new UIElement[]
-                {
-                    CreateSocialButton("Профиль", friend.UserId, friend.Login, OpenFriendProfile_Click),
-                    CreateSocialButton("Удалить", friend.UserId, friend.Login, RemoveFriend_Click)
-                };
-                var card = CreateSocialCard(friend.UserId, friend.Login, friend.DisplayName, friend.HasAvatar, actions);
-                FriendsListPanel.Children.Add(card);
-            }
-        }
-        catch (Exception ex)
-        {
-            FriendsListStatusText.Text = "Не удалось загрузить список друзей: " + ex.Message;
-        }
-        finally
-        {
-            FriendsRefreshButton.IsEnabled = true;
-        }
-    }
-
     private async Task SearchFriendsAsync()
     {
         var loginPrefix = FriendsSearchBox.Text.Trim();
