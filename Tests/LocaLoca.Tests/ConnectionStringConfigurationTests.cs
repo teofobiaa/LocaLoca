@@ -86,7 +86,7 @@ public sealed class ConnectionStringConfigurationTests
         });
     }
 
-    private static void WithConfiguration<T>(T configuration, Action<string> action) =>
+    internal static void WithConfiguration<T>(T configuration, Action<string> action) =>
         WithConfigurationText(JsonSerializer.Serialize(configuration), action);
 
     private static void WithConfigurationText(string json, Action<string> action)
