@@ -77,7 +77,7 @@ public static class BirthdayEndpoints
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
             context.Response.Headers["Cache-Control"] = "private, no-store";
 
-            var referenceDate = today ?? DateOnly.FromDateTime(DateTime.UtcNow);
+            var referenceDate = today ?? GetUserToday(context);
             var contacts = new List<BirthdayContactDto>();
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
@@ -128,7 +128,7 @@ public static class BirthdayEndpoints
 
             var id = Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
             return Results.Ok(CreateContactDto(
-                id, displayName, request.BirthDate, DateOnly.FromDateTime(DateTime.UtcNow)));
+                id, displayName, request.BirthDate, GetUserToday(context)));
         });
 
         app.MapPut("/api/me/birthday-contacts/{contactId:int}", async Task<IResult> (
@@ -142,7 +142,7 @@ public static class BirthdayEndpoints
             context.Response.Headers["Cache-Control"] = "private, no-store";
             if (contactId <= 0) return Results.BadRequest(new ApiErrorResponse("Некорректный идентификатор контакта."));
 
-            var validation = ValidateContact(request.DisplayName, request.BirthDate);
+            var validation = ValidateContact(context, request.DisplayName, request.BirthDate);
             if (validation is not null) return Results.BadRequest(new ApiErrorResponse(validation));
 
             var displayName = request.DisplayName?.Trim() ?? string.Empty;
@@ -160,7 +160,7 @@ public static class BirthdayEndpoints
             var updatedId = await command.ExecuteScalarAsync(cancellationToken);
             if (updatedId is null) return Results.NotFound(new ApiErrorResponse("Контакт не найден."));
             return Results.Ok(CreateContactDto(
-                Convert.ToInt32(updatedId), displayName, request.BirthDate, DateOnly.FromDateTime(DateTime.UtcNow)));
+                Convert.ToInt32(updatedId), displayName, request.BirthDate, GetUserToday(context)));
         });
 
         app.MapDelete("/api/me/birthday-contacts/{contactId:int}", async Task<IResult> (
