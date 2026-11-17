@@ -199,6 +199,8 @@ public static class RelationshipEndpoints
 
             var (lowId, highId) = OrderedPair(userId, otherUserId);
             await using var connection = await OpenAsync(connectionString, cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            await LockRelationshipPairAsync(connection, transaction, lowId, highId, cancellationToken);
             await using var command = new NpgsqlCommand(@"
                 UPDATE public.user_friendships
                 SET status = 'accepted', updated_at = now()
@@ -208,13 +210,15 @@ public static class RelationshipEndpoints
                       SELECT 1 FROM public.user_blocks
                       WHERE (blocker_user_id = @user AND blocked_user_id = @other)
                          OR (blocker_user_id = @other AND blocked_user_id = @user)
-                  )", connection);
+                  )", connection, transaction);
             command.Parameters.AddWithValue("low", NpgsqlDbType.Integer, lowId);
             command.Parameters.AddWithValue("high", NpgsqlDbType.Integer, highId);
             command.Parameters.AddWithValue("other", NpgsqlDbType.Integer, otherUserId);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
 
-            return await command.ExecuteNonQueryAsync(cancellationToken) == 1
+            var accepted = await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+            await transaction.CommitAsync(cancellationToken);
+            return accepted
                 ? Results.Ok(new MessageDto("Запрос дружбы принят."))
                 : Results.NotFound(new ApiErrorResponse("Входящий запрос дружбы не найден."));
         });
@@ -228,16 +232,18 @@ public static class RelationshipEndpoints
 
             var (lowId, highId) = OrderedPair(userId, otherUserId);
             await using var connection = await OpenAsync(connectionString, cancellationToken);
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            await LockRelationshipPairAsync(connection, transaction, lowId, highId, cancellationToken);
             await using var command = new NpgsqlCommand(@"
                 DELETE FROM public.user_friendships
-                WHERE user_low_id = @low AND user_high_id = @high AND status = 'pending'", connection);
+                WHERE user_low_id = @low AND user_high_id = @high AND status = 'pending'", connection, transaction);
             command.Parameters.AddWithValue("low", NpgsqlDbType.Integer, lowId);
             command.Parameters.AddWithValue("high", NpgsqlDbType.Integer, highId);
 
+            var deleted = await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+            await transaction.CommitAsync(cancellationToken);
             return Results.Ok(new MessageDto(
-                await command.ExecuteNonQueryAsync(cancellationToken) == 1
-                    ? "Запрос дружбы отменён."
-                    : "Ожидающий запрос не найден."));
+                deleted ? "Запрос дружбы отменён." : "Ожидающий запрос не найден."));
         });
 
         app.MapGet("/api/me/friends", async Task<IResult> (
@@ -248,6 +254,7 @@ public static class RelationshipEndpoints
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
                 SELECT u.user_id,
+                       u.login,
                        CASE WHEN COALESCE(v.display_name_visibility, 'registered') IN ('friends', 'registered')
                             THEN u.display_name ELSE NULL END,
                        CASE WHEN COALESCE(v.avatar_visibility, 'registered') IN ('friends', 'registered')
@@ -272,8 +279,9 @@ public static class RelationshipEndpoints
             while (await reader.ReadAsync(cancellationToken))
                 items.Add(new UserRelationshipDto(
                     reader.GetInt32(0),
-                    reader.IsDBNull(1) ? null : reader.GetString(1),
-                    reader.IsDBNull(2) ? null : reader.GetBoolean(2)));
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetBoolean(3)));
 
             return Results.Ok(new ItemsResponse<UserRelationshipDto>(items));
         });
