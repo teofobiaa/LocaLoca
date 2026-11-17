@@ -120,7 +120,7 @@
                     </StackPanel>
                     <StackPanel Spacing="6">
                         <TextBlock Text="Пароль" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource AuthTextBrush}" />
-                        <PasswordBox x:Name="PasswordBox" PlaceholderText="Не менее 6 символов" Height="46" />
+                        <PasswordBox x:Name="PasswordBox" PlaceholderText="Введите пароль" Height="46" />
                     </StackPanel>
                     <Button x:Name="AuthSubmitButton" Content="Войти в аккаунт" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="AuthSubmit_Click" Margin="0,12,0,0" />
                     <Button x:Name="AuthModeButton" Content="Создать новый аккаунт" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource AuthMutedTextBrush}" HorizontalAlignment="Center" Click="AuthModeButton_Click" />
