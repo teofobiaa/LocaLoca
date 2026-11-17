@@ -41,6 +41,8 @@ public sealed partial class MainWindow : Window
     private bool _initialized;
     private bool _friendsLoading;
     private bool _friendRequestsLoading;
+    private bool _blockedUsersLoading;
+    private bool _blockedUsersExpanded;
     private bool _mapInitialized;
     private bool _isDarkTheme;
     private string _authStatusTone = "muted";
@@ -868,6 +870,7 @@ public sealed partial class MainWindow : Window
         }
 
         await LoadFriendRequestsAsync();
+        await LoadBlockedUsersAsync();
     }
 
     private async Task LoadFriendRequestsAsync()
@@ -934,6 +937,59 @@ public sealed partial class MainWindow : Window
         finally
         {
             _friendRequestsLoading = false;
+        }
+    }
+
+    private void ToggleBlockedUsers_Click(object sender, RoutedEventArgs e)
+    {
+        _blockedUsersExpanded = !_blockedUsersExpanded;
+        BlockedUsersScrollViewer.Visibility = _blockedUsersExpanded
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        BlockedUsersToggleButton.Content = _blockedUsersExpanded ? "Скрыть" : "Показать";
+    }
+
+    private async Task LoadBlockedUsersAsync()
+    {
+        if (_blockedUsersLoading) return;
+
+        _blockedUsersLoading = true;
+        BlockedUsersToggleButton.IsEnabled = false;
+        BlockedUsersStatusText.Text = "Загружаем список блокировок…";
+
+        try
+        {
+            var blockedUsers = await _api.GetBlockedUsersAsync();
+            BlockedUsersPanel.Children.Clear();
+
+            BlockedUsersStatusText.Text = blockedUsers.Count == 0
+                ? "Нет заблокированных пользователей."
+                : $"Заблокировано: {blockedUsers.Count}";
+
+            foreach (var user in blockedUsers)
+            {
+                var actions = new List<UIElement>
+                {
+                    CreateSocialButton("Разблокировать", user.UserId, user.Login, UnblockUser_Click)
+                };
+                BlockedUsersPanel.Children.Add(CreateSocialCard(
+                    user.UserId,
+                    user.Login,
+                    displayName: null,
+                    hasAvatar: null,
+                    actions,
+                    "Пользователь заблокирован"));
+            }
+        }
+        catch (Exception ex)
+        {
+            BlockedUsersStatusText.Text = "Не удалось загрузить список блокировок.";
+            await ShowMessageAsync("Не удалось загрузить блокировки", ex.Message);
+        }
+        finally
+        {
+            _blockedUsersLoading = false;
+            BlockedUsersToggleButton.IsEnabled = true;
         }
     }
 
@@ -1178,26 +1234,32 @@ public sealed partial class MainWindow : Window
             FriendsSearchStatusText.Text = $"Найдено пользователей: {users.Count}.";
             foreach (var user in users)
             {
-                var actions = new List<UIElement>
-                {
-                    CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click)
-                };
+                var actions = new List<UIElement>();
 
                 switch (user.RelationshipStatus)
                 {
                     case "none":
+                        actions.Add(CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click));
                         actions.Add(CreateSocialButton("Добавить", user.UserId, user.Login, SendFriendRequest_Click, primary: true));
+                        actions.Add(CreateSocialButton("Блокировать", user.UserId, user.Login, BlockUser_Click));
                         break;
                     case "outgoing_pending":
+                        actions.Add(CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click));
                         actions.Add(CreateSocialButton("Отменить заявку", user.UserId, user.Login, CancelFriendRequest_Click));
+                        actions.Add(CreateSocialButton("Блокировать", user.UserId, user.Login, BlockUser_Click));
                         break;
                     case "incoming_pending":
                         actions.Add(CreateSocialButton("Принять", user.UserId, user.Login, AcceptFriendRequest_Click, primary: true));
+                        actions.Add(CreateSocialButton("Отклонить", user.UserId, user.Login, RejectFriendRequest_Click));
+                        actions.Add(CreateSocialButton("Блокировать", user.UserId, user.Login, BlockUser_Click));
                         break;
                     case "friends":
+                        actions.Add(CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click));
                         actions.Add(CreateSocialButton("Уже друзья", user.UserId, user.Login, null, enabled: false));
+                        actions.Add(CreateSocialButton("Блокировать", user.UserId, user.Login, BlockUser_Click));
                         break;
                     default:
+                        actions.Add(CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click));
                         actions.Add(CreateSocialButton("Недоступно", user.UserId, user.Login, null, enabled: false));
                         break;
                 }
@@ -1394,6 +1456,52 @@ public sealed partial class MainWindow : Window
         catch (Exception ex)
         {
             FriendsSearchStatusText.Text = "Не удалось отправить заявку: " + ex.Message;
+        }
+    }
+
+    private async void BlockUser_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+
+        var result = await ConfirmAsync(
+            "Заблокировать пользователя?",
+            $"Пользователь @{login} будет заблокирован. Дружба и все ожидающие заявки между вами будут удалены. Уведомление о блокировке не отправляется.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.BlockUserAsync(userId);
+            FriendsSearchStatusText.Text = $"Пользователь @{login} заблокирован.";
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось заблокировать пользователя", ex.Message);
+        }
+    }
+
+    private async void UnblockUser_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+
+        var result = await ConfirmAsync(
+            "Снять блокировку?",
+            $"Пользователь @{login} снова сможет находить аккаунт в пределах настроек приватности. Дружба и заявки автоматически не восстановятся.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.UnblockUserAsync(userId);
+            BlockedUsersStatusText.Text = $"Блокировка для @{login} снята.";
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось снять блокировку", ex.Message);
         }
     }
 
