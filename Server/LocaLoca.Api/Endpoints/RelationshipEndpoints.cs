@@ -150,6 +150,7 @@ public static class RelationshipEndpoints
             HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
@@ -250,6 +251,7 @@ public static class RelationshipEndpoints
             HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
@@ -356,6 +358,7 @@ public static class RelationshipEndpoints
             HttpContext context, SessionStore sessions, CancellationToken cancellationToken) =>
         {
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
+            context.Response.Headers["Cache-Control"] = "private, no-store";
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
