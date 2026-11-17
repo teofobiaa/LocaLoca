@@ -19,23 +19,29 @@ public sealed class FreshSchemaV20Tests
         await using var connection = new NpgsqlConnection(postgres.GetConnectionString());
         await connection.OpenAsync();
 
-        await ExecuteFileAsync(connection, "schema", "02_schema_v20.sql");
-
         await using (var createRoles = new NpgsqlCommand(@"
+            CREATE ROLE postgres NOLOGIN SUPERUSER;
             CREATE ROLE anon NOLOGIN;
             CREATE ROLE authenticated NOLOGIN;
             CREATE ROLE localoca_app LOGIN PASSWORD 'fresh-v20-test-password'
-                NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;",
+                NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+            SET ROLE postgres;",
             connection))
         {
             await createRoles.ExecuteNonQueryAsync();
         }
 
+        // The production permission bootstrap is defined for objects owned by
+        // Supabase's postgres role, so create the fresh schema under that role.
+        await ExecuteFileAsync(connection, "schema", "02_schema_v20.sql");
         await ExecuteFileAsync(connection, "security", "06_update_runtime_permissions.sql");
 
         await using var schemaCheck = new NpgsqlCommand(@"
             SELECT
-                (SELECT count(*) = 16 FROM public.localoca_schema_migrations)
+                current_user = 'postgres'
+                AND (SELECT rolsuper AND NOT rolcanlogin
+                     FROM pg_roles WHERE rolname = 'postgres')
+                AND (SELECT count(*) = 16 FROM public.localoca_schema_migrations)
                 AND (SELECT count(*) = 17 FROM pg_policies
                      WHERE schemaname = 'public'
                        AND policyname IN ('localoca_app_runtime_access', 'localoca_app_catalog_read'))
@@ -63,11 +69,40 @@ public sealed class FreshSchemaV20Tests
                 AND NOT has_table_privilege('anon', 'public.users', 'SELECT')
                 AND NOT has_table_privilege('authenticated', 'public.users', 'SELECT')
                 AND NOT has_table_privilege('localoca_app', 'public.localoca_schema_migrations', 'SELECT')
-                AND (SELECT NOT (rolsuper OR rolcreatedb OR rolcreaterole OR rolbypassrls)
-                     FROM pg_roles WHERE rolname = 'localoca_app')",
+                AND (SELECT rolcanlogin
+                            AND NOT (rolsuper OR rolcreatedb OR rolcreaterole
+                                     OR rolinherit OR rolreplication OR rolbypassrls)
+                     FROM pg_roles WHERE rolname = 'localoca_app')
+                AND NOT pg_has_role('localoca_app', 'postgres', 'MEMBER')",
             connection);
 
         Assert.True((bool)(await schemaCheck.ExecuteScalarAsync() ?? false));
+
+        // Prove that the ALTER DEFAULT PRIVILEGES statements in the bootstrap
+        // script apply to objects subsequently created by the postgres owner.
+        await using (var createDefaultPrivilegeProbes = new NpgsqlCommand(@"
+            CREATE TABLE public.runtime_default_privilege_probe (id integer);
+            CREATE SEQUENCE public.runtime_default_privilege_probe_seq;
+            CREATE FUNCTION public.runtime_default_privilege_probe_fn()
+                RETURNS integer LANGUAGE sql AS $$ SELECT 1 $$;",
+            connection))
+        {
+            await createDefaultPrivilegeProbes.ExecuteNonQueryAsync();
+        }
+
+        await using var defaultPrivilegesCheck = new NpgsqlCommand(@"
+            SELECT
+                NOT has_table_privilege('anon', 'public.runtime_default_privilege_probe', 'SELECT')
+                AND NOT has_table_privilege('authenticated', 'public.runtime_default_privilege_probe', 'SELECT')
+                AND NOT has_table_privilege('localoca_app', 'public.runtime_default_privilege_probe', 'SELECT')
+                AND NOT has_sequence_privilege('anon', 'public.runtime_default_privilege_probe_seq', 'USAGE')
+                AND NOT has_sequence_privilege('authenticated', 'public.runtime_default_privilege_probe_seq', 'USAGE')
+                AND NOT has_sequence_privilege('localoca_app', 'public.runtime_default_privilege_probe_seq', 'USAGE')
+                AND NOT has_function_privilege('anon', 'public.runtime_default_privilege_probe_fn()', 'EXECUTE')
+                AND NOT has_function_privilege('authenticated', 'public.runtime_default_privilege_probe_fn()', 'EXECUTE')
+                AND NOT has_function_privilege('localoca_app', 'public.runtime_default_privilege_probe_fn()', 'EXECUTE')",
+            connection);
+        Assert.True((bool)(await defaultPrivilegesCheck.ExecuteScalarAsync() ?? false));
 
         await using var insertUser = new NpgsqlCommand(@"
             INSERT INTO public.users(login, password_hash, display_name)
