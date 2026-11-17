@@ -1366,6 +1366,15 @@ public sealed class ApiIntegrationTests
             Assert.Equal(JsonValueKind.Null, nonFriendProfile.RootElement.GetProperty("hasAvatar").ValueKind);
         }
 
+        using var requesterPrivacy = await viewerClient.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "friends",
+            avatarVisibility = "friends",
+            residenceCountryVisibility = "private",
+            residenceCityVisibility = "private"
+        });
+        Assert.Equal(HttpStatusCode.OK, requesterPrivacy.StatusCode);
+
         using var friendRequest = await viewerClient.PostAsync($"/api/users/{owner.UserId}/friend-request", content: null);
         Assert.Equal(HttpStatusCode.OK, friendRequest.StatusCode);
 
