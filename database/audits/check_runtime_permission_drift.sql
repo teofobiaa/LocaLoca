@@ -51,10 +51,6 @@ expected_table_privileges(schema_name, table_name, privilege_type) AS (
         ('public', 'user_avatars', 'INSERT'),
         ('public', 'user_avatars', 'UPDATE'),
         ('public', 'user_avatars', 'DELETE'),
-        ('public', 'birthday_contacts', 'SELECT'),
-        ('public', 'birthday_contacts', 'INSERT'),
-        ('public', 'birthday_contacts', 'UPDATE'),
-        ('public', 'birthday_contacts', 'DELETE'),
         ('public', 'user_profile_visibility', 'SELECT'),
         ('public', 'user_profile_visibility', 'INSERT'),
         ('public', 'user_profile_visibility', 'UPDATE'),
@@ -79,7 +75,7 @@ expected_sequence_privileges(schema_name, sequence_name, privilege_type) AS (
         ('public', 'photos_photo_id_seq', 'USAGE'),
         ('public', 'user_map_places_user_map_place_id_seq', 'USAGE'),
         ('public', 'user_map_place_photos_photo_id_seq', 'USAGE'),
-        ('public', 'birthday_contacts_birthday_contact_id_seq', 'USAGE')
+
 ),
 expected_sequences AS (
     SELECT DISTINCT schema_name, sequence_name
@@ -90,7 +86,7 @@ expected_rls_tables(schema_name, table_name) AS (
         ('public','users'), ('public','visits'), ('public','photos'), ('public','wishlist'),
         ('public','user_map_places'), ('public','user_map_place_photos'),
         ('public','user_sessions'), ('public','auth_rate_limit_counters'),
-        ('public','user_avatars'), ('public','birthday_contacts'),
+        ('public','user_avatars'),
         ('public','user_profile_visibility'), ('public','user_friendships'), ('public','user_blocks'),
         ('public','categories'), ('public','countries'), ('public','cities'), ('public','attractions'),
         ('public','localoca_schema_migrations')
@@ -106,7 +102,6 @@ expected_rls_policies(schema_name, table_name, policy_name, command_name, qual_e
         ('public','user_sessions','localoca_app_runtime_access','ALL','true','true'),
         ('public','auth_rate_limit_counters','localoca_app_runtime_access','ALL','true','true'),
         ('public','user_avatars','localoca_app_runtime_access','ALL','true','true'),
-        ('public','birthday_contacts','localoca_app_runtime_access','ALL','true','true'),
         ('public','user_profile_visibility','localoca_app_runtime_access','ALL','true','true'),
         ('public','user_friendships','localoca_app_runtime_access','ALL','true','true'),
         ('public','user_blocks','localoca_app_runtime_access','ALL','true','true'),
