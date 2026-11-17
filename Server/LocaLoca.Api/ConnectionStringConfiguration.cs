@@ -50,7 +50,8 @@ public static class ConnectionStringConfiguration
             }
         }
         catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException
-            or CryptographicException or FormatException or InvalidOperationException or ArgumentException)
+            or CryptographicException or FormatException or InvalidOperationException or ArgumentException
+            or KeyNotFoundException)
         {
             // Do not silently fall back to an unconfigured connection when a
             // DPAPI secret cannot be decrypted (for example, under another user).
@@ -128,7 +129,7 @@ public static class ConnectionStringConfiguration
         }
     }
 
-    private static class Dpapi
+    internal static class Dpapi
     {
         [StructLayout(LayoutKind.Sequential)]
         private struct DataBlob
@@ -152,7 +153,7 @@ public static class ConnectionStringConfiguration
             ref DataBlob input, string description, IntPtr entropy, IntPtr reserved,
             IntPtr prompt, int flags, out DataBlob output);
 
-        public static byte[] Protect(byte[] clear)
+        internal static byte[] Protect(byte[] clear)
         {
             if (clear.Length == 0) throw new ArgumentException("The protected value cannot be empty.", nameof(clear));
             var inputPointer = Marshal.AllocHGlobal(clear.Length);
@@ -181,7 +182,7 @@ public static class ConnectionStringConfiguration
             }
         }
 
-        public static byte[] Unprotect(byte[] encrypted)
+        internal static byte[] Unprotect(byte[] encrypted)
         {
             var inputPointer = Marshal.AllocHGlobal(encrypted.Length);
             try
