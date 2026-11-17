@@ -1378,6 +1378,19 @@ public sealed class ApiIntegrationTests
         using var friendRequest = await viewerClient.PostAsync($"/api/users/{owner.UserId}/friend-request", content: null);
         Assert.Equal(HttpStatusCode.OK, friendRequest.StatusCode);
 
+        using var outgoingRequests = await viewerClient.GetAsync("/api/me/friend-requests");
+        Assert.True(outgoingRequests.Headers.CacheControl?.Private);
+        Assert.True(outgoingRequests.Headers.CacheControl?.NoStore);
+        using (var outgoingJson = JsonDocument.Parse(await outgoingRequests.Content.ReadAsStringAsync()))
+        {
+            var outgoing = Assert.Single(outgoingJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal(owner.UserId, outgoing.GetProperty("userId").GetInt32());
+            Assert.Equal(owner.Login, outgoing.GetProperty("login").GetString());
+            Assert.False(outgoing.GetProperty("isIncoming").GetBoolean());
+            Assert.Equal(JsonValueKind.Null, outgoing.GetProperty("displayName").ValueKind);
+            Assert.Equal(JsonValueKind.Null, outgoing.GetProperty("hasAvatar").ValueKind);
+        }
+
         using var incomingRequests = await ownerClient.GetAsync("/api/me/friend-requests");
         Assert.True(incomingRequests.Headers.CacheControl?.Private);
         Assert.True(incomingRequests.Headers.CacheControl?.NoStore);
