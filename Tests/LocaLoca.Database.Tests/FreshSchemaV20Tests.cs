@@ -159,7 +159,6 @@ public sealed class FreshSchemaV20Tests
                 AND NOT has_table_privilege('localoca_app', 'public.runtime_default_privilege_probe', 'SELECT')
                 AND NOT has_sequence_privilege('anon', 'public.runtime_default_privilege_probe_seq', 'USAGE')
                 AND NOT has_sequence_privilege('authenticated', 'public.runtime_default_privilege_probe_seq', 'USAGE')
-                AND NOT has_sequence_privilege('localoca_app', 'public.runtime_default_privilege_probe_seq', 'USAGE')
                 AND NOT has_sequence_privilege('localoca_app', 'public.runtime_default_privilege_probe_seq', 'USAGE')",
             connection);
         Assert.True((bool)(await defaultPrivilegesCheck.ExecuteScalarAsync() ?? false));
