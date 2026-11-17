@@ -8,7 +8,7 @@ namespace LocaLoca.Database.Tests;
 public sealed class FreshSchemaV20Tests
 {
     [Fact]
-    public async Task Fresh_V020_Baseline_And_Runtime_Bootstrap_Produce_Expected_Schema()
+    public async Task Fresh_V020_Baseline_With_Current_Migrations_Produces_V022_Runtime_Schema()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
             .WithDatabase("localoca_fresh_v20_tests")
@@ -33,6 +33,11 @@ public sealed class FreshSchemaV20Tests
         // The production permission bootstrap is defined for objects owned by
         // Supabase's postgres role, so create the fresh schema under that role.
         await ExecuteFileAsync(connection, "schema", "02_schema_v20.sql");
+
+        // The immutable baseline is v020; apply the current migrations before
+        // granting runtime permissions or validating the deployable schema.
+        await ExecuteFileAsync(connection, "migrations", "21_user_login_prefix_search.sql");
+        await ExecuteFileAsync(connection, "migrations", "22_profile_birthday_visibility_and_remove_contacts.sql");
 
         // Exercise the real app-role bootstrap instead of duplicating its flags
         // and grants in test-only SQL. The password exists only in this container.
@@ -67,10 +72,9 @@ public sealed class FreshSchemaV20Tests
         var manifestPath = Path.Combine(AppContext.BaseDirectory, "Database", "migrations", "manifest.json");
         using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(manifestPath));
         var expectedMigrationVersions = manifest.RootElement
-            .GetProperty("freshInstallBaseline")
-            .GetProperty("includesSchemaMigrations")
+            .GetProperty("schemaMigrations")
             .EnumerateArray()
-            .Select(version => version.GetInt32())
+            .Select(migration => migration.GetProperty("version").GetInt32())
             .ToArray();
 
         Assert.DoesNotContain(1, expectedMigrationVersions);
@@ -106,16 +110,20 @@ public sealed class FreshSchemaV20Tests
                 current_user = 'postgres'
                 AND (SELECT rolsuper AND NOT rolcanlogin
                      FROM pg_roles WHERE rolname = 'postgres')
-                AND (SELECT count(*) = 17 FROM pg_policies
+                AND (SELECT count(*) = 16 FROM pg_policies
                      WHERE schemaname = 'public'
                        AND policyname IN ('localoca_app_runtime_access', 'localoca_app_catalog_read'))
                 AND EXISTS (SELECT 1 FROM information_schema.columns
                             WHERE table_schema = 'public' AND table_name = 'users'
                               AND column_name = 'date_of_birth')
                 AND EXISTS (SELECT 1 FROM information_schema.columns
+                            WHERE table_schema = 'public' AND table_name = 'user_profile_visibility'
+                              AND column_name = 'date_of_birth_visibility'
+                              AND column_default LIKE '%private%')
+                AND EXISTS (SELECT 1 FROM information_schema.columns
                             WHERE table_schema = 'public' AND table_name = 'attractions'
                               AND column_name = 'min_recommended_age')
-                AND to_regclass('public.birthday_contacts') IS NOT NULL
+                AND to_regclass('public.birthday_contacts') IS NULL
                 AND to_regclass('public.user_profile_visibility') IS NOT NULL
                 AND to_regclass('public.user_friendships') IS NOT NULL
                 AND to_regclass('public.user_blocks') IS NOT NULL
@@ -126,9 +134,7 @@ public sealed class FreshSchemaV20Tests
                 AND EXISTS (SELECT 1 FROM pg_proc
                             WHERE oid = 'public.create_default_user_profile_visibility()'::regprocedure
                               AND proconfig @> ARRAY['search_path=pg_catalog, public'])
-                AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT')
                 AND has_column_privilege('localoca_app', 'public.users', 'password_hash', 'UPDATE')
-                AND has_sequence_privilege('localoca_app', 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE')
                 AND NOT has_sequence_privilege('localoca_app', 'public.countries_country_id_seq', 'USAGE')
                 AND NOT has_table_privilege('anon', 'public.users', 'SELECT')
                 AND NOT has_table_privilege('authenticated', 'public.users', 'SELECT')

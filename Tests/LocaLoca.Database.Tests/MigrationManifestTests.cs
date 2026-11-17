@@ -16,14 +16,14 @@ public sealed class MigrationManifestTests
         using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(manifestPath));
         var root = manifest.RootElement;
         Assert.Equal(1, root.GetProperty("manifestVersion").GetInt32());
-        Assert.Equal(20, root.GetProperty("currentSchemaVersion").GetInt32());
+        Assert.Equal(22, root.GetProperty("currentSchemaVersion").GetInt32());
         Assert.Equal(13, root.GetProperty("baseline").GetProperty("version").GetInt32());
         Assert.Equal(20, root.GetProperty("freshInstallBaseline").GetProperty("version").GetInt32());
         Assert.Equal(new[] { 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 },
             root.GetProperty("freshInstallBaseline").GetProperty("includesSchemaMigrations")
                 .EnumerateArray().Select(x => x.GetInt32()).ToArray());
 
-        var schemaVersions = new[] { 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+        var schemaVersions = new[] { 3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22 };
         var actualVersions = root.GetProperty("schemaMigrations").EnumerateArray()
             .Select(x => x.GetProperty("version").GetInt32()).ToArray();
         Assert.Equal(schemaVersions, actualVersions);

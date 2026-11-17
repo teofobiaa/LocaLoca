@@ -186,6 +186,78 @@ public sealed class LocaLocaApiClient : IDisposable
         return result;
     }
 
+    public async Task<List<UserSearchResultDto>> SearchUsersAsync(
+        string login, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(login);
+        var path = "api/users/search?login=" + Uri.EscapeDataString(login.Trim());
+        var result = await GetJsonAsync<ItemsResponse<UserSearchResultDto>>(path, cancellationToken);
+        return result.Items;
+    }
+
+    public Task SendFriendRequestAsync(int targetUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(targetUserId);
+        return SendForMessageAsync(
+            HttpMethod.Post, $"api/users/{targetUserId}/friend-request", null, cancellationToken);
+    }
+
+    public async Task<List<FriendRequestDto>> GetFriendRequestsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await GetJsonAsync<ItemsResponse<FriendRequestDto>>(
+            "api/me/friend-requests", cancellationToken);
+        return result.Items;
+    }
+
+    public Task AcceptFriendRequestAsync(int otherUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(otherUserId);
+        return SendForMessageAsync(
+            HttpMethod.Post, $"api/me/friend-requests/{otherUserId}/accept", null, cancellationToken);
+    }
+
+    public Task CancelOrRejectFriendRequestAsync(int otherUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(otherUserId);
+        return SendForMessageAsync(
+            HttpMethod.Delete, $"api/me/friend-requests/{otherUserId}", null, cancellationToken);
+    }
+
+    public async Task<List<UserRelationshipDto>> GetFriendsAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await GetJsonAsync<ItemsResponse<UserRelationshipDto>>(
+            "api/me/friends", cancellationToken);
+        return result.Items;
+    }
+
+    public Task RemoveFriendAsync(int otherUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(otherUserId);
+        return SendForMessageAsync(
+            HttpMethod.Delete, $"api/me/friends/{otherUserId}", null, cancellationToken);
+    }
+
+    public Task BlockUserAsync(int targetUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(targetUserId);
+        return SendForMessageAsync(
+            HttpMethod.Post, $"api/users/{targetUserId}/block", null, cancellationToken);
+    }
+
+    public async Task<List<UserBlockDto>> GetBlockedUsersAsync(CancellationToken cancellationToken = default)
+    {
+        var result = await GetJsonAsync<ItemsResponse<UserBlockDto>>(
+            "api/me/blocks", cancellationToken);
+        return result.Items;
+    }
+
+    public Task UnblockUserAsync(int blockedUserId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(blockedUserId);
+        return SendForMessageAsync(
+            HttpMethod.Delete, $"api/me/blocks/{blockedUserId}", null, cancellationToken);
+    }
+
     public async Task<UserDto> UpdateDisplayNameAsync(string displayName, CancellationToken cancellationToken = default)
     {
         using var request = new HttpRequestMessage(HttpMethod.Put, "api/me/profile/display-name")
@@ -231,56 +303,6 @@ public sealed class LocaLocaApiClient : IDisposable
         var result = await response.Content.ReadFromJsonAsync<PrivateBirthDateDto>(JsonOptions, cancellationToken)
             ?? throw new InvalidOperationException("Сервер вернул пустую дату рождения.");
         return result.DateOfBirth;
-    }
-
-    public async Task<List<BirthdayContactDto>> GetBirthdayContactsAsync(
-        DateOnly today, CancellationToken cancellationToken = default)
-    {
-        var path = "api/me/birthday-contacts?today=" + Uri.EscapeDataString(today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
-        var result = await GetJsonAsync<ItemsResponse<BirthdayContactDto>>(path, cancellationToken);
-        return result.Items;
-    }
-
-    public async Task<BirthdayContactDto> CreateBirthdayContactAsync(
-        string displayName, DateOnly birthDate, CancellationToken cancellationToken = default)
-    {
-        var result = await PostJsonAsync<BirthdayContactWriteRequest, BirthdayContactDto>(
-            "api/me/birthday-contacts",
-            new BirthdayContactWriteRequest(displayName, birthDate),
-            authenticated: true,
-            cancellationToken);
-        return result;
-    }
-
-    public async Task<BirthdayContactDto> UpdateBirthdayContactAsync(
-        int contactId, string displayName, DateOnly birthDate, CancellationToken cancellationToken = default)
-    {
-        if (contactId <= 0) throw new ArgumentOutOfRangeException(nameof(contactId));
-        using var request = new HttpRequestMessage(HttpMethod.Put, $"api/me/birthday-contacts/{contactId}")
-        {
-            Content = JsonContent.Create(new BirthdayContactWriteRequest(displayName, birthDate), options: JsonOptions)
-        };
-        AddAuthorization(request);
-        using var response = await _http.SendAsync(request, cancellationToken);
-        await EnsureSuccessAsync(response, cancellationToken);
-        return (await response.Content.ReadFromJsonAsync<BirthdayContactDto>(JsonOptions, cancellationToken))
-            ?? throw new InvalidOperationException("Сервер вернул пустой контакт.");
-    }
-
-    public Task DeleteBirthdayContactAsync(int contactId, CancellationToken cancellationToken = default)
-    {
-        if (contactId <= 0) throw new ArgumentOutOfRangeException(nameof(contactId));
-        return SendForMessageAsync(HttpMethod.Delete, $"api/me/birthday-contacts/{contactId}", null, cancellationToken);
-    }
-
-    public async Task<string> GetBirthdayCalendarAsync(int contactId, CancellationToken cancellationToken = default)
-    {
-        if (contactId <= 0) throw new ArgumentOutOfRangeException(nameof(contactId));
-        using var request = new HttpRequestMessage(HttpMethod.Get, $"api/me/birthday-contacts/{contactId}/calendar.ics");
-        AddAuthorization(request);
-        using var response = await _http.SendAsync(request, cancellationToken);
-        await EnsureSuccessAsync(response, cancellationToken);
-        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
     public async Task<ProfilePrivacyDto> GetProfilePrivacyAsync(CancellationToken cancellationToken = default)
@@ -339,6 +361,30 @@ public sealed class LocaLocaApiClient : IDisposable
         await EnsureSuccessAsync(response, cancellationToken);
         return await response.Content.ReadAsByteArrayAsync(cancellationToken);
     }
+
+    public async Task<UserProfileViewDto> GetUserProfileAsync(
+        int userId, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(userId);
+        return await GetJsonAsync<UserProfileViewDto>(
+            $"api/users/{userId}/profile", cancellationToken);
+    }
+
+    public async Task<byte[]?> GetUserAvatarBytesAsync(
+        int userId, bool thumbnail = true, CancellationToken cancellationToken = default)
+    {
+        ValidateRelationshipUserId(userId);
+        var size = thumbnail ? "thumbnail" : "full";
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get, $"api/users/{userId}/avatar?size={size}");
+        AddAuthorization(request);
+        using var response = await _http.SendAsync(
+            request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound) return null;
+        await EnsureSuccessAsync(response, cancellationToken);
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
 
     public async Task DeleteAvatarAsync(CancellationToken cancellationToken = default)
     {
@@ -631,6 +677,12 @@ public sealed class LocaLocaApiClient : IDisposable
             if (!result.HasMore)
                 return items;
         }
+    }
+
+    private static void ValidateRelationshipUserId(int userId)
+    {
+        if (userId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(userId), "Идентификатор пользователя должен быть положительным.");
     }
 
     private async Task<T> GetJsonAsync<T>(string path, CancellationToken cancellationToken)

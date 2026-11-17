@@ -1,40 +1,57 @@
+using Microsoft.UI.Xaml.Media.Imaging;
+
 namespace LocaLoca.Models;
 
 public sealed record HealthDto(bool ApiConfigured, bool DatabaseConnected, string Message);
 public sealed record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
+public sealed record UserSearchResultDto(
+    int UserId, string Login, string? DisplayName, bool? HasAvatar, string RelationshipStatus);
+public sealed record FriendRequestDto(
+    int UserId, string Login, string? DisplayName, bool? HasAvatar, bool IsIncoming, DateTime CreatedAt);
+public sealed record UserRelationshipDto(
+    int UserId, string Login, string? DisplayName, bool? HasAvatar);
+
+public sealed class FriendListItemViewModel
+{
+    public int UserId { get; set; }
+    public string Login { get; set; }
+    public string? DisplayName { get; set; }
+    public string Initials { get; set; }
+    public BitmapImage? AvatarSource { get; set; }
+
+    public string DisplayText => string.IsNullOrWhiteSpace(DisplayName) ? Login : DisplayName;
+    public string LoginLabel => "@" + Login;
+
+    public FriendListItemViewModel(
+        int userId, string login, string? displayName, string initials, BitmapImage? avatarSource)
+    {
+        UserId = userId;
+        Login = login;
+        DisplayName = displayName;
+        Initials = initials;
+        AvatarSource = avatarSource;
+    }
+}
+public sealed record UserBlockDto(int UserId, string Login);
+public sealed record UserProfileViewDto(
+    int Id, string? DisplayName, string? ResidenceCountry, string? ResidenceCity, bool? HasAvatar,
+    int? BirthdayMonth, int? BirthdayDay);
 public sealed record UpdateDisplayNameRequest(string DisplayName);
 public sealed record UpdateResidenceRequest(string? ResidenceCountry, string? ResidenceCity);
 public sealed record UpdateBirthDateRequest(DateOnly? DateOfBirth);
 public sealed record PrivateBirthDateDto(DateOnly? DateOfBirth);
-public sealed record BirthdayContactWriteRequest(string DisplayName, DateOnly BirthDate);
-public sealed class BirthdayContactDto
-{
-    public int Id { get; set; }
-    public string DisplayName { get; set; } = string.Empty;
-    public DateOnly BirthDate { get; set; }
-    public DateOnly NextBirthdayDate { get; set; }
-    public int DaysUntilBirthday { get; set; }
-    public int AgeOnNextBirthday { get; set; }
-
-    public string ReminderText => DaysUntilBirthday switch
-    {
-        0 => "Сегодня день рождения",
-        1 => "Завтра день рождения",
-        _ => $"Через {DaysUntilBirthday} дн."
-    };
-
-    public string BirthdayDetails => $"{NextBirthdayDate:dd.MM.yyyy} · исполнится {AgeOnNextBirthday}";
-}
 public sealed record ProfilePrivacyDto(
     string DisplayNameVisibility,
     string AvatarVisibility,
     string ResidenceCountryVisibility,
-    string ResidenceCityVisibility);
+    string ResidenceCityVisibility,
+    string DateOfBirthVisibility);
 public sealed record UpdateProfilePrivacyRequest(
     string DisplayNameVisibility,
     string AvatarVisibility,
     string ResidenceCountryVisibility,
-    string ResidenceCityVisibility);
+    string ResidenceCityVisibility,
+    string DateOfBirthVisibility);
 public sealed record AuthResponse(UserDto User, string Token);
 public sealed record ErrorDto(string Error);
 public sealed record MessageDto(string Message);

@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Ellipse = Microsoft.UI.Xaml.Shapes.Ellipse;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Windows.Storage;
@@ -23,8 +24,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<AttractionDto> _attractions = new();
     private readonly ObservableCollection<VisitDto> _visits = new();
     private readonly ObservableCollection<AttractionDto> _wishlistAttractions = new();
-    private readonly ObservableCollection<BirthdayContactDto> _birthdayContacts = new();
-    private int? _editingBirthdayContactId;
+    private readonly ObservableCollection<FriendListItemViewModel> _friends = new();
     private readonly HashSet<int> _wishlistIds = new();
     private readonly Dictionary<int, AttractionDto> _attractionCache = new();
     private const int CatalogPageSize = 50;
@@ -37,6 +37,10 @@ public sealed partial class MainWindow : Window
     private List<CategoryDto> _categories = new();
     private bool _isRegisterMode;
     private bool _initialized;
+    private bool _friendsLoading;
+    private bool _friendRequestsLoading;
+    private bool _blockedUsersLoading;
+    private bool _blockedUsersExpanded;
     private bool _mapInitialized;
     private bool _isDarkTheme;
     private string _authStatusTone = "muted";
@@ -45,7 +49,7 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<AttractionDto> Attractions => _attractions;
     public ObservableCollection<VisitDto> Visits => _visits;
     public ObservableCollection<AttractionDto> WishlistAttractions => _wishlistAttractions;
-    public ObservableCollection<BirthdayContactDto> BirthdayContacts => _birthdayContacts;
+    public ObservableCollection<FriendListItemViewModel> Friends => _friends;
     public MainWindow()
     {
         InitializeComponent();
@@ -206,7 +210,6 @@ public sealed partial class MainWindow : Window
             CountriesCountText.Text = summary.Countries.ToString();
             ConnectionStatusText.Text = "Облачная база подключена";
             await RefreshLocalRecommendationsAsync();
-            await LoadDashboardBirthdayReminderAsync();
         }
         catch (Exception ex)
         {
@@ -759,6 +762,366 @@ public sealed partial class MainWindow : Window
     }
     private void WishlistNav_Click(object sender, RoutedEventArgs e) => ShowPage("wishlist");
 
+    private async void FriendsNav_Click(object sender, RoutedEventArgs e)
+    {
+        ShowPage("friends");
+        await LoadFriendsAsync();
+    }
+
+    private async void RefreshFriends_Click(object sender, RoutedEventArgs e) =>
+        await LoadFriendsAsync();
+
+    private async Task LoadFriendsAsync()
+    {
+        if (_friendsLoading) return;
+
+        _friendsLoading = true;
+        FriendsRefreshButton.IsEnabled = false;
+        FriendsStatusText.Text = "Обновляем список друзей…";
+
+        try
+        {
+            var friends = await _api.GetFriendsAsync();
+            _friends.Clear();
+
+            foreach (var friend in friends)
+            {
+                _friends.Add(new FriendListItemViewModel(
+                    friend.UserId,
+                    friend.Login,
+                    friend.DisplayName,
+                    CreateInitials(friend.DisplayName, friend.Login),
+                    avatarSource: null));
+            }
+
+            var hasFriends = _friends.Count > 0;
+            FriendsList.Visibility = hasFriends ? Visibility.Visible : Visibility.Collapsed;
+            FriendsEmptyState.Visibility = hasFriends ? Visibility.Collapsed : Visibility.Visible;
+
+            if (!hasFriends)
+            {
+                FriendsStatusText.Text = "У тебя пока нет добавленных друзей.";
+            }
+            else
+            {
+                FriendsStatusText.Text = $"Друзей: {_friends.Count}";
+
+                // Load several avatars in parallel, but keep the number of concurrent
+                // requests bounded so a large friends list cannot flood the API.
+                using var concurrencyLimit = new SemaphoreSlim(4);
+                var avatarTasks = friends
+                    .Where(friend => friend.HasAvatar == true)
+                    .Select(async friend =>
+                    {
+                        await concurrencyLimit.WaitAsync();
+                        try
+                        {
+                            var bytes = await _api.GetUserAvatarBytesAsync(friend.UserId, thumbnail: true);
+                            if (bytes is null) return;
+
+                            var avatar = await CreateBitmapImageAsync(bytes);
+                            var index = -1;
+                            for (var i = 0; i < _friends.Count; i++)
+                            {
+                                if (_friends[i].UserId != friend.UserId) continue;
+                                index = i;
+                                break;
+                            }
+
+                            if (index >= 0)
+                            {
+                                var currentFriend = _friends[index];
+                                _friends[index] = new FriendListItemViewModel(
+                                    currentFriend.UserId,
+                                    currentFriend.Login,
+                                    currentFriend.DisplayName,
+                                    currentFriend.Initials,
+                                    avatar);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            // An unavailable or newly restricted avatar should not hide
+                            // the rest of the friend list; the initials remain visible.
+                            Debug.WriteLine($"Could not load avatar for friend {friend.UserId}: {ex.Message}");
+                        }
+                        finally
+                        {
+                            concurrencyLimit.Release();
+                        }
+                    });
+
+                await Task.WhenAll(avatarTasks);
+            }
+        }
+        catch (Exception ex)
+        {
+            FriendsStatusText.Text = "Не удалось обновить список друзей.";
+            await ShowMessageAsync("Не удалось загрузить друзей", ex.Message);
+        }
+        finally
+        {
+            _friendsLoading = false;
+            FriendsRefreshButton.IsEnabled = true;
+        }
+
+        await LoadFriendRequestsAsync();
+        await LoadBlockedUsersAsync();
+    }
+
+    private async Task LoadFriendRequestsAsync()
+    {
+        if (_friendRequestsLoading) return;
+
+        _friendRequestsLoading = true;
+        IncomingRequestsStatusText.Text = "Загружаем заявки…";
+        OutgoingRequestsStatusText.Text = "Загружаем заявки…";
+
+        try
+        {
+            var requests = await _api.GetFriendRequestsAsync();
+            var incoming = requests.Where(request => request.IsIncoming).ToList();
+            var outgoing = requests.Where(request => !request.IsIncoming).ToList();
+
+            IncomingFriendRequestsPanel.Children.Clear();
+            OutgoingFriendRequestsPanel.Children.Clear();
+
+            IncomingRequestsStatusText.Text = incoming.Count == 0
+                ? "Нет входящих заявок."
+                : $"Входящих: {incoming.Count}";
+            OutgoingRequestsStatusText.Text = outgoing.Count == 0
+                ? "Нет исходящих заявок."
+                : $"Исходящих: {outgoing.Count}";
+
+            foreach (var request in incoming)
+            {
+                var actions = new List<UIElement>
+                {
+                    CreateSocialButton("Принять", request.UserId, request.Login, AcceptFriendRequest_Click, primary: true),
+                    CreateSocialButton("Отклонить", request.UserId, request.Login, RejectFriendRequest_Click),
+                    CreateSocialButton("Блокировать", request.UserId, request.Login, BlockUser_Click)
+                };
+                IncomingFriendRequestsPanel.Children.Add(CreateSocialCard(
+                    request.UserId,
+                    request.Login,
+                    request.DisplayName,
+                    request.HasAvatar,
+                    actions,
+                    $"Получена {request.CreatedAt.ToLocalTime():dd.MM.yyyy HH:mm}"));
+            }
+
+            foreach (var request in outgoing)
+            {
+                var actions = new List<UIElement>
+                {
+                    CreateSocialButton("Отменить", request.UserId, request.Login, CancelFriendRequest_Click),
+                    CreateSocialButton("Блокировать", request.UserId, request.Login, BlockUser_Click)
+                };
+                OutgoingFriendRequestsPanel.Children.Add(CreateSocialCard(
+                    request.UserId,
+                    request.Login,
+                    request.DisplayName,
+                    request.HasAvatar,
+                    actions,
+                    $"Отправлена {request.CreatedAt.ToLocalTime():dd.MM.yyyy HH:mm}"));
+            }
+        }
+        catch (Exception ex)
+        {
+            IncomingRequestsStatusText.Text = "Не удалось загрузить заявки.";
+            OutgoingRequestsStatusText.Text = "Не удалось загрузить заявки.";
+            await ShowMessageAsync("Не удалось загрузить заявки", ex.Message);
+        }
+        finally
+        {
+            _friendRequestsLoading = false;
+        }
+    }
+
+    private void ToggleBlockedUsers_Click(object sender, RoutedEventArgs e)
+    {
+        _blockedUsersExpanded = !_blockedUsersExpanded;
+        BlockedUsersScrollViewer.Visibility = _blockedUsersExpanded
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        BlockedUsersToggleButton.Content = _blockedUsersExpanded ? "Скрыть" : "Показать";
+    }
+
+    private async Task LoadBlockedUsersAsync()
+    {
+        if (_blockedUsersLoading) return;
+
+        _blockedUsersLoading = true;
+        BlockedUsersToggleButton.IsEnabled = false;
+        BlockedUsersStatusText.Text = "Загружаем список блокировок…";
+
+        try
+        {
+            var blockedUsers = await _api.GetBlockedUsersAsync();
+            BlockedUsersPanel.Children.Clear();
+
+            BlockedUsersStatusText.Text = blockedUsers.Count == 0
+                ? "Нет заблокированных пользователей."
+                : $"Заблокировано: {blockedUsers.Count}";
+
+            foreach (var user in blockedUsers)
+            {
+                var actions = new List<UIElement>
+                {
+                    CreateSocialButton("Разблокировать", user.UserId, user.Login, UnblockUser_Click)
+                };
+                BlockedUsersPanel.Children.Add(CreateSocialCard(
+                    user.UserId,
+                    user.Login,
+                    displayName: null,
+                    hasAvatar: null,
+                    actions: actions,
+                    detail: "Пользователь заблокирован"));
+            }
+        }
+        catch (Exception ex)
+        {
+            BlockedUsersStatusText.Text = "Не удалось загрузить список блокировок.";
+            await ShowMessageAsync("Не удалось загрузить блокировки", ex.Message);
+        }
+        finally
+        {
+            _blockedUsersLoading = false;
+            BlockedUsersToggleButton.IsEnabled = true;
+        }
+    }
+
+    private static string CreateInitials(string? displayName, string login)
+    {
+        var value = string.IsNullOrWhiteSpace(displayName) ? login.Trim() : displayName.Trim();
+        if (value.Length == 0) return "?";
+
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length > 1)
+            return string.Concat(char.ToUpperInvariant(parts[0][0]), char.ToUpperInvariant(parts[1][0]));
+
+        return value[..Math.Min(2, value.Length)].ToUpperInvariant();
+    }
+
+    private static async Task<BitmapImage> CreateBitmapImageAsync(byte[] bytes)
+    {
+        using var imageStream = new InMemoryRandomAccessStream();
+        using (var writer = new DataWriter(imageStream))
+        {
+            writer.WriteBytes(bytes);
+            await writer.StoreAsync();
+            await writer.FlushAsync();
+        }
+
+        imageStream.Seek(0);
+        var bitmap = new BitmapImage();
+        await bitmap.SetSourceAsync(imageStream);
+        return bitmap;
+    }
+
+    private async void OpenFriendProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not int userId) return;
+        var friend = _friends.FirstOrDefault(item => item.UserId == userId);
+        if (friend is null) return;
+
+        try
+        {
+            var profile = await _api.GetUserProfileAsync(userId);
+            var profileContent = new StackPanel { Spacing = 10 };
+
+            if (profile.HasAvatar == true)
+            {
+                var bytes = await _api.GetUserAvatarBytesAsync(userId, thumbnail: true);
+                if (bytes is not null)
+                {
+                    var avatar = new Image
+                    {
+                        Width = 92,
+                        Height = 92,
+                        Stretch = Stretch.UniformToFill,
+                        HorizontalAlignment = HorizontalAlignment.Left
+                    };
+                    avatar.Source = await CreateBitmapImageAsync(bytes);
+                    profileContent.Children.Add(avatar);
+                }
+            }
+
+            profileContent.Children.Add(new TextBlock
+            {
+                Text = profile.DisplayName ?? friend.Login,
+                FontSize = 22,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Brush("#1B2A25")
+            });
+            profileContent.Children.Add(new TextBlock
+            {
+                Text = friend.LoginLabel,
+                FontSize = 13,
+                Foreground = Brush("#819087")
+            });
+
+            if (profile.BirthdayMonth is { } birthdayMonth && profile.BirthdayDay is { } birthdayDay)
+                profileContent.Children.Add(new TextBlock
+                {
+                    Text = $"День рождения: {birthdayDay:00}.{birthdayMonth:00}",
+                    FontSize = 13,
+                    Foreground = Brush("#74837A")
+                });
+
+            var location = string.Join(" · ",
+                new[] { profile.ResidenceCity, profile.ResidenceCountry }
+                    .Where(value => !string.IsNullOrWhiteSpace(value)));
+            if (!string.IsNullOrWhiteSpace(location))
+            {
+                profileContent.Children.Add(new TextBlock
+                {
+                    Text = location,
+                    FontSize = 13,
+                    Foreground = Brush("#74837A")
+                });
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = "Профиль друга",
+                Content = profileContent,
+                CloseButtonText = "Закрыть",
+                RequestedTheme = Root.RequestedTheme,
+                XamlRoot = Root.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось открыть профиль", ex.Message);
+        }
+    }
+
+    private async void RemoveFriend_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not int userId) return;
+        var friend = _friends.FirstOrDefault(item => item.UserId == userId);
+        if (friend is null) return;
+
+        var result = await ConfirmAsync(
+            "Удалить из друзей?",
+            $"Пользователь {friend.LoginLabel} будет удалён из списка друзей.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.RemoveFriendAsync(userId);
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось удалить друга", ex.Message);
+        }
+    }
+
     private async void MapNav_Click(object sender, RoutedEventArgs e) => await OpenMapAsync();
 
     private void MapWebView_WebResourceRequested(
@@ -811,6 +1174,7 @@ public sealed partial class MainWindow : Window
         VisitsPage.Visibility = page == "visits" ? Visibility.Visible : Visibility.Collapsed;
         WishlistPage.Visibility = page == "wishlist" ? Visibility.Visible : Visibility.Collapsed;
         MapPage.Visibility = page == "map" ? Visibility.Visible : Visibility.Collapsed;
+        FriendsPage.Visibility = page == "friends" ? Visibility.Visible : Visibility.Collapsed;
         ProfilePage.Visibility = page == "profile" ? Visibility.Visible : Visibility.Collapsed;
         SupportPage.Visibility = page == "support" ? Visibility.Visible : Visibility.Collapsed;
 
@@ -821,12 +1185,473 @@ public sealed partial class MainWindow : Window
             "visits" => ("Сохранённые моменты", "Мои посещения"),
             "wishlist" => ("Идеи для следующей поездки", "Хочу посетить"),
             "map" => ("Исследуй мир", "Карта открытий"),
+            "friends" => ("Люди и совместные открытия", "Мои друзья"),
             "profile" => ("Личные данные и оформление", "Профиль и настройки"),
             "support" => ("Контакты и полезные ссылки", "Поддержка"),
             _ => ("Исследуй мир", "Карта открытий")
         };
         HomeNavButton.Background = page == "home" ? Brush("#29443D") : Brush("Transparent");
+        FriendsNavButton.Background = page == "friends" ? Brush("#29443D") : Brush("Transparent");
         SupportNavButton.Background = page == "support" ? Brush("#29443D") : Brush("Transparent");
+
+    }
+
+
+    private async void FriendsSearch_Click(object sender, RoutedEventArgs e) =>
+        await SearchFriendsAsync();
+
+    private async void FriendsSearchBox_KeyDown(
+        object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Enter) return;
+        e.Handled = true;
+        await SearchFriendsAsync();
+    }
+
+    private async Task SearchFriendsAsync()
+    {
+        var loginPrefix = FriendsSearchBox.Text.Trim();
+        FriendsSearchResultsPanel.Children.Clear();
+
+        if (loginPrefix.Length < 3)
+        {
+            FriendsSearchStatusText.Text = "Для поиска введи не менее трёх символов.";
+            return;
+        }
+
+        if (loginPrefix.Length > 50)
+        {
+            FriendsSearchStatusText.Text = "Логин для поиска не должен быть длиннее 50 символов.";
+            return;
+        }
+
+        FriendsSearchButton.IsEnabled = false;
+        FriendsSearchStatusText.Text = "Ищем пользователей…";
+
+        try
+        {
+            var users = await _api.SearchUsersAsync(loginPrefix);
+            if (users.Count == 0)
+            {
+                FriendsSearchStatusText.Text = "Пользователи с таким началом логина не найдены.";
+                return;
+            }
+
+            FriendsSearchStatusText.Text = $"Найдено пользователей: {users.Count}.";
+            foreach (var user in users)
+            {
+                var actions = new List<UIElement>();
+
+                switch (user.RelationshipStatus)
+                {
+                    case "none":
+                        actions.Add(CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click));
+                        actions.Add(CreateSocialButton("Добавить", user.UserId, user.Login, SendFriendRequest_Click, primary: true));
+                        actions.Add(CreateSocialButton("Блокировать", user.UserId, user.Login, BlockUser_Click));
+                        break;
+                    case "outgoing_pending":
+                        actions.Add(CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click));
+                        actions.Add(CreateSocialButton("Отменить заявку", user.UserId, user.Login, CancelFriendRequest_Click));
+                        actions.Add(CreateSocialButton("Блокировать", user.UserId, user.Login, BlockUser_Click));
+                        break;
+                    case "incoming_pending":
+                        actions.Add(CreateSocialButton("Принять", user.UserId, user.Login, AcceptFriendRequest_Click, primary: true));
+                        actions.Add(CreateSocialButton("Отклонить", user.UserId, user.Login, RejectFriendRequest_Click));
+                        actions.Add(CreateSocialButton("Блокировать", user.UserId, user.Login, BlockUser_Click));
+                        break;
+                    case "friends":
+                        actions.Add(CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click));
+                        actions.Add(CreateSocialButton("Уже друзья", user.UserId, user.Login, null, enabled: false));
+                        actions.Add(CreateSocialButton("Блокировать", user.UserId, user.Login, BlockUser_Click));
+                        break;
+                    default:
+                        actions.Add(CreateSocialButton("Профиль", user.UserId, user.Login, OpenSearchedUserProfile_Click));
+                        actions.Add(CreateSocialButton("Недоступно", user.UserId, user.Login, null, enabled: false));
+                        break;
+                }
+
+                FriendsSearchResultsPanel.Children.Add(
+                    CreateSocialCard(user.UserId, user.Login, user.DisplayName, user.HasAvatar, actions));
+            }
+        }
+        catch (Exception ex)
+        {
+            FriendsSearchStatusText.Text = "Не удалось выполнить поиск: " + ex.Message;
+        }
+        finally
+        {
+            FriendsSearchButton.IsEnabled = true;
+        }
+    }
+
+    private Border CreateSocialCard(
+        int userId, string login, string? displayName, bool? hasAvatar,
+        IEnumerable<UIElement> actions, string? detail = null)
+    {
+        var card = new Border
+        {
+            Background = Brush("#FFFFFF"),
+            BorderBrush = Brush("#E7EBE5"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(15),
+            Padding = new Thickness(13)
+        };
+
+        var layout = new Grid { ColumnSpacing = 13 };
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(56) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var avatar = CreateSocialAvatar(userId, login, displayName, hasAvatar);
+        Grid.SetColumn(avatar, 0);
+        layout.Children.Add(avatar);
+
+        var identity = new StackPanel
+        {
+            Spacing = 4,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        identity.Children.Add(new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(displayName) ? login : displayName,
+            FontSize = 15,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = Brush("#1B2A25"),
+            TextWrapping = TextWrapping.Wrap
+        });
+        identity.Children.Add(new TextBlock
+        {
+            Text = "@" + login,
+            FontSize = 12,
+            Foreground = Brush("#819087")
+        });
+        if (!string.IsNullOrWhiteSpace(detail))
+        {
+            identity.Children.Add(new TextBlock
+            {
+                Text = detail,
+                FontSize = 11,
+                Foreground = Brush("#819087")
+            });
+        }
+        Grid.SetColumn(identity, 1);
+        layout.Children.Add(identity);
+
+        var actionPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 7,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        foreach (var action in actions)
+            actionPanel.Children.Add(action);
+        Grid.SetColumn(actionPanel, 2);
+        layout.Children.Add(actionPanel);
+
+        card.Child = layout;
+        return card;
+    }
+
+    private Grid CreateSocialAvatar(int userId, string login, string? displayName, bool? hasAvatar)
+    {
+        var avatar = new Ellipse
+        {
+            Width = 52,
+            Height = 52,
+            Fill = Brush("#DDEBCB")
+        };
+        var fallback = new TextBlock
+        {
+            Text = GetInitials(displayName, login),
+            FontSize = 17,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            Foreground = Brush("#5F7844"),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var container = new Grid { Width = 52, Height = 52 };
+        container.Children.Add(avatar);
+        container.Children.Add(fallback);
+
+        if (hasAvatar == true)
+            _ = LoadSocialAvatarAsync(userId, avatar, fallback);
+
+        return container;
+    }
+
+    private async Task LoadSocialAvatarAsync(int userId, Ellipse avatar, TextBlock fallback)
+    {
+        try
+        {
+            var bytes = await _api.GetUserAvatarBytesAsync(userId, thumbnail: true);
+            if (bytes is null || bytes.Length == 0) return;
+
+            using var imageStream = new InMemoryRandomAccessStream();
+            using (var writer = new DataWriter(imageStream))
+            {
+                writer.WriteBytes(bytes);
+                await writer.StoreAsync();
+                await writer.FlushAsync();
+            }
+
+            imageStream.Seek(0);
+            var bitmap = new BitmapImage();
+            await bitmap.SetSourceAsync(imageStream);
+            avatar.Fill = new ImageBrush
+            {
+                ImageSource = bitmap,
+                Stretch = Stretch.UniformToFill
+            };
+            fallback.Visibility = Visibility.Collapsed;
+        }
+        catch
+        {
+            // Keep the initials fallback when an avatar is unavailable or cannot be decoded.
+        }
+    }
+
+    private static string GetInitials(string? displayName, string login)
+    {
+        var value = string.IsNullOrWhiteSpace(displayName) ? login.Trim() : displayName.Trim();
+        if (value.Length == 0) return "??";
+        return value.Length == 1
+            ? value.ToUpperInvariant()
+            : string.Concat(char.ToUpperInvariant(value[0]), char.ToUpperInvariant(value[1]));
+    }
+
+    private Button CreateSocialButton(
+        string caption, int userId, string login, RoutedEventHandler? handler,
+        bool primary = false, bool enabled = true)
+    {
+        var button = new Button
+        {
+            Content = caption,
+            Tag = (userId, login),
+            IsEnabled = enabled,
+            Style = (Style)Root.Resources[primary ? "PrimaryButtonStyle" : "QuietButtonStyle"]
+        };
+        if (handler is not null)
+            button.Click += handler;
+        return button;
+    }
+
+    private static bool TryGetSocialUser(object sender, out int userId, out string login)
+    {
+        if (sender is Button button && button.Tag is ValueTuple<int, string> value)
+        {
+            userId = value.Item1;
+            login = value.Item2;
+            return userId > 0;
+        }
+
+        userId = 0;
+        login = string.Empty;
+        return false;
+    }
+
+    private async void SendFriendRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        try
+        {
+            await _api.SendFriendRequestAsync(userId);
+            FriendsSearchStatusText.Text = $"Заявка для @{login} отправлена.";
+            await LoadFriendsAsync();
+            await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            FriendsSearchStatusText.Text = "Не удалось отправить заявку: " + ex.Message;
+        }
+    }
+
+    private async void BlockUser_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        await BlockUserAsync(userId, login);
+    }
+
+    private async void BlockFriend_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not int userId) return;
+        var friend = _friends.FirstOrDefault(item => item.UserId == userId);
+        if (friend is null) return;
+        await BlockUserAsync(userId, friend.Login);
+    }
+
+    private async Task BlockUserAsync(int userId, string login)
+    {
+        var result = await ConfirmAsync(
+            "Заблокировать пользователя?",
+            $"Пользователь @{login} будет заблокирован. Дружба и все ожидающие заявки между вами будут удалены. Уведомление о блокировке не отправляется.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.BlockUserAsync(userId);
+            FriendsSearchStatusText.Text = $"Пользователь @{login} заблокирован.";
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось заблокировать пользователя", ex.Message);
+        }
+    }
+
+    private async void UnblockUser_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+
+        var result = await ConfirmAsync(
+            "Снять блокировку?",
+            $"Пользователь @{login} снова сможет находить аккаунт в пределах настроек приватности. Дружба и заявки автоматически не восстановятся.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.UnblockUserAsync(userId);
+            BlockedUsersStatusText.Text = $"Блокировка для @{login} снята.";
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось снять блокировку", ex.Message);
+        }
+    }
+
+    private async void AcceptFriendRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        try
+        {
+            await _api.AcceptFriendRequestAsync(userId);
+            FriendsSearchStatusText.Text = $"Заявка от @{login} принята. Теперь вы друзья.";
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось принять заявку", ex.Message);
+        }
+    }
+
+    private async void RejectFriendRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        var result = await ConfirmAsync(
+            "Отклонить заявку?",
+            $"Заявка от @{login} будет удалена.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.CancelOrRejectFriendRequestAsync(userId);
+            FriendsSearchStatusText.Text = $"Заявка от @{login} отклонена.";
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось отклонить заявку", ex.Message);
+        }
+    }
+
+    private async void CancelFriendRequest_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        var result = await ConfirmAsync(
+            "Отменить заявку?",
+            $"Запрос на добавление @{login} в друзья будет отменён.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.CancelOrRejectFriendRequestAsync(userId);
+            FriendsSearchStatusText.Text = $"Заявка для @{login} отменена.";
+            await LoadFriendsAsync();
+            if (FriendsSearchBox.Text.Trim().Length >= 3)
+                await SearchFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось отменить заявку", ex.Message);
+        }
+    }
+
+    private async void OpenSearchedUserProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+
+        try
+        {
+            var profile = await _api.GetUserProfileAsync(userId);
+            var content = new StackPanel { Spacing = 12, MinWidth = 300 };
+            content.Children.Add(CreateSocialAvatar(userId, login, profile.DisplayName, profile.HasAvatar));
+            content.Children.Add(new TextBlock
+            {
+                Text = "@" + login,
+                FontSize = 12,
+                Foreground = Brush("#819087")
+            });
+
+            if (profile.BirthdayMonth is { } birthdayMonth && profile.BirthdayDay is { } birthdayDay)
+                content.Children.Add(new TextBlock
+                {
+                    Text = $"День рождения: {birthdayDay:00}.{birthdayMonth:00}",
+                    FontSize = 13,
+                    Foreground = Brush("#53645B")
+                });
+
+            if (!string.IsNullOrWhiteSpace(profile.ResidenceCity))
+                content.Children.Add(new TextBlock
+                {
+                    Text = "Город: " + profile.ResidenceCity,
+                    FontSize = 13,
+                    Foreground = Brush("#53645B"),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+            if (!string.IsNullOrWhiteSpace(profile.ResidenceCountry))
+                content.Children.Add(new TextBlock
+                {
+                    Text = "Страна: " + profile.ResidenceCountry,
+                    FontSize = 13,
+                    Foreground = Brush("#53645B"),
+                    TextWrapping = TextWrapping.Wrap
+                });
+
+            var dialog = new ContentDialog
+            {
+                Title = profile.DisplayName ?? login,
+                Content = content,
+                CloseButtonText = "Закрыть",
+                RequestedTheme = Root.RequestedTheme,
+                XamlRoot = Root.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось открыть профиль", ex.Message);
+        }
+    }
+
+    private static string GetRussianCountWord(int count, string one, string few, string many)
+    {
+        var remainder100 = count % 100;
+        if (remainder100 is >= 11 and <= 14) return many;
+        return (count % 10) switch
+        {
+            1 => one,
+            2 or 3 or 4 => few,
+            _ => many
+        };
     }
 
     private void SupportNav_Click(object sender, RoutedEventArgs e) => ShowPage("support");
@@ -860,6 +1685,7 @@ public sealed partial class MainWindow : Window
             ProfileAvatarVisibilityBox.SelectedValue = settings.AvatarVisibility;
             ProfileResidenceCountryVisibilityBox.SelectedValue = settings.ResidenceCountryVisibility;
             ProfileResidenceCityVisibilityBox.SelectedValue = settings.ResidenceCityVisibility;
+            ProfileDateOfBirthVisibilityBox.SelectedValue = settings.DateOfBirthVisibility;
             SetProfilePrivacyStatus(string.Empty, "muted");
         }
         catch (Exception ex)
@@ -1055,8 +1881,9 @@ public sealed partial class MainWindow : Window
         var avatar = SelectedVisibility(ProfileAvatarVisibilityBox);
         var country = SelectedVisibility(ProfileResidenceCountryVisibilityBox);
         var city = SelectedVisibility(ProfileResidenceCityVisibilityBox);
+        var dateOfBirth = SelectedVisibility(ProfileDateOfBirthVisibilityBox);
         var allowed = new[] { "private", "friends", "registered" };
-        if (new[] { displayName, avatar, country, city }.Any(value => value is null || !allowed.Contains(value)))
+        if (new[] { displayName, avatar, country, city, dateOfBirth }.Any(value => value is null || !allowed.Contains(value)))
         {
             SetProfilePrivacyStatus("Выбери видимость для каждого поля.", "error");
             return;
@@ -1067,7 +1894,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var settings = new UpdateProfilePrivacyRequest(
-                displayName!, avatar!, country!, city!);
+                displayName!, avatar!, country!, city!, dateOfBirth!);
             await _api.UpdateProfilePrivacyAsync(settings);
             SetProfilePrivacyStatus("Настройки видимости сохранены.", "success");
         }
@@ -1163,69 +1990,21 @@ public sealed partial class MainWindow : Window
         var maximum = ToCalendarDate(DateOnly.FromDateTime(DateTime.Today));
         ProfileBirthDatePicker.MinDate = minimum;
         ProfileBirthDatePicker.MaxDate = maximum;
-        BirthdayContactDatePicker.MinDate = minimum;
-        BirthdayContactDatePicker.MaxDate = maximum;
     }
 
     private async Task LoadBirthdaySettingsAsync()
     {
         InitializeBirthdayDatePickers();
         SetBirthDateStatus(string.Empty, "muted");
-        SetBirthdayContactsStatus(string.Empty, "muted");
-        ResetBirthdayContactEditor();
-
         try
         {
             var birthDate = await _api.GetMyBirthDateAsync();
             ProfileBirthDatePicker.Date = birthDate is { } date ? ToCalendarDate(date) : null;
-            await LoadBirthdayContactsAsync();
         }
         catch (Exception ex)
         {
             SetBirthDateStatus("Не удалось загрузить дату рождения: " + ex.Message, "error");
-            SetBirthdayContactsStatus("Не удалось загрузить дни рождения друзей: " + ex.Message, "error");
         }
-    }
-
-    private async Task LoadBirthdayContactsAsync()
-    {
-        var contacts = await _api.GetBirthdayContactsAsync(DateOnly.FromDateTime(DateTime.Today));
-        _birthdayContacts.Clear();
-        foreach (var contact in contacts)
-            _birthdayContacts.Add(contact);
-
-        UpdateDashboardBirthdayReminder(contacts);
-    }
-
-    private async Task LoadDashboardBirthdayReminderAsync()
-    {
-        try
-        {
-            var contacts = await _api.GetBirthdayContactsAsync(DateOnly.FromDateTime(DateTime.Today));
-            UpdateDashboardBirthdayReminder(contacts);
-        }
-        catch (Exception ex)
-        {
-            DashboardBirthdayReminderText.Text = "Не удалось загрузить напоминания о днях рождения: " + ex.Message;
-        }
-    }
-
-    private void UpdateDashboardBirthdayReminder(IReadOnlyList<BirthdayContactDto> contacts)
-    {
-        if (contacts.Count == 0)
-        {
-            DashboardBirthdayReminderText.Text = "Добавь дни рождения друзей в профиле — ближайшие напоминания появятся здесь.";
-            return;
-        }
-
-        var next = contacts[0];
-        var when = next.DaysUntilBirthday switch
-        {
-            0 => "Сегодня",
-            1 => "Завтра",
-            _ => $"Через {next.DaysUntilBirthday} дн."
-        };
-        DashboardBirthdayReminderText.Text = $"{when}: день рождения — {next.DisplayName}. {next.BirthdayDetails}";
     }
 
     private async void SaveBirthDate_Click(object sender, RoutedEventArgs e)
@@ -1249,7 +2028,7 @@ public sealed partial class MainWindow : Window
         try
         {
             await _api.UpdateMyBirthDateAsync(date);
-            SetBirthDateStatus("Дата рождения сохранена. Она не отображается в публичном профиле.", "success");
+            SetBirthDateStatus("Дата рождения сохранена. День и месяц показываются только согласно выбранной видимости; год остаётся приватным.", "success");
             await RefreshLocalRecommendationsAsync();
         }
         catch (Exception ex)
@@ -1285,139 +2064,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void SaveBirthdayContact_Click(object sender, RoutedEventArgs e)
-    {
-        var displayName = BirthdayContactNameBox.Text.Trim();
-        if (displayName.Length is < 1 or > 80)
-        {
-            SetBirthdayContactsStatus("Имя должно содержать от 1 до 80 символов.", "error");
-            return;
-        }
-        if (BirthdayContactDatePicker.Date is not { } selectedDate)
-        {
-            SetBirthdayContactsStatus("Выбери дату рождения контакта.", "error");
-            return;
-        }
-
-        var birthDate = DateOnly.FromDateTime(selectedDate.DateTime);
-        if (birthDate > DateOnly.FromDateTime(DateTime.Today))
-        {
-            SetBirthdayContactsStatus("Дата рождения не может быть в будущем.", "error");
-            return;
-        }
-
-        BirthdayContactSaveButton.IsEnabled = false;
-        BirthdayContactCancelEditButton.IsEnabled = false;
-        SetBirthdayContactsStatus(_editingBirthdayContactId.HasValue ? "Сохраняем изменения…" : "Добавляем контакт…", "muted");
-        try
-        {
-            if (_editingBirthdayContactId is { } contactId)
-                await _api.UpdateBirthdayContactAsync(contactId, displayName, birthDate);
-            else
-                await _api.CreateBirthdayContactAsync(displayName, birthDate);
-
-            ResetBirthdayContactEditor();
-            await LoadBirthdayContactsAsync();
-            SetBirthdayContactsStatus("День рождения сохранён. Напоминание и ежегодное событие доступны в списке.", "success");
-        }
-        catch (Exception ex)
-        {
-            SetBirthdayContactsStatus(ex.Message, "error");
-        }
-        finally
-        {
-            BirthdayContactSaveButton.IsEnabled = true;
-            BirthdayContactCancelEditButton.IsEnabled = true;
-        }
-    }
-
-    private void EditBirthdayContact_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button button || !int.TryParse(Convert.ToString(button.Tag), out var contactId))
-            return;
-
-        var contact = _birthdayContacts.FirstOrDefault(item => item.Id == contactId);
-        if (contact is null) return;
-
-        _editingBirthdayContactId = contact.Id;
-        BirthdayContactNameBox.Text = contact.DisplayName;
-        BirthdayContactDatePicker.Date = ToCalendarDate(contact.BirthDate);
-        BirthdayContactSaveButton.Content = "Сохранить";
-        BirthdayContactCancelEditButton.Visibility = Visibility.Visible;
-        SetBirthdayContactsStatus("Изменяешь контакт: " + contact.DisplayName, "muted");
-    }
-
-    private void CancelBirthdayContactEdit_Click(object sender, RoutedEventArgs e)
-    {
-        ResetBirthdayContactEditor();
-        SetBirthdayContactsStatus("Редактирование отменено.", "muted");
-    }
-
-    private void ResetBirthdayContactEditor()
-    {
-        _editingBirthdayContactId = null;
-        BirthdayContactNameBox.Text = string.Empty;
-        BirthdayContactDatePicker.Date = null;
-        BirthdayContactSaveButton.Content = "Добавить";
-        BirthdayContactCancelEditButton.Visibility = Visibility.Collapsed;
-    }
-
-    private async void DeleteBirthdayContact_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button button || !int.TryParse(Convert.ToString(button.Tag), out var contactId))
-            return;
-
-        button.IsEnabled = false;
-        try
-        {
-            await _api.DeleteBirthdayContactAsync(contactId);
-            if (_editingBirthdayContactId == contactId)
-                ResetBirthdayContactEditor();
-            await LoadBirthdayContactsAsync();
-            SetBirthdayContactsStatus("День рождения удалён из твоего списка.", "success");
-        }
-        catch (Exception ex)
-        {
-            SetBirthdayContactsStatus(ex.Message, "error");
-        }
-        finally
-        {
-            button.IsEnabled = true;
-        }
-    }
-
-    private async void ExportBirthdayCalendar_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button button || !int.TryParse(Convert.ToString(button.Tag), out var contactId))
-            return;
-
-        button.IsEnabled = false;
-        try
-        {
-            var picker = new FileSavePicker
-            {
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
-                SuggestedFileName = $"birthday-{contactId}"
-            };
-            picker.FileTypeChoices.Add("Календарь iCalendar", new List<string> { ".ics" });
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-            var file = await picker.PickSaveFileAsync();
-            if (file is null) return;
-
-            var calendar = await _api.GetBirthdayCalendarAsync(contactId);
-            await FileIO.WriteTextAsync(file, calendar, UnicodeEncoding.Utf8);
-            SetBirthdayContactsStatus("Файл календаря сохранён. Импортируй .ics в календарь, чтобы получать ежегодные напоминания.", "success");
-        }
-        catch (Exception ex)
-        {
-            SetBirthdayContactsStatus(ex.Message, "error");
-        }
-        finally
-        {
-            button.IsEnabled = true;
-        }
-    }
-
     private void SetBirthDateStatus(string message, string tone)
     {
         ProfileBirthDateStatusText.Text = message;
@@ -1428,18 +2074,6 @@ public sealed partial class MainWindow : Window
             _ => "#7A8980"
         });
     }
-
-    private void SetBirthdayContactsStatus(string message, string tone)
-    {
-        BirthdayContactsStatusText.Text = message;
-        BirthdayContactsStatusText.Foreground = Brush(tone switch
-        {
-            "success" => "#4F8758",
-            "error" => "#B85D4D",
-            _ => "#7A8980"
-        });
-    }
-
 
     private async void ProfileTheme_Toggled(object sender, RoutedEventArgs e)
     {
@@ -1536,6 +2170,10 @@ public sealed partial class MainWindow : Window
             catch (Exception ex) { Debug.WriteLine($"WebView2 cleanup failed: {ex.Message}"); }
         }
         _currentUser = null;
+        _friends.Clear();
+        FriendsStatusText.Text = "Список ещё не загружен.";
+        FriendsList.Visibility = Visibility.Collapsed;
+        FriendsEmptyState.Visibility = Visibility.Visible;
         _selectedAttraction = null;
         _selectedVisit = null;
         PasswordBox.Password = string.Empty;

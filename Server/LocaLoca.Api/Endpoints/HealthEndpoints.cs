@@ -96,18 +96,18 @@ public static class HealthEndpoints
             AND EXISTS (SELECT 1 FROM pg_trigger
                         WHERE tgrelid = to_regclass('public.users')
                           AND tgname = 'trg_users_default_profile_visibility' AND NOT tgisinternal)
-            AND (SELECT count(*) = 5
+            AND (SELECT count(*) = 6
                  FROM pg_attribute
                  WHERE attrelid = to_regclass('public.user_profile_visibility')
                    AND attnum > 0 AND NOT attisdropped
                    AND attname IN ('user_id', 'display_name_visibility', 'avatar_visibility',
-                                   'residence_country_visibility', 'residence_city_visibility'))";
+                                   'residence_country_visibility', 'residence_city_visibility', 'date_of_birth_visibility'))";
                 await using (var privacySchemaCommand = new NpgsqlCommand(privacySchemaCheck, connection))
                 {
                     var privacySchemaReady = Equals(await privacySchemaCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!privacySchemaReady)
                         return Results.Json(new HealthDto(true, false,
-                            "Не применена миграция настроек приватности и отношений пользователей. Выполните database/migrations/15_profile_privacy_and_relationships.sql в Supabase SQL Editor."),
+                            "Не применены миграции настроек приватности и отношений пользователей (015 и 022). Выполните database/migrations/15_profile_privacy_and_relationships.sql и database/migrations/22_profile_birthday_visibility_and_remove_contacts.sql в Supabase SQL Editor."),
                             statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
 
@@ -119,16 +119,10 @@ public static class HealthEndpoints
                         AND column_name='min_recommended_age' AND data_type='smallint')
             AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='attractions'
                         AND column_name='max_recommended_age' AND data_type='smallint')
-            AND to_regclass('public.birthday_contacts') IS NOT NULL
-            AND to_regclass('public.ix_birthday_contacts_user_birth_date') IS NOT NULL
             AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.users'::regclass
                         AND conname='ck_users_date_of_birth_range')
             AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.attractions'::regclass
-                        AND conname='ck_attractions_recommended_age_range')
-            AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.birthday_contacts'::regclass
-                        AND conname='ck_birthday_contacts_display_name')
-            AND EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='public.birthday_contacts'::regclass
-                        AND conname='ck_birthday_contacts_birth_date')";
+                        AND conname='ck_attractions_recommended_age_range')";
                 await using (var birthdaySchemaCommand = new NpgsqlCommand(birthdaySchemaCheck, connection))
                 {
                     var birthdaySchemaReady = Equals(await birthdaySchemaCommand.ExecuteScalarAsync(cancellationToken), true);
@@ -182,10 +176,6 @@ public static class HealthEndpoints
             AND has_column_privilege(current_user, 'public.users', 'residence_country', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'residence_city', 'UPDATE')
             AND has_column_privilege(current_user, 'public.users', 'date_of_birth', 'UPDATE')
-            AND has_table_privilege(current_user, 'public.birthday_contacts', 'SELECT')
-            AND has_table_privilege(current_user, 'public.birthday_contacts', 'INSERT')
-            AND has_table_privilege(current_user, 'public.birthday_contacts', 'UPDATE')
-            AND has_table_privilege(current_user, 'public.birthday_contacts', 'DELETE')
             AND has_table_privilege(current_user, 'public.categories', 'SELECT')
             AND has_table_privilege(current_user, 'public.countries', 'SELECT')
             AND has_table_privilege(current_user, 'public.cities', 'SELECT')
@@ -220,7 +210,7 @@ public static class HealthEndpoints
             AND has_sequence_privilege(current_user, 'public.photos_photo_id_seq', 'USAGE')
             AND has_sequence_privilege(current_user, 'public.user_map_places_user_map_place_id_seq', 'USAGE')
             AND has_sequence_privilege(current_user, 'public.user_map_place_photos_photo_id_seq', 'USAGE')
-            AND has_sequence_privilege(current_user, 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE')";
+";
                 await using var command = new NpgsqlCommand(permissionCheck, connection);
                 var hasPermissions = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
                 if (!hasPermissions)

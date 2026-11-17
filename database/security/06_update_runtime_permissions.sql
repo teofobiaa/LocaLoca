@@ -1,4 +1,4 @@
--- Reconcile the reviewed LocaLoca runtime-role grants after schema migrations 014-020.
+-- Reconcile the reviewed LocaLoca runtime-role grants after schema migrations 014-022.
 -- Run as the database administrator. Safe to rerun; this does not grant BYPASSRLS or role membership.
 BEGIN;
 
@@ -21,7 +21,7 @@ REVOKE ALL ON TABLE
     public.users, public.categories, public.countries, public.cities, public.attractions,
     public.visits, public.photos, public.wishlist, public.user_map_places,
     public.user_map_place_photos, public.user_sessions, public.auth_rate_limit_counters,
-    public.user_avatars, public.birthday_contacts, public.user_profile_visibility,
+    public.user_avatars, public.user_profile_visibility,
     public.user_friendships, public.user_blocks, public.localoca_schema_migrations,
     public.v_visit_details
 FROM PUBLIC, anon, authenticated, localoca_app;
@@ -58,14 +58,13 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.visits TO localoca_app;
 GRANT SELECT, INSERT, DELETE ON TABLE public.photos, public.wishlist, public.user_map_place_photos TO localoca_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
     public.user_map_places, public.user_sessions, public.auth_rate_limit_counters,
-    public.user_avatars, public.birthday_contacts, public.user_profile_visibility,
+    public.user_avatars, public.user_profile_visibility,
     public.user_friendships, public.user_blocks
 TO localoca_app;
 
 GRANT USAGE ON SEQUENCE
     public.users_user_id_seq, public.visits_visit_id_seq, public.photos_photo_id_seq,
-    public.user_map_places_user_map_place_id_seq, public.user_map_place_photos_photo_id_seq,
-    public.birthday_contacts_birthday_contact_id_seq
+    public.user_map_places_user_map_place_id_seq, public.user_map_place_photos_photo_id_seq
 TO localoca_app;
 
 ALTER TABLE public.localoca_schema_migrations ENABLE ROW LEVEL SECURITY;
@@ -76,7 +75,7 @@ DECLARE
 BEGIN
     FOREACH relation_name IN ARRAY ARRAY[
         'users','visits','photos','wishlist','user_map_places','user_map_place_photos',
-        'user_sessions','auth_rate_limit_counters','user_avatars','birthday_contacts',
+        'user_sessions','auth_rate_limit_counters','user_avatars',
         'user_profile_visibility','user_friendships','user_blocks'
     ] LOOP
         EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', relation_name);
@@ -105,7 +104,6 @@ SELECT
     (has_table_privilege('localoca_app', 'public.users', 'SELECT')
      AND has_table_privilege('localoca_app', 'public.users', 'INSERT')
      AND has_column_privilege('localoca_app', 'public.users', 'password_hash', 'UPDATE')) AS account_permissions_ok,
-    has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT') AS birthday_contacts_ok,
     has_table_privilege('localoca_app', 'public.user_profile_visibility', 'SELECT') AS profile_visibility_ok,
     has_table_privilege('localoca_app', 'public.user_friendships', 'SELECT') AS friendships_ok,
     has_table_privilege('localoca_app', 'public.user_blocks', 'SELECT') AS blocks_ok,

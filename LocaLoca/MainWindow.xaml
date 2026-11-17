@@ -68,6 +68,35 @@
                     </Grid>
                 </Border>
             </DataTemplate>
+            <DataTemplate x:Key="FriendTemplate" x:DataType="models:FriendListItemViewModel">
+                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="16" Padding="15" Margin="0,0,0,10" BorderBrush="{ThemeResource Palette_E9ECE6}" BorderThickness="1">
+                    <Grid ColumnDefinitions="58,*,Auto" ColumnSpacing="13">
+                        <Grid Width="58" Height="58" VerticalAlignment="Center">
+                            <Ellipse Fill="{ThemeResource Palette_EAF0E2}" />
+                            <TextBlock Text="{x:Bind Initials}" FontSize="18" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource Palette_688A43}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Ellipse>
+                                <Ellipse.Fill>
+                                    <ImageBrush ImageSource="{x:Bind AvatarSource}" Stretch="UniformToFill" />
+                                </Ellipse.Fill>
+                            </Ellipse>
+                        </Grid>
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind DisplayText}" FontSize="15" FontWeight="SemiBold"
+                                       Foreground="{ThemeResource Palette_1B2A25}" TextWrapping="Wrap" />
+                            <TextBlock Text="{x:Bind LoginLabel}" FontSize="12" Foreground="{ThemeResource Palette_819087}" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button Content="Профиль" Tag="{x:Bind UserId}" Style="{StaticResource QuietButtonStyle}"
+                                    Click="OpenFriendProfile_Click" />
+                            <Button Content="Удалить" Tag="{x:Bind UserId}" Style="{StaticResource QuietButtonStyle}"
+                                    Click="RemoveFriend_Click" />
+                            <Button Content="Блокировать" Tag="{x:Bind UserId}" Style="{StaticResource QuietButtonStyle}"
+                                    Click="BlockFriend_Click" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </DataTemplate>
         </Grid.Resources>
         <!-- Authentication -->
         <Grid x:Name="AuthPage" Visibility="Visible" ColumnDefinitions="1.15*,0.85*">
@@ -165,6 +194,9 @@
                     <Button Style="{StaticResource NavButtonStyle}" Click="MapNav_Click">
                         <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE81D;" FontSize="17" /><TextBlock Text="Карта" VerticalAlignment="Center" /></StackPanel>
                     </Button>
+                    <Button x:Name="FriendsNavButton" Style="{StaticResource NavButtonStyle}" Click="FriendsNav_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE716;" FontSize="17" /><TextBlock Text="Друзья" VerticalAlignment="Center" /></StackPanel>
+                    </Button>
                     <Button x:Name="SupportNavButton" Style="{StaticResource NavButtonStyle}" Click="SupportNav_Click">
                         <StackPanel Orientation="Horizontal" Spacing="13"><FontIcon Glyph="&#xE897;" FontSize="17" /><TextBlock Text="Поддержка" VerticalAlignment="Center" /></StackPanel>
                     </Button>
@@ -234,7 +266,7 @@
                                 <StackPanel Spacing="4">
                                     <TextBlock Text="Интересное рядом" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource Palette_1C3028}" />
                                     <TextBlock x:Name="DashboardRecommendationsStatusText" Text="Укажи страну и, при желании, город проживания в профиле, чтобы получить локальную подборку." FontSize="12" Foreground="{ThemeResource Palette_87948C}" TextWrapping="Wrap" />
-                                    <TextBlock x:Name="DashboardBirthdayReminderText" Text="Дни рождения друзей появятся здесь после добавления в профиле." FontSize="12" Foreground="{ThemeResource Palette_5F7844}" TextWrapping="Wrap" />
+
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                     <Button x:Name="DashboardResidenceButton" Content="Указать место" Style="{StaticResource QuietButtonStyle}" Click="OpenResidenceFromDashboard_Click" />
@@ -343,6 +375,109 @@
                         </Border>
                     </Grid>
 
+                    <!-- Friends -->
+                    <Grid x:Name="FriendsPage" Visibility="Collapsed" RowDefinitions="Auto,Auto,Auto,*">
+                        <StackPanel Grid.Row="0" Spacing="14" Margin="0,0,0,14">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <StackPanel Spacing="4" VerticalAlignment="Center">
+                                    <TextBlock Text="Твои друзья в Loca Loca" FontSize="14" Foreground="{ThemeResource Palette_839188}" />
+                                    <TextBlock x:Name="FriendsStatusText" Text="Список ещё не загружен." FontSize="12"
+                                               Foreground="{ThemeResource Palette_87948C}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <Button x:Name="FriendsRefreshButton" Grid.Column="1" Content="Обновить"
+                                        Style="{StaticResource QuietButtonStyle}" Click="RefreshFriends_Click" />
+                            </Grid>
+
+                            <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="20"
+                                    BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                                <StackPanel Spacing="10">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Добавить друзей" FontSize="18" FontWeight="SemiBold"
+                                                   Foreground="{ThemeResource Palette_1B2A25}" />
+                                        <TextBlock Text="Найди пользователя по логину. Можно ввести начало логина — поиск не зависит от регистра."
+                                                   FontSize="12" Foreground="{ThemeResource Palette_819087}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="9">
+                                        <TextBox x:Name="FriendsSearchBox" PlaceholderText="Например, example_user"
+                                                 MaxLength="50" Height="44" VerticalContentAlignment="Center"
+                                                 KeyDown="FriendsSearchBox_KeyDown" />
+                                        <Button x:Name="FriendsSearchButton" Grid.Column="1" Content="Найти"
+                                                Style="{StaticResource PrimaryButtonStyle}" Click="FriendsSearch_Click" />
+                                    </Grid>
+                                    <TextBlock x:Name="FriendsSearchStatusText"
+                                               Text="Для поиска введи не менее трёх символов."
+                                               FontSize="12" Foreground="{ThemeResource Palette_819087}" TextWrapping="Wrap" />
+                                    <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
+                                        <StackPanel x:Name="FriendsSearchResultsPanel" Spacing="8" />
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                        <Border Grid.Row="1" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18"
+                                Padding="18" Margin="0,0,0,14" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="18">
+                                <StackPanel Grid.Column="0" Spacing="8">
+                                    <TextBlock Text="Входящие заявки" FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{ThemeResource Palette_1B2A25}" />
+                                    <TextBlock x:Name="IncomingRequestsStatusText" Text="Заявки ещё не загружены."
+                                               FontSize="12" Foreground="{ThemeResource Palette_819087}" />
+                                    <ScrollViewer MaxHeight="170" VerticalScrollBarVisibility="Auto">
+                                        <StackPanel x:Name="IncomingFriendRequestsPanel" Spacing="8" />
+                                    </ScrollViewer>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="8">
+                                    <TextBlock Text="Исходящие заявки" FontSize="16" FontWeight="SemiBold"
+                                               Foreground="{ThemeResource Palette_1B2A25}" />
+                                    <TextBlock x:Name="OutgoingRequestsStatusText" Text="Заявки ещё не загружены."
+                                               FontSize="12" Foreground="{ThemeResource Palette_819087}" />
+                                    <ScrollViewer MaxHeight="170" VerticalScrollBarVisibility="Auto">
+                                        <StackPanel x:Name="OutgoingFriendRequestsPanel" Spacing="8" />
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="2" Background="{ThemeResource Palette_FFFFFF}" CornerRadius="16"
+                                Padding="14" Margin="0,0,0,14" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
+                            <StackPanel Spacing="8">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <StackPanel Spacing="3">
+                                        <TextBlock Text="Заблокированные пользователи" FontSize="15" FontWeight="SemiBold"
+                                                   Foreground="{ThemeResource Palette_1B2A25}" />
+                                        <TextBlock x:Name="BlockedUsersStatusText" Text="Список ещё не загружен."
+                                                   FontSize="12" Foreground="{ThemeResource Palette_819087}" />
+                                    </StackPanel>
+                                    <Button x:Name="BlockedUsersToggleButton" Grid.Column="1" Content="Показать"
+                                            Style="{StaticResource QuietButtonStyle}" Click="ToggleBlockedUsers_Click" />
+                                </Grid>
+                                <ScrollViewer x:Name="BlockedUsersScrollViewer" MaxHeight="170"
+                                              VerticalScrollBarVisibility="Auto" Visibility="Collapsed">
+                                    <StackPanel x:Name="BlockedUsersPanel" Spacing="8" />
+                                </ScrollViewer>
+                            </StackPanel>
+                        </Border>
+
+                        <Grid Grid.Row="3">
+                            <ListView x:Name="FriendsList" ItemsSource="{x:Bind Friends, Mode=OneWay}"
+                                      ItemTemplate="{StaticResource FriendTemplate}" SelectionMode="None"
+                                      Background="Transparent" BorderThickness="0" Visibility="Collapsed" />
+                            <StackPanel x:Name="FriendsEmptyState" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        MaxWidth="420" Spacing="10" Visibility="Visible">
+                                <Border Width="70" Height="70" CornerRadius="35" Background="{ThemeResource Palette_EAF0E2}"
+                                        HorizontalAlignment="Center">
+                                    <FontIcon Glyph="&#xE716;" FontSize="30" Foreground="{ThemeResource Palette_688A43}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
+                                <TextBlock Text="Пока нет друзей" FontSize="21" FontWeight="SemiBold"
+                                           Foreground="{ThemeResource Palette_1B2A25}" TextAlignment="Center" />
+                                <TextBlock Text="После подтверждения заявок друзья появятся в этом списке."
+                                           FontSize="13" Foreground="{ThemeResource Palette_819087}"
+                                           TextWrapping="Wrap" TextAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+
                     <!-- Profile settings -->
                     <Grid x:Name="ProfilePage" Visibility="Collapsed">
                         <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -428,7 +563,7 @@
                                             <TextBlock Text="Настраивай доступ к каждому полю отдельно. «Друзья» — только взаимно подтверждённые друзья. Заблокированные аккаунты не видят профиль независимо от этих настроек."
                                                        FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
                                         </StackPanel>
-                                        <Grid ColumnDefinitions="*,*" ColumnSpacing="18" RowSpacing="12">
+                                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="18" RowSpacing="12">
                                             <StackPanel Spacing="6">
                                                 <TextBlock Text="Отображаемое имя" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
                                                 <ComboBox x:Name="ProfileDisplayNameVisibilityBox" SelectedValuePath="Tag" HorizontalAlignment="Stretch">
@@ -461,6 +596,14 @@
                                                     <ComboBoxItem Content="Все зарегистрированные" Tag="registered" />
                                                 </ComboBox>
                                             </StackPanel>
+                                            <StackPanel Grid.Row="2" Spacing="6">
+                                                <TextBlock Text="День рождения" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource MutedBrush}" />
+                                                <ComboBox x:Name="ProfileDateOfBirthVisibilityBox" SelectedValuePath="Tag" HorizontalAlignment="Stretch">
+                                                    <ComboBoxItem Content="Только я" Tag="private" />
+                                                    <ComboBoxItem Content="Друзья" Tag="friends" />
+                                                    <ComboBoxItem Content="Все зарегистрированные" Tag="registered" />
+                                                </ComboBox>
+                                            </StackPanel>
                                         </Grid>
                                         <Button x:Name="ProfilePrivacySaveButton" Content="Сохранить настройки видимости"
                                                 Style="{StaticResource PrimaryButtonStyle}" Click="SaveProfilePrivacy_Click"
@@ -472,7 +615,7 @@
                                 <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
                                     <StackPanel Spacing="12">
                                         <TextBlock Text="Дата рождения" FontSize="17" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
-                                        <TextBlock Text="Эта дата используется для возрастных рекомендаций. Она приватна: не показывается другим пользователям и не входит в публичный профиль." FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
+                                        <TextBlock Text="Полная дата используется для возрастных рекомендаций и всегда доступна только тебе. В профиле других пользователей может отображаться только день и месяц — согласно настройке видимости выше; год рождения не раскрывается." FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
                                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
                                             <CalendarDatePicker x:Name="ProfileBirthDatePicker" PlaceholderText="Выбери дату рождения" />
                                             <Button x:Name="ProfileBirthDateSaveButton" Grid.Column="1" Content="Сохранить" Style="{StaticResource PrimaryButtonStyle}" Click="SaveBirthDate_Click" />
@@ -481,39 +624,7 @@
                                         <TextBlock x:Name="ProfileBirthDateStatusText" Text="" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource MutedBrush}" />
                                     </StackPanel>
                                 </Border>
-                                <Border Background="{ThemeResource Palette_FFFFFF}" CornerRadius="18" Padding="22" BorderBrush="{ThemeResource Palette_E7EBE5}" BorderThickness="1">
-                                    <StackPanel Spacing="12">
-                                        <TextBlock Text="Дни рождения друзей" FontSize="17" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
-                                        <TextBlock Text="Список виден только тебе. Для каждого контакта можно добавить ежегодное событие в календарь с напоминанием за день." FontSize="12" Foreground="{ThemeResource MutedBrush}" TextWrapping="Wrap" />
-                                        <Grid ColumnDefinitions="1.1*,0.9*" ColumnSpacing="12">
-                                            <TextBox x:Name="BirthdayContactNameBox" PlaceholderText="Имя друга" MaxLength="80" Height="44" />
-                                            <CalendarDatePicker x:Name="BirthdayContactDatePicker" Grid.Column="1" PlaceholderText="Дата рождения" />
-                                        </Grid>
-                                        <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <Button x:Name="BirthdayContactSaveButton" Content="Добавить" Style="{StaticResource PrimaryButtonStyle}" Click="SaveBirthdayContact_Click" />
-                                            <Button x:Name="BirthdayContactCancelEditButton" Content="Отмена" Style="{StaticResource QuietButtonStyle}" Click="CancelBirthdayContactEdit_Click" Visibility="Collapsed" />
-                                        </StackPanel>
-                                        <TextBlock x:Name="BirthdayContactsStatusText" Text="" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource MutedBrush}" />
-                                        <ListView x:Name="BirthdayContactsList" ItemsSource="{x:Bind BirthdayContacts, Mode=OneWay}" MaxHeight="360" SelectionMode="None" Background="Transparent" BorderThickness="0">
-                                            <ListView.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Grid ColumnDefinitions="*,Auto" Padding="4,8" ColumnSpacing="10">
-                                                        <StackPanel Spacing="3">
-                                                            <TextBlock Text="{Binding DisplayName}" FontSize="14" FontWeight="SemiBold" Foreground="{ThemeResource InkBrush}" />
-                                                            <TextBlock Text="{Binding ReminderText}" FontSize="12" Foreground="{ThemeResource AccentDarkBrush}" />
-                                                            <TextBlock Text="{Binding BirthdayDetails}" FontSize="11" Foreground="{ThemeResource MutedBrush}" />
-                                                        </StackPanel>
-                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                            <Button Content="Изменить" Tag="{Binding Id}" Style="{StaticResource QuietButtonStyle}" Click="EditBirthdayContact_Click" />
-                                                            <Button Content="В календарь" Tag="{Binding Id}" Style="{StaticResource QuietButtonStyle}" Click="ExportBirthdayCalendar_Click" />
-                                                            <Button Content="Удалить" Tag="{Binding Id}" Style="{StaticResource QuietButtonStyle}" Click="DeleteBirthdayContact_Click" />
-                                                        </StackPanel>
-                                                    </Grid>
-                                                </DataTemplate>
-                                            </ListView.ItemTemplate>
-                                        </ListView>
-                                    </StackPanel>
-                                </Border>
+                                
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>

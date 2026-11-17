@@ -1,27 +1,31 @@
-# Private birthdays and age-based recommendations
+# Profile birthdays and age-based recommendations
 
 ## Privacy boundary
 
-A user's full date of birth is stored in `public.users.date_of_birth` and is available only through the authenticated owner endpoints:
+A user's full date of birth is stored in `public.users.date_of_birth` and can be read or changed only through the authenticated owner endpoints:
 
 - `GET /api/me/profile/birthday`
 - `PUT /api/me/profile/birthday`
 
-The full date is not included in authentication responses, the standard `UserDto`, public profile DTOs, or public search results. The endpoints send `Cache-Control: private, no-store`.
+The full date is excluded from authentication responses, the standard `UserDto`, search results and other users' public profile DTOs. The owner-only endpoints send `Cache-Control: private, no-store`.
 
-Birthday contacts are a private, per-account list. Every list, create, update, delete, and calendar-export query is scoped by the authenticated `user_id`. The API does not accept a user ID from the caller to select another account's contacts.
+The social profile has an independent `date_of_birth_visibility` setting with the same values as other profile fields:
 
-The database migration applies ownership constraints and access controls for `birthday_contacts`. Runtime permissions are checked by `/ready`; an API instance reports not-ready when the birthday schema or required grants are missing.
+- `private` — only the account owner can see the birthday;
+- `friends` — only confirmed mutual friends can see it;
+- `registered` — any authenticated LocaLoca user can see it.
+
+When visible, another user's profile receives only the month and day. The birth year and full date are never returned by the public profile endpoint. Pending friend requests do not count as friendship. A block in either direction hides the entire profile regardless of the selected visibility.
+
+The default for existing and new accounts is `private`. The setting is managed together with the other fields through `GET/PUT /api/me/profile/privacy`.
+
+The former owner-maintained birthday contacts list and its calendar export have been retired. Migration 022 removes `public.birthday_contacts`; the associated API routes, client methods, profile editor and dashboard reminders are no longer part of the application. This list was unrelated to actual LocaLoca accounts and is not a substitute for friend profiles.
 
 ## Age-based recommendations
 
-Attractions may define `min_recommended_age` and/or `max_recommended_age`. The recommendations query calculates the user's age from the private date of birth and applies the configured bounds.
+Attractions may define `min_recommended_age` and/or `max_recommended_age`. The recommendations query calculates the user's age from the private full date of birth and applies the configured bounds.
 
 When an attraction has an age restriction and the user has not provided a date of birth, that attraction is excluded. Missing personal data must not bypass a configured age limit. Attractions without age restrictions remain eligible.
-
-## Calendar reminders
-
-A birthday contact can be exported as an iCalendar (`.ics`) event. The event has yearly recurrence and a display reminder one day before the birthday. Its UID is derived from the persistent contact ID so repeated exports identify the same logical event.
 
 ## Aggregate age report
 
@@ -31,12 +35,11 @@ The query applies a minimum group size of five. If any populated band contains f
 
 ## Database rollout
 
-The repository's current schema baseline is version **13** and the manifest is at schema version **20**. The birthday feature uses the canonical migration sequence:
+The repository's current schema version is **22**. The fresh-install baseline remains the immutable version **20** snapshot; migrations 21 and 22 are applied afterwards.
 
-1. Apply baseline `database/schema/01_schema.sql` (version 13) for a fresh database.
-2. Apply migrations in manifest order. Birthday columns and contacts are introduced by `database/migrations/14_user_birthdays_and_age_filtering.sql`, before profile-privacy migration 015.
-3. For an existing `localoca_app` role, run the repeatable `database/security/06_update_runtime_permissions.sql` after applying the required migrations.
-4. For a new runtime role, run `database/security/05_create_app_role.sql`, then run `06_update_runtime_permissions.sql` so the role receives the later birthday and privacy grants.
-5. Deploy the API only after the schema and runtime grants are in place. The `/ready` endpoint validates the birthday schema and permissions.
+1. Apply baseline `database/schema/02_schema_v20.sql` (or the documented schema baseline) for a fresh database.
+2. Apply migrations in manifest order. Migration 022 adds `date_of_birth_visibility` with a `private` default and drops the retired contacts table.
+3. Run the repeatable `database/security/06_update_runtime_permissions.sql` after the migrations so runtime grants and RLS policies match the current schema.
+4. Deploy the API only after the schema and runtime grants are in place. The `/ready` endpoint checks the current profile-privacy schema and the age-recommendation columns.
 
-Do not renumber migration 014, duplicate it in another branch, or change the baseline to make a feature branch fit. The migration manifest and drift tests are the source of truth for schema ordering.
+Migration 014 and the version 20 baseline are historical inputs and must not be edited to simulate the current schema. The migration manifest and drift tests are the source of truth for schema ordering.

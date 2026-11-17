@@ -352,11 +352,15 @@ public sealed class PostgreSqlSchemaTests
         await _database.ExecuteSqlFileAsync("migrations", "19_restore_password_hash_update_permission.sql");
         await _database.ExecuteSqlFileAsync("migrations", "20_restrict_runtime_sequence_privileges.sql");
         await _database.ExecuteSqlFileAsync("migrations", "20_restrict_runtime_sequence_privileges.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "21_user_login_prefix_search.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "21_user_login_prefix_search.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "22_profile_birthday_visibility_and_remove_contacts.sql");
+        await _database.ExecuteSqlFileAsync("migrations", "22_profile_birthday_visibility_and_remove_contacts.sql");
 
         // Reconcile the journal after the migration sequence.
         await _database.ExecuteSqlFileAsync("migrations", "00_migration_history.sql");
 
-        // The repeatable security script runs only after the full schema has reached v020.
+        // The repeatable security script runs only after the full schema has reached v022.
         await using (var revokeSessionPermissions = new NpgsqlCommand(
             "REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLE public.user_sessions FROM localoca_app",
             connection))
@@ -373,6 +377,14 @@ public sealed class PostgreSqlSchemaTests
                 AND has_column_privilege('localoca_app', 'public.users', 'residence_city', 'UPDATE')
                 AND has_column_privilege('localoca_app', 'public.users', 'date_of_birth', 'UPDATE')
                 AND has_column_privilege('localoca_app', 'public.users', 'password_hash', 'UPDATE')
+                AND to_regclass('public.birthday_contacts') IS NULL
+                AND EXISTS (SELECT 1 FROM information_schema.columns
+                            WHERE table_schema = 'public' AND table_name = 'user_profile_visibility'
+                              AND column_name = 'date_of_birth_visibility'
+                              AND column_default LIKE '%private%')
+                AND EXISTS (SELECT 1 FROM pg_constraint
+                            WHERE conrelid = 'public.user_profile_visibility'::regclass
+                              AND conname = 'ck_user_profile_visibility_date_of_birth_visibility')
                 AND has_table_privilege('localoca_app', 'public.user_sessions', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_sessions', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_sessions', 'UPDATE')
@@ -388,7 +400,6 @@ public sealed class PostgreSqlSchemaTests
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'INSERT')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'UPDATE')
                 AND has_table_privilege('localoca_app', 'public.user_avatars', 'DELETE')
-                AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_profile_visibility', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_friendships', 'SELECT')
                 AND has_table_privilege('localoca_app', 'public.user_blocks', 'SELECT')
@@ -419,7 +430,6 @@ public sealed class PostgreSqlSchemaTests
                 AND has_sequence_privilege('localoca_app', 'public.photos_photo_id_seq', 'USAGE')
                 AND has_sequence_privilege('localoca_app', 'public.user_map_places_user_map_place_id_seq', 'USAGE')
                 AND has_sequence_privilege('localoca_app', 'public.user_map_place_photos_photo_id_seq', 'USAGE')
-                AND has_sequence_privilege('localoca_app', 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE')
                 AND NOT has_sequence_privilege('localoca_app', 'public.categories_category_id_seq', 'USAGE')
                 AND NOT has_sequence_privilege('localoca_app', 'public.countries_country_id_seq', 'USAGE')
                 AND NOT has_sequence_privilege('localoca_app', 'public.cities_city_id_seq', 'USAGE')
@@ -430,7 +440,7 @@ public sealed class PostgreSqlSchemaTests
         Assert.True((bool)(await permissionCheck.ExecuteScalarAsync() ?? false));
 
         await using var versionCheck = new NpgsqlCommand(@"
-            SELECT count(*) = 16
+            SELECT count(*) = 18
                AND count(*) FILTER (WHERE name IN (
                    'migrate_wishlist', 'migrate_user_map_places', 'migrate_photo_storage',
                    'server_sessions', 'map_marker_viewport_indexes', 'map_marker_visit_lookup_index',
@@ -438,9 +448,10 @@ public sealed class PostgreSqlSchemaTests
                    'user_birthdays_and_age_filtering', 'profile_privacy_and_relationships',
                    'catalog_search_trigram_indexes', 'runtime_role_rls_policies_and_grant_hardening',
                    'harden_profile_trigger_and_migration_ledger',
-                   'restore_password_hash_update_permission', 'restrict_runtime_sequence_privileges')) = 16
+                   'restore_password_hash_update_permission', 'restrict_runtime_sequence_privileges',
+                    'user_login_prefix_search', 'profile_birthday_visibility_and_remove_contacts')) = 18
             FROM public.localoca_schema_migrations
-            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20)", connection);
+            WHERE version IN (3, 4, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22)", connection);
         Assert.True((bool)(await versionCheck.ExecuteScalarAsync() ?? false));
     }
 

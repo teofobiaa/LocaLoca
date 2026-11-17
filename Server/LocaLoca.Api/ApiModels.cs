@@ -6,36 +6,30 @@ record UpdateDisplayNameRequest(string? DisplayName);
 record UpdateResidenceRequest(string? ResidenceCountry, string? ResidenceCity);
 record UpdateBirthDateRequest(DateOnly? DateOfBirth);
 record PrivateBirthDateDto(DateOnly? DateOfBirth);
-record BirthdayContactWriteRequest(string? DisplayName, DateOnly BirthDate);
-record BirthdayContactDto(int Id, string DisplayName, DateOnly BirthDate, DateOnly NextBirthdayDate,
-    int DaysUntilBirthday, int AgeOnNextBirthday)
-{
-    public string ReminderText => DaysUntilBirthday switch
-    {
-        0 => "Сегодня день рождения",
-        1 => "Завтра день рождения",
-        _ => $"Через {DaysUntilBirthday} дн."
-    };
-}
 record UpdateProfilePrivacyRequest(
     string? DisplayNameVisibility,
     string? AvatarVisibility,
     string? ResidenceCountryVisibility,
-    string? ResidenceCityVisibility);
+    string? ResidenceCityVisibility,
+    string? DateOfBirthVisibility);
 record ProfilePrivacyDto(
     string DisplayNameVisibility,
     string AvatarVisibility,
     string ResidenceCountryVisibility,
-    string ResidenceCityVisibility);
+    string ResidenceCityVisibility,
+    string DateOfBirthVisibility);
 record UserProfileViewDto(
     int Id,
     string? DisplayName,
     string? ResidenceCountry,
     string? ResidenceCity,
-    bool? HasAvatar);
-record UserRelationshipDto(int UserId, string? DisplayName, bool? HasAvatar);
-record FriendRequestDto(int UserId, bool IsIncoming, DateTime CreatedAt);
-record UserBlockDto(int UserId);
+    bool? HasAvatar,
+    int? BirthdayMonth,
+    int? BirthdayDay);
+record UserRelationshipDto(int UserId, string Login, string? DisplayName, bool? HasAvatar);
+record UserSearchResultDto(int UserId, string Login, string? DisplayName, bool? HasAvatar, string RelationshipStatus);
+record FriendRequestDto(int UserId, string Login, string? DisplayName, bool? HasAvatar, bool IsIncoming, DateTime CreatedAt);
+record UserBlockDto(int UserId, string Login);
 record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
 record AuthResponse(UserDto User, string Token);
 record MessageDto(string Message);
