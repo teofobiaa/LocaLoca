@@ -1095,7 +1095,8 @@ public sealed class ApiIntegrationTests
             displayNameVisibility = "private",
             avatarVisibility = "private",
             residenceCountryVisibility = "private",
-            residenceCityVisibility = "private"
+            residenceCityVisibility = "private",
+            dateOfBirthVisibility = "private"
         });
         Assert.Equal(HttpStatusCode.OK, privateSettings.StatusCode);
 
@@ -1152,7 +1153,8 @@ public sealed class ApiIntegrationTests
             displayNameVisibility = "friends",
             avatarVisibility = "friends",
             residenceCountryVisibility = "private",
-            residenceCityVisibility = "private"
+            residenceCityVisibility = "private",
+            dateOfBirthVisibility = "private"
         });
         Assert.Equal(HttpStatusCode.OK, friendSettings.StatusCode);
 
@@ -1350,6 +1352,10 @@ public sealed class ApiIntegrationTests
         Assert.True(avatarCacheControl.Private);
         Assert.True(avatarCacheControl.NoStore);
 
+        using var ownerBirthday = await ownerClient.PutAsJsonAsync("/api/me/profile/birthday",
+            new { dateOfBirth = "1990-04-17" });
+        Assert.Equal(HttpStatusCode.OK, ownerBirthday.StatusCode);
+
         using var defaultsResponse = await ownerClient.GetAsync("/api/me/profile/privacy");
         Assert.Equal(HttpStatusCode.OK, defaultsResponse.StatusCode);
         using var defaults = JsonDocument.Parse(await defaultsResponse.Content.ReadAsStringAsync());
@@ -1357,6 +1363,7 @@ public sealed class ApiIntegrationTests
         Assert.Equal("registered", defaults.RootElement.GetProperty("avatarVisibility").GetString());
         Assert.Equal("private", defaults.RootElement.GetProperty("residenceCountryVisibility").GetString());
         Assert.Equal("private", defaults.RootElement.GetProperty("residenceCityVisibility").GetString());
+        Assert.Equal("private", defaults.RootElement.GetProperty("dateOfBirthVisibility").GetString());
 
         using var initialProfileResponse = await viewerClient.GetAsync($"/api/users/{owner.UserId}/profile");
         Assert.Equal(HttpStatusCode.OK, initialProfileResponse.StatusCode);
@@ -1365,6 +1372,8 @@ public sealed class ApiIntegrationTests
             Assert.Equal("API integration test", initialProfile.RootElement.GetProperty("displayName").GetString());
             Assert.True(initialProfile.RootElement.GetProperty("residenceCountry").ValueKind == JsonValueKind.Null);
             Assert.True(initialProfile.RootElement.GetProperty("residenceCity").ValueKind == JsonValueKind.Null);
+            Assert.Equal(JsonValueKind.Null, initialProfile.RootElement.GetProperty("birthdayMonth").ValueKind);
+            Assert.Equal(JsonValueKind.Null, initialProfile.RootElement.GetProperty("birthdayDay").ValueKind);
         }
 
         using var invalidPrivacy = await ownerClient.PutAsJsonAsync("/api/me/profile/privacy", new
@@ -1372,7 +1381,8 @@ public sealed class ApiIntegrationTests
             displayNameVisibility = "public",
             avatarVisibility = "registered",
             residenceCountryVisibility = "private",
-            residenceCityVisibility = "private"
+            residenceCityVisibility = "private",
+            dateOfBirthVisibility = "public"
         });
         Assert.Equal(HttpStatusCode.BadRequest, invalidPrivacy.StatusCode);
 
@@ -1381,7 +1391,8 @@ public sealed class ApiIntegrationTests
             displayNameVisibility = "friends",
             avatarVisibility = "private",
             residenceCountryVisibility = "registered",
-            residenceCityVisibility = "friends"
+            residenceCityVisibility = "friends",
+            dateOfBirthVisibility = "friends"
         });
         Assert.Equal(HttpStatusCode.OK, updatePrivacy.StatusCode);
 
@@ -1405,7 +1416,8 @@ public sealed class ApiIntegrationTests
             displayNameVisibility = "friends",
             avatarVisibility = "friends",
             residenceCountryVisibility = "private",
-            residenceCityVisibility = "private"
+            residenceCityVisibility = "private",
+            dateOfBirthVisibility = "private"
         });
         Assert.Equal(HttpStatusCode.OK, requesterPrivacy.StatusCode);
 
@@ -1448,6 +1460,9 @@ public sealed class ApiIntegrationTests
             Assert.Equal(HttpStatusCode.OK, friendProfileResponse.StatusCode);
             Assert.Equal("API integration test", friendProfile.RootElement.GetProperty("displayName").GetString());
             Assert.Equal("Privacy test city", friendProfile.RootElement.GetProperty("residenceCity").GetString());
+            Assert.Equal(4, friendProfile.RootElement.GetProperty("birthdayMonth").GetInt32());
+            Assert.Equal(17, friendProfile.RootElement.GetProperty("birthdayDay").GetInt32());
+            Assert.False(friendProfile.RootElement.TryGetProperty("dateOfBirth", out _));
         }
 
         using var visibleFriendsResponse = await viewerClient.GetAsync("/api/me/friends");
@@ -1466,7 +1481,8 @@ public sealed class ApiIntegrationTests
             displayNameVisibility = "private",
             avatarVisibility = "private",
             residenceCountryVisibility = "registered",
-            residenceCityVisibility = "friends"
+            residenceCityVisibility = "friends",
+            dateOfBirthVisibility = "friends"
         });
         Assert.Equal(HttpStatusCode.OK, privateNameSettings.StatusCode);
 
@@ -1519,6 +1535,8 @@ public sealed class ApiIntegrationTests
             Assert.Equal(HttpStatusCode.OK, profileAfterUnblock.StatusCode);
             Assert.Equal(JsonValueKind.Null, unblockedJson.RootElement.GetProperty("displayName").ValueKind);
             Assert.Equal("Privacy test country", unblockedJson.RootElement.GetProperty("residenceCountry").GetString());
+            Assert.Equal(JsonValueKind.Null, unblockedJson.RootElement.GetProperty("birthdayMonth").ValueKind);
+            Assert.Equal(JsonValueKind.Null, unblockedJson.RootElement.GetProperty("birthdayDay").ValueKind);
         }
 
         using var ownerSelfView = await ownerClient.GetAsync($"/api/users/{owner.UserId}/profile");
