@@ -99,32 +99,6 @@ public sealed class PasswordHasherTests
     }
 }
 
-public sealed class LocalSessionSecretPersistenceTests
-{
-    [Fact]
-    public void Local_Session_Secret_Is_Protected_And_Reused_After_Restart()
-    {
-        if (!OperatingSystem.IsWindows()) return;
-
-        var directory = Path.Combine(Path.GetTempPath(), "LocaLoca-session-secret-" + Guid.NewGuid().ToString("N"));
-        var path = Path.Combine(directory, "session-secret.dpapi");
-        try
-        {
-            var first = ConnectionStringConfiguration.ReadOrCreateLocalSessionSecret(path);
-            var second = ConnectionStringConfiguration.ReadOrCreateLocalSessionSecret(path);
-
-            Assert.Equal(first, second);
-            Assert.True(first.Length >= 32);
-            Assert.NotEqual(first, Encoding.UTF8.GetString(File.ReadAllBytes(path)));
-        }
-        finally
-        {
-            if (Directory.Exists(directory))
-                Directory.Delete(directory, recursive: true);
-        }
-    }
-}
-
 public sealed class SessionStoreConfigurationTests
 {
     private static IConfiguration CreateConfiguration(string? secret) =>

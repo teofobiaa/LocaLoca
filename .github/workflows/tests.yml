@@ -86,6 +86,49 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  windows-dpapi:
+    name: Windows DPAPI unit tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Run unit tests including Windows DPAPI paths
+        run: >
+          dotnet test Tests/LocaLoca.Tests/LocaLoca.Tests.csproj
+          --configuration Release
+          --verbosity normal
+          --logger "console;verbosity=normal"
+          --logger "trx;LogFileName=windows-unit-tests.trx"
+          --collect:"XPlat Code Coverage"
+          --results-directory TestResults/Windows
+
+      - name: Upload Windows TRX results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trx-windows-dpapi-${{ github.run_id }}-${{ github.run_attempt }}
+          path: TestResults/Windows/**/*.trx
+          if-no-files-found: warn
+          retention-days: 90
+
+      - name: Upload Windows coverage data
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-windows
+          path: TestResults/Windows/**/coverage.cobertura.xml
+          if-no-files-found: warn
+          retention-days: 30
+
   api:
     name: API integration tests (isolated PostgreSQL)
     runs-on: ubuntu-24.04
@@ -177,6 +220,7 @@ jobs:
     needs:
       - unit
       - api
+      - windows-dpapi
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -224,6 +268,10 @@ jobs:
             echo ' ```text'
             cat CoverageReport/Summary.txt
             echo ' ```'
+            echo
+            echo "### Platform-specific coverage"
+            echo
+            echo "- `ConnectionStringConfiguration` DPAPI paths require Windows DPAPI (CurrentUser). The Ubuntu unit job does not execute these paths; the dedicated `windows-dpapi` job runs the same unit test project on `windows-latest` and contributes its coverage data to this aggregate report."
           } >> "$GITHUB_STEP_SUMMARY"
 
           cat CoverageReport/Summary.txt

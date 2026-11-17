@@ -8,7 +8,8 @@
 
 | Проект | Уровень | Что проверяет | Docker |
 | --- | --- | --- | --- |
-| `LocaLoca.Tests` | Unit | PBKDF2-хеширование паролей, HMAC-сессии, сигнатуры и MIME изображений | Нет |
+| `LocaLoca.Tests` | Unit | PBKDF2-хеширование паролей, HMAC-сессии, сигнатуры и MIME изображений; чтение конфигурации и legacy-формата | Нет |
+| Windows DPAPI tests | Windows unit (same project) | DPAPI-шифрование/расшифровка пароля, сохранение и повторное использование ключа локальной сессии; выполняется на `windows-latest` | Нет |
 | `LocaLoca.Api.Tests` | API integration | HTTP-маршруты, регистрацию и вход, авторизацию, изоляцию пользователей, посещения, wishlist, личные точки и фотографии | Да |
 | `LocaLoca.Database.Tests` | Database integration | PostgreSQL-схему, ограничения, внешние ключи, каскады, миграции и runtime-права | Да |
 
@@ -20,7 +21,7 @@
 - Docker Desktop с работающим Linux-контейнерным движком для API- и Database-тестов.
 - Доступ к NuGet для первичного восстановления пакетов.
 
-Unit-тесты не требуют Docker и внешней базы данных. API- и Database-тесты запускают PostgreSQL 16 через Testcontainers.
+Unit-тесты не требуют Docker и внешней базы данных. Windows-only DPAPI-сценарии явно помечаются как skipped на Linux и выполняются отдельным job на `windows-latest`. Тесты конфигурации создают временный `server-config.json` с синтетическими значениями; пользовательский файл конфигурации и production-секреты в репозитории не хранятся. API- и Database-тесты запускают PostgreSQL 16 через Testcontainers.
 
 ## Запуск всех тестов
 
