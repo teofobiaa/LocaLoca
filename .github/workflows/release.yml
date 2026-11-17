@@ -7,6 +7,14 @@ on:
         description: 'Stable version without v prefix (example: 1.2.0)'
         required: true
         type: string
+      mode:
+        description: 'Create a new release or rebuild assets for an existing release'
+        required: true
+        type: choice
+        options:
+          - create
+          - refresh
+        default: create
   release:
     types: [published, edited]
 
@@ -33,9 +41,11 @@ jobs:
         shell: pwsh
         env:
           RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_MODE: ${{ inputs.mode }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           RELEASE_IS_DRAFT: ${{ github.event.release.draft }}
           RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if ($env:GITHUB_EVENT_NAME -eq 'release') {
             if ($env:RELEASE_IS_DRAFT -eq 'true' -or $env:RELEASE_IS_PRERELEASE -eq 'true') {
@@ -91,11 +101,38 @@ jobs:
               throw 'Could not check remote Git tags.'
             }
 
-            if (-not [string]::IsNullOrWhiteSpace(($existingTag | Out-String))) {
-              throw "Tag $tag already exists. Choose a new version or publish/edit the existing GitHub Release."
-            }
+            $tagExists = -not [string]::IsNullOrWhiteSpace(($existingTag | Out-String))
+            if ($env:RELEASE_MODE -eq 'refresh') {
+              if (-not $tagExists) {
+                throw "Cannot refresh $tag because its Git tag does not exist."
+              }
 
-            Write-Host "Preparing new stable release $tag from $mainSha."
+              $headers = @{
+                Accept = 'application/vnd.github+json'
+                Authorization = "Bearer $env:GH_TOKEN"
+                'X-GitHub-Api-Version' = '2022-11-28'
+              }
+              $releaseUrl = "https://api.github.com/repos/$env:GITHUB_REPOSITORY/releases/tags/$tag"
+              try {
+                $existingRelease = Invoke-RestMethod -Method Get -Uri $releaseUrl -Headers $headers
+              }
+              catch {
+                throw "Cannot refresh $tag because the published GitHub Release could not be found: $($_.Exception.Message)"
+              }
+
+              if ($existingRelease.draft -or $existingRelease.prerelease) {
+                throw "Only an existing published stable release can be refreshed: $tag."
+              }
+
+              Write-Host "Refreshing assets for existing release $tag from current main commit $mainSha. The Git tag will not be moved."
+            }
+            else {
+              if ($tagExists) {
+                throw "Tag $tag already exists. Choose a new version or use mode=refresh to replace the existing release assets."
+              }
+
+              Write-Host "Preparing new stable release $tag from $mainSha."
+            }
           }
 
           "tag=$tag" >> $env:GITHUB_OUTPUT
@@ -167,11 +204,12 @@ jobs:
         with:
           tag_name: ${{ steps.validate.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: ${{ github.event_name == 'release' && github.event.release.name || format('Loca Loca {0}', steps.validate.outputs.tag) }}
-          generate_release_notes: ${{ github.event_name == 'workflow_dispatch' }}
+          name: ${{ github.event_name == 'release' && github.event.release.name || (inputs.mode == 'refresh' && '' || format('Loca Loca {0}', steps.validate.outputs.tag)) }}
+          generate_release_notes: ${{ github.event_name == 'workflow_dispatch' && inputs.mode != 'refresh' }}
           make_latest: true
           draft: false
           prerelease: false
+          overwrite_files: true
           fail_on_unmatched_files: true
           files: |
             Builds/Installer/LocaLoca-Setup.exe
