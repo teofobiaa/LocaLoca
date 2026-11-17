@@ -99,6 +99,7 @@ public static class RelationshipEndpoints
             var (lowId, highId) = OrderedPair(userId, targetUserId);
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            await LockRelationshipPairAsync(connection, transaction, lowId, highId, cancellationToken);
 
             await using (var targetCheck = new NpgsqlCommand(@"
                 SELECT EXISTS (SELECT 1 FROM public.users WHERE user_id = @target)
@@ -153,14 +154,26 @@ public static class RelationshipEndpoints
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
                 SELECT u.user_id,
+                       u.login,
+                       CASE WHEN COALESCE(v.display_name_visibility, 'registered') = 'registered'
+                            THEN u.display_name ELSE NULL END AS display_name,
+                       CASE WHEN COALESCE(v.avatar_visibility, 'registered') = 'registered'
+                            THEN EXISTS (SELECT 1 FROM public.user_avatars a WHERE a.user_id = u.user_id)
+                            ELSE NULL END AS has_avatar,
                        f.requested_by_user_id <> @user AS is_incoming,
                        f.created_at
                 FROM public.user_friendships f
                 JOIN public.users u ON u.user_id =
                     CASE WHEN f.user_low_id = @user THEN f.user_high_id ELSE f.user_low_id END
+                LEFT JOIN public.user_profile_visibility v ON v.user_id = u.user_id
                 WHERE f.status = 'pending'
                   AND (f.user_low_id = @user OR f.user_high_id = @user)
-                ORDER BY f.created_at DESC, u.user_id", connection);
+                  AND NOT EXISTS (
+                      SELECT 1 FROM public.user_blocks b
+                      WHERE (b.blocker_user_id = @user AND b.blocked_user_id = u.user_id)
+                         OR (b.blocker_user_id = u.user_id AND b.blocked_user_id = @user)
+                  )
+                ORDER BY f.created_at DESC, u.login", connection);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
 
             var items = new List<FriendRequestDto>();
@@ -168,8 +181,11 @@ public static class RelationshipEndpoints
             while (await reader.ReadAsync(cancellationToken))
                 items.Add(new FriendRequestDto(
                     reader.GetInt32(0),
-                    reader.GetBoolean(1),
-                    reader.GetDateTime(2)));
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetBoolean(3),
+                    reader.GetBoolean(4),
+                    reader.GetDateTime(5)));
 
             return Results.Ok(new ItemsResponse<FriendRequestDto>(items));
         });
