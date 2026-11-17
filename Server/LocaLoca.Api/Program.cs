@@ -118,6 +118,7 @@ app.Use(async (context, next) =>
     // Render routes public traffic through Cloudflare and supplies the canonical
     // client address in CF-Connecting-IP. Do not trust arbitrary X-Forwarded-For.
     var path = context.Request.Path.Value;
+    var pathSegments = path?.Split('/', StringSplitOptions.RemoveEmptyEntries);
     string? policyKey = null;
     var permitLimit = 0;
 
@@ -126,6 +127,16 @@ app.Use(async (context, next) =>
     {
         policyKey = "user-search";
         permitLimit = 30;
+    }
+    else if (HttpMethods.IsPost(context.Request.Method) &&
+        pathSegments is { Length: 4 } &&
+        string.Equals(pathSegments[0], "api", StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(pathSegments[1], "users", StringComparison.OrdinalIgnoreCase) &&
+        int.TryParse(pathSegments[2], out _) &&
+        string.Equals(pathSegments[3], "friend-request", StringComparison.OrdinalIgnoreCase))
+    {
+        policyKey = "friend-request";
+        permitLimit = 10;
     }
     else if (HttpMethods.IsPost(context.Request.Method))
     {
