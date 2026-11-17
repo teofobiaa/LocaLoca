@@ -1396,6 +1396,19 @@ public sealed class ApiIntegrationTests
         });
         Assert.Equal(HttpStatusCode.OK, updatePrivacy.StatusCode);
 
+        // A client from before schema v22 sends only the original four profile fields.
+        // Such an update must preserve the birthday audience rather than reset or reject it.
+        using var legacyPrivacyUpdate = await ownerClient.PutAsJsonAsync("/api/me/profile/privacy", new
+        {
+            displayNameVisibility = "friends",
+            avatarVisibility = "private",
+            residenceCountryVisibility = "registered",
+            residenceCityVisibility = "friends"
+        });
+        Assert.Equal(HttpStatusCode.OK, legacyPrivacyUpdate.StatusCode);
+        using var legacyPrivacy = JsonDocument.Parse(await legacyPrivacyUpdate.Content.ReadAsStringAsync());
+        Assert.Equal("friends", legacyPrivacy.RootElement.GetProperty("dateOfBirthVisibility").GetString());
+
         using var hiddenAvatar = await viewerClient.GetAsync($"/api/users/{owner.UserId}/avatar?size=thumbnail");
         Assert.Equal(HttpStatusCode.NotFound, hiddenAvatar.StatusCode);
         using var ownerAvatar = await ownerClient.GetAsync($"/api/users/{owner.UserId}/avatar?size=thumbnail");
