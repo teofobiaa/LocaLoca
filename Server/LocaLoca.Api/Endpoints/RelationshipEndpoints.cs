@@ -359,16 +359,17 @@ public static class RelationshipEndpoints
 
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var command = new NpgsqlCommand(@"
-                SELECT b.blocked_user_id
+                SELECT b.blocked_user_id, u.login
                 FROM public.user_blocks b
+                JOIN public.users u ON u.user_id = b.blocked_user_id
                 WHERE b.blocker_user_id = @user
-                ORDER BY b.blocked_user_id", connection);
+                ORDER BY u.login", connection);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
 
             var items = new List<UserBlockDto>();
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
-                items.Add(new UserBlockDto(reader.GetInt32(0)));
+                items.Add(new UserBlockDto(reader.GetInt32(0), reader.GetString(1)));
 
             return Results.Ok(new ItemsResponse<UserBlockDto>(items));
         });
