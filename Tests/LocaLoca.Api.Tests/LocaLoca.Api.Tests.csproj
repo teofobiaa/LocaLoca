@@ -4,6 +4,9 @@
     <Content Include="../../database/migrations/16_catalog_search_trigram_indexes.sql"
              Link="Database/migrations/16_catalog_search_trigram_indexes.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/17_user_login_prefix_search.sql"
+             Link="Database/migrations/17_user_login_prefix_search.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
