@@ -25,8 +25,6 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<VisitDto> _visits = new();
     private readonly ObservableCollection<AttractionDto> _wishlistAttractions = new();
     private readonly ObservableCollection<FriendListItemViewModel> _friends = new();
-    private readonly ObservableCollection<BirthdayContactDto> _birthdayContacts = new();
-    private int? _editingBirthdayContactId;
     private readonly HashSet<int> _wishlistIds = new();
     private readonly Dictionary<int, AttractionDto> _attractionCache = new();
     private const int CatalogPageSize = 50;
@@ -52,7 +50,6 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<VisitDto> Visits => _visits;
     public ObservableCollection<AttractionDto> WishlistAttractions => _wishlistAttractions;
     public ObservableCollection<FriendListItemViewModel> Friends => _friends;
-    public ObservableCollection<BirthdayContactDto> BirthdayContacts => _birthdayContacts;
     public MainWindow()
     {
         InitializeComponent();
@@ -213,7 +210,6 @@ public sealed partial class MainWindow : Window
             CountriesCountText.Text = summary.Countries.ToString();
             ConnectionStatusText.Text = "Облачная база подключена";
             await RefreshLocalRecommendationsAsync();
-            await LoadDashboardBirthdayReminderAsync();
         }
         catch (Exception ex)
         {
@@ -1065,6 +1061,14 @@ public sealed partial class MainWindow : Window
                 Foreground = Brush("#819087")
             });
 
+            if (profile.BirthdayMonth is { } birthdayMonth && profile.BirthdayDay is { } birthdayDay)
+                profileContent.Children.Add(new TextBlock
+                {
+                    Text = $"День рождения: {birthdayDay:00}.{birthdayMonth:00}",
+                    FontSize = 13,
+                    Foreground = Brush("#74837A")
+                });
+
             var location = string.Join(" · ",
                 new[] { profile.ResidenceCity, profile.ResidenceCountry }
                     .Where(value => !string.IsNullOrWhiteSpace(value)));
@@ -1596,6 +1600,14 @@ public sealed partial class MainWindow : Window
                 Foreground = Brush("#819087")
             });
 
+            if (profile.BirthdayMonth is { } birthdayMonth && profile.BirthdayDay is { } birthdayDay)
+                content.Children.Add(new TextBlock
+                {
+                    Text = $"День рождения: {birthdayDay:00}.{birthdayMonth:00}",
+                    FontSize = 13,
+                    Foreground = Brush("#53645B")
+                });
+
             if (!string.IsNullOrWhiteSpace(profile.ResidenceCity))
                 content.Children.Add(new TextBlock
                 {
@@ -1673,6 +1685,7 @@ public sealed partial class MainWindow : Window
             ProfileAvatarVisibilityBox.SelectedValue = settings.AvatarVisibility;
             ProfileResidenceCountryVisibilityBox.SelectedValue = settings.ResidenceCountryVisibility;
             ProfileResidenceCityVisibilityBox.SelectedValue = settings.ResidenceCityVisibility;
+            ProfileDateOfBirthVisibilityBox.SelectedValue = settings.DateOfBirthVisibility;
             SetProfilePrivacyStatus(string.Empty, "muted");
         }
         catch (Exception ex)
@@ -1868,8 +1881,9 @@ public sealed partial class MainWindow : Window
         var avatar = SelectedVisibility(ProfileAvatarVisibilityBox);
         var country = SelectedVisibility(ProfileResidenceCountryVisibilityBox);
         var city = SelectedVisibility(ProfileResidenceCityVisibilityBox);
+        var dateOfBirth = SelectedVisibility(ProfileDateOfBirthVisibilityBox);
         var allowed = new[] { "private", "friends", "registered" };
-        if (new[] { displayName, avatar, country, city }.Any(value => value is null || !allowed.Contains(value)))
+        if (new[] { displayName, avatar, country, city, dateOfBirth }.Any(value => value is null || !allowed.Contains(value)))
         {
             SetProfilePrivacyStatus("Выбери видимость для каждого поля.", "error");
             return;
@@ -1880,7 +1894,7 @@ public sealed partial class MainWindow : Window
         try
         {
             var settings = new UpdateProfilePrivacyRequest(
-                displayName!, avatar!, country!, city!);
+                displayName!, avatar!, country!, city!, dateOfBirth!);
             await _api.UpdateProfilePrivacyAsync(settings);
             SetProfilePrivacyStatus("Настройки видимости сохранены.", "success");
         }
@@ -1976,69 +1990,21 @@ public sealed partial class MainWindow : Window
         var maximum = ToCalendarDate(DateOnly.FromDateTime(DateTime.Today));
         ProfileBirthDatePicker.MinDate = minimum;
         ProfileBirthDatePicker.MaxDate = maximum;
-        BirthdayContactDatePicker.MinDate = minimum;
-        BirthdayContactDatePicker.MaxDate = maximum;
     }
 
     private async Task LoadBirthdaySettingsAsync()
     {
         InitializeBirthdayDatePickers();
         SetBirthDateStatus(string.Empty, "muted");
-        SetBirthdayContactsStatus(string.Empty, "muted");
-        ResetBirthdayContactEditor();
-
         try
         {
             var birthDate = await _api.GetMyBirthDateAsync();
             ProfileBirthDatePicker.Date = birthDate is { } date ? ToCalendarDate(date) : null;
-            await LoadBirthdayContactsAsync();
         }
         catch (Exception ex)
         {
             SetBirthDateStatus("Не удалось загрузить дату рождения: " + ex.Message, "error");
-            SetBirthdayContactsStatus("Не удалось загрузить дни рождения друзей: " + ex.Message, "error");
         }
-    }
-
-    private async Task LoadBirthdayContactsAsync()
-    {
-        var contacts = await _api.GetBirthdayContactsAsync(DateOnly.FromDateTime(DateTime.Today));
-        _birthdayContacts.Clear();
-        foreach (var contact in contacts)
-            _birthdayContacts.Add(contact);
-
-        UpdateDashboardBirthdayReminder(contacts);
-    }
-
-    private async Task LoadDashboardBirthdayReminderAsync()
-    {
-        try
-        {
-            var contacts = await _api.GetBirthdayContactsAsync(DateOnly.FromDateTime(DateTime.Today));
-            UpdateDashboardBirthdayReminder(contacts);
-        }
-        catch (Exception ex)
-        {
-            DashboardBirthdayReminderText.Text = "Не удалось загрузить напоминания о днях рождения: " + ex.Message;
-        }
-    }
-
-    private void UpdateDashboardBirthdayReminder(IReadOnlyList<BirthdayContactDto> contacts)
-    {
-        if (contacts.Count == 0)
-        {
-            DashboardBirthdayReminderText.Text = "Добавь дни рождения друзей в профиле — ближайшие напоминания появятся здесь.";
-            return;
-        }
-
-        var next = contacts[0];
-        var when = next.DaysUntilBirthday switch
-        {
-            0 => "Сегодня",
-            1 => "Завтра",
-            _ => $"Через {next.DaysUntilBirthday} дн."
-        };
-        DashboardBirthdayReminderText.Text = $"{when}: день рождения — {next.DisplayName}. {next.BirthdayDetails}";
     }
 
     private async void SaveBirthDate_Click(object sender, RoutedEventArgs e)
@@ -2062,7 +2028,7 @@ public sealed partial class MainWindow : Window
         try
         {
             await _api.UpdateMyBirthDateAsync(date);
-            SetBirthDateStatus("Дата рождения сохранена. Она не отображается в публичном профиле.", "success");
+            SetBirthDateStatus("Дата рождения сохранена. День и месяц показываются только согласно выбранной видимости; год остаётся приватным.", "success");
             await RefreshLocalRecommendationsAsync();
         }
         catch (Exception ex)
@@ -2098,139 +2064,6 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private async void SaveBirthdayContact_Click(object sender, RoutedEventArgs e)
-    {
-        var displayName = BirthdayContactNameBox.Text.Trim();
-        if (displayName.Length is < 1 or > 80)
-        {
-            SetBirthdayContactsStatus("Имя должно содержать от 1 до 80 символов.", "error");
-            return;
-        }
-        if (BirthdayContactDatePicker.Date is not { } selectedDate)
-        {
-            SetBirthdayContactsStatus("Выбери дату рождения контакта.", "error");
-            return;
-        }
-
-        var birthDate = DateOnly.FromDateTime(selectedDate.DateTime);
-        if (birthDate > DateOnly.FromDateTime(DateTime.Today))
-        {
-            SetBirthdayContactsStatus("Дата рождения не может быть в будущем.", "error");
-            return;
-        }
-
-        BirthdayContactSaveButton.IsEnabled = false;
-        BirthdayContactCancelEditButton.IsEnabled = false;
-        SetBirthdayContactsStatus(_editingBirthdayContactId.HasValue ? "Сохраняем изменения…" : "Добавляем контакт…", "muted");
-        try
-        {
-            if (_editingBirthdayContactId is { } contactId)
-                await _api.UpdateBirthdayContactAsync(contactId, displayName, birthDate);
-            else
-                await _api.CreateBirthdayContactAsync(displayName, birthDate);
-
-            ResetBirthdayContactEditor();
-            await LoadBirthdayContactsAsync();
-            SetBirthdayContactsStatus("День рождения сохранён. Напоминание и ежегодное событие доступны в списке.", "success");
-        }
-        catch (Exception ex)
-        {
-            SetBirthdayContactsStatus(ex.Message, "error");
-        }
-        finally
-        {
-            BirthdayContactSaveButton.IsEnabled = true;
-            BirthdayContactCancelEditButton.IsEnabled = true;
-        }
-    }
-
-    private void EditBirthdayContact_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button button || !int.TryParse(Convert.ToString(button.Tag), out var contactId))
-            return;
-
-        var contact = _birthdayContacts.FirstOrDefault(item => item.Id == contactId);
-        if (contact is null) return;
-
-        _editingBirthdayContactId = contact.Id;
-        BirthdayContactNameBox.Text = contact.DisplayName;
-        BirthdayContactDatePicker.Date = ToCalendarDate(contact.BirthDate);
-        BirthdayContactSaveButton.Content = "Сохранить";
-        BirthdayContactCancelEditButton.Visibility = Visibility.Visible;
-        SetBirthdayContactsStatus("Изменяешь контакт: " + contact.DisplayName, "muted");
-    }
-
-    private void CancelBirthdayContactEdit_Click(object sender, RoutedEventArgs e)
-    {
-        ResetBirthdayContactEditor();
-        SetBirthdayContactsStatus("Редактирование отменено.", "muted");
-    }
-
-    private void ResetBirthdayContactEditor()
-    {
-        _editingBirthdayContactId = null;
-        BirthdayContactNameBox.Text = string.Empty;
-        BirthdayContactDatePicker.Date = null;
-        BirthdayContactSaveButton.Content = "Добавить";
-        BirthdayContactCancelEditButton.Visibility = Visibility.Collapsed;
-    }
-
-    private async void DeleteBirthdayContact_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button button || !int.TryParse(Convert.ToString(button.Tag), out var contactId))
-            return;
-
-        button.IsEnabled = false;
-        try
-        {
-            await _api.DeleteBirthdayContactAsync(contactId);
-            if (_editingBirthdayContactId == contactId)
-                ResetBirthdayContactEditor();
-            await LoadBirthdayContactsAsync();
-            SetBirthdayContactsStatus("День рождения удалён из твоего списка.", "success");
-        }
-        catch (Exception ex)
-        {
-            SetBirthdayContactsStatus(ex.Message, "error");
-        }
-        finally
-        {
-            button.IsEnabled = true;
-        }
-    }
-
-    private async void ExportBirthdayCalendar_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is not Button button || !int.TryParse(Convert.ToString(button.Tag), out var contactId))
-            return;
-
-        button.IsEnabled = false;
-        try
-        {
-            var picker = new FileSavePicker
-            {
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
-                SuggestedFileName = $"birthday-{contactId}"
-            };
-            picker.FileTypeChoices.Add("Календарь iCalendar", new List<string> { ".ics" });
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(this));
-            var file = await picker.PickSaveFileAsync();
-            if (file is null) return;
-
-            var calendar = await _api.GetBirthdayCalendarAsync(contactId);
-            await FileIO.WriteTextAsync(file, calendar, UnicodeEncoding.Utf8);
-            SetBirthdayContactsStatus("Файл календаря сохранён. Импортируй .ics в календарь, чтобы получать ежегодные напоминания.", "success");
-        }
-        catch (Exception ex)
-        {
-            SetBirthdayContactsStatus(ex.Message, "error");
-        }
-        finally
-        {
-            button.IsEnabled = true;
-        }
-    }
-
     private void SetBirthDateStatus(string message, string tone)
     {
         ProfileBirthDateStatusText.Text = message;
@@ -2241,18 +2074,6 @@ public sealed partial class MainWindow : Window
             _ => "#7A8980"
         });
     }
-
-    private void SetBirthdayContactsStatus(string message, string tone)
-    {
-        BirthdayContactsStatusText.Text = message;
-        BirthdayContactsStatusText.Foreground = Brush(tone switch
-        {
-            "success" => "#4F8758",
-            "error" => "#B85D4D",
-            _ => "#7A8980"
-        });
-    }
-
 
     private async void ProfileTheme_Toggled(object sender, RoutedEventArgs e)
     {
