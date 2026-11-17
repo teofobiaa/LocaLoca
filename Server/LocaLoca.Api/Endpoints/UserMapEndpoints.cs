@@ -39,6 +39,9 @@ public static class UserMapEndpoints
                 return Results.BadRequest(new ApiErrorResponse("Границы видимой области карты содержат некорректные координаты."));
         
             var offset = ((long)currentPage - 1) * currentPageSize;
+            if (offset > MaxPageOffset)
+                return Results.BadRequest(new ApiErrorResponse(
+                    $"Смещение маркеров карты не должно превышать {MaxPageOffset} записей. Запросите более раннюю страницу."));
             var items = new List<MapMarkerDto>();
             await using var connection = await OpenAsync(connectionString, cancellationToken);
         
