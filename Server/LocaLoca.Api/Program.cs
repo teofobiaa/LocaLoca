@@ -121,7 +121,13 @@ app.Use(async (context, next) =>
     string? policyKey = null;
     var permitLimit = 0;
 
-    if (HttpMethods.IsPost(context.Request.Method))
+    if (HttpMethods.IsGet(context.Request.Method) &&
+        string.Equals(path, "/api/users/search", StringComparison.OrdinalIgnoreCase))
+    {
+        policyKey = "user-search";
+        permitLimit = 30;
+    }
+    else if (HttpMethods.IsPost(context.Request.Method))
     {
         if (string.Equals(path, "/api/auth/login", StringComparison.OrdinalIgnoreCase))
         {
