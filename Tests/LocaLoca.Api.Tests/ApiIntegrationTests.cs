@@ -1102,6 +1102,8 @@ public sealed class ApiIntegrationTests
         using var initialSearch = await requesterClient.GetAsync(
             "/api/users/search?login=" + Uri.EscapeDataString(searchPrefix));
         Assert.Equal(HttpStatusCode.OK, initialSearch.StatusCode);
+        Assert.True(initialSearch.Headers.CacheControl?.Private);
+        Assert.True(initialSearch.Headers.CacheControl?.NoStore);
         using (var initialJson = JsonDocument.Parse(await initialSearch.Content.ReadAsStringAsync()))
         {
             var items = initialJson.RootElement.GetProperty("items");
