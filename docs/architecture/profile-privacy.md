@@ -76,7 +76,7 @@
 - `GET /api/me/friends` — список подтверждённых друзей;
 - `DELETE /api/me/friends/{id}` — удалить из друзей.
 
-Клиентский `LocaLocaApiClient` предоставляет методы `SearchUsersAsync`, `SendFriendRequestAsync`, `GetFriendRequestsAsync`, `AcceptFriendRequestAsync`, `CancelOrRejectFriendRequestAsync`, `GetFriendsAsync` и `RemoveFriendAsync`. Для блокировок доступны `BlockUserAsync`, `GetBlockedUsersAsync` и `UnblockUserAsync`. Числовой `userId` не предназначен для отображения пользователю.
+Клиентский `LocaLocaApiClient` предоставляет методы `SearchUsersAsync`, `SendFriendRequestAsync`, `GetFriendRequestsAsync`, `AcceptFriendRequestAsync`, `CancelOrRejectFriendRequestAsync`, `GetFriendsAsync` и `RemoveFriendAsync`. Для блокировок доступны `BlockUserAsync`, `GetBlockedUsersAsync` и `UnblockUserAsync`. Для просмотра разрешённых полей чужого профиля и загрузки аватара используются `GetUserProfileAsync` и `GetUserAvatarBytesAsync`; недоступный или скрытый аватар клиент получает как `null`. Числовой `userId` не предназначен для отображения пользователю.
 
 Блокировки:
 - `POST /api/users/{id}/block` — заблокировать;
