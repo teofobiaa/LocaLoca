@@ -409,7 +409,7 @@ public static class RelationshipEndpoints
             "SELECT pg_advisory_xact_lock(@low, @high)", connection, transaction);
         command.Parameters.AddWithValue("low", NpgsqlDbType.Integer, lowId);
         command.Parameters.AddWithValue("high", NpgsqlDbType.Integer, highId);
-        await command.ExecuteScalarAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static (int LowId, int HighId) OrderedPair(int first, int second) =>
