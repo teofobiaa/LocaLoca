@@ -513,9 +513,9 @@ def main():
         or ["- None in the selected period."]
     )
 
-    if coverage["incomplete_windows"]:
+    if coverage["pagination_incomplete_windows"]:
         lines.extend(["", "## Incomplete pagination windows", ""])
-        for window in coverage["incomplete_windows"]:
+        for window in coverage["pagination_incomplete_windows"]:
             lines.append(
                 f"- {window['event']}: {window['since_utc']} to "
                 f"{window['until_utc_exclusive']} — {window['reason']}"
