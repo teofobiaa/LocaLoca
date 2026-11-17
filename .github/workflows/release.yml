@@ -124,6 +124,7 @@ jobs:
                 throw "Only an existing published stable release can be refreshed: $tag."
               }
 
+              "release_name=$($existingRelease.name)" >> $env:GITHUB_OUTPUT
               Write-Host "Refreshing assets for existing release $tag from current main commit $mainSha. The Git tag will not be moved."
             }
             else {
@@ -204,7 +205,7 @@ jobs:
         with:
           tag_name: ${{ steps.validate.outputs.tag }}
           target_commitish: ${{ github.sha }}
-          name: ${{ github.event_name == 'release' && github.event.release.name || (inputs.mode == 'refresh' && '' || format('Loca Loca {0}', steps.validate.outputs.tag)) }}
+          name: ${{ github.event_name == 'release' && github.event.release.name || (inputs.mode == 'refresh' && steps.validate.outputs.release_name || format('Loca Loca {0}', steps.validate.outputs.tag)) }}
           generate_release_notes: ${{ github.event_name == 'workflow_dispatch' && inputs.mode != 'refresh' }}
           make_latest: true
           draft: false
