@@ -43,7 +43,7 @@ public static class BirthdayEndpoints
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
             context.Response.Headers["Cache-Control"] = "private, no-store";
 
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = GetUserToday(context);
             if (request.DateOfBirth is { } date &&
                 (date < EarliestBirthDate || date > today))
             {
@@ -113,7 +113,7 @@ public static class BirthdayEndpoints
             if (!TryUser(context, sessions, out var userId)) return Results.Unauthorized();
             context.Response.Headers["Cache-Control"] = "private, no-store";
 
-            var validation = ValidateContact(request.DisplayName, request.BirthDate);
+            var validation = ValidateContact(context, request.DisplayName, request.BirthDate);
             if (validation is not null) return Results.BadRequest(new ApiErrorResponse(validation));
 
             var displayName = request.DisplayName?.Trim() ?? string.Empty;
@@ -227,13 +227,13 @@ public static class BirthdayEndpoints
         };
     }
 
-    private static string? ValidateContact(string? displayName, DateOnly birthDate)
+    private static string? ValidateContact(HttpContext context, string? displayName, DateOnly birthDate)
     {
         var normalizedName = displayName?.Trim() ?? string.Empty;
         if (normalizedName.Length is < 1 or > 80 || normalizedName.Any(char.IsControl))
             return "Имя контакта должно содержать от 1 до 80 символов и не содержать управляющих символов.";
 
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var today = GetUserToday(context);
         if (birthDate < EarliestBirthDate || birthDate > today)
             return $"Дата рождения должна находиться между {EarliestBirthDate:yyyy-MM-dd} и сегодняшним днём.";
 
