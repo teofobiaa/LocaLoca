@@ -23,6 +23,7 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<AttractionDto> _attractions = new();
     private readonly ObservableCollection<VisitDto> _visits = new();
     private readonly ObservableCollection<AttractionDto> _wishlistAttractions = new();
+    private readonly ObservableCollection<FriendListItemViewModel> _friends = new();
     private readonly ObservableCollection<BirthdayContactDto> _birthdayContacts = new();
     private int? _editingBirthdayContactId;
     private readonly HashSet<int> _wishlistIds = new();
@@ -37,6 +38,7 @@ public sealed partial class MainWindow : Window
     private List<CategoryDto> _categories = new();
     private bool _isRegisterMode;
     private bool _initialized;
+    private bool _friendsLoading;
     private bool _mapInitialized;
     private bool _isDarkTheme;
     private string _authStatusTone = "muted";
@@ -45,6 +47,7 @@ public sealed partial class MainWindow : Window
     public ObservableCollection<AttractionDto> Attractions => _attractions;
     public ObservableCollection<VisitDto> Visits => _visits;
     public ObservableCollection<AttractionDto> WishlistAttractions => _wishlistAttractions;
+    public ObservableCollection<FriendListItemViewModel> Friends => _friends;
     public ObservableCollection<BirthdayContactDto> BirthdayContacts => _birthdayContacts;
     public MainWindow()
     {
@@ -759,6 +762,222 @@ public sealed partial class MainWindow : Window
     }
     private void WishlistNav_Click(object sender, RoutedEventArgs e) => ShowPage("wishlist");
 
+    private async void FriendsNav_Click(object sender, RoutedEventArgs e)
+    {
+        ShowPage("friends");
+        await LoadFriendsAsync();
+    }
+
+    private async void RefreshFriends_Click(object sender, RoutedEventArgs e) =>
+        await LoadFriendsAsync();
+
+    private async Task LoadFriendsAsync()
+    {
+        if (_friendsLoading) return;
+
+        _friendsLoading = true;
+        FriendsRefreshButton.IsEnabled = false;
+        FriendsStatusText.Text = "Обновляем список друзей…";
+
+        try
+        {
+            var friends = await _api.GetFriendsAsync();
+            _friends.Clear();
+
+            foreach (var friend in friends)
+            {
+                _friends.Add(new FriendListItemViewModel(
+                    friend.UserId,
+                    friend.Login,
+                    friend.DisplayName,
+                    CreateInitials(friend.DisplayName, friend.Login),
+                    AvatarSource: null));
+            }
+
+            var hasFriends = _friends.Count > 0;
+            FriendsList.Visibility = hasFriends ? Visibility.Visible : Visibility.Collapsed;
+            FriendsEmptyState.Visibility = hasFriends ? Visibility.Collapsed : Visibility.Visible;
+
+            if (!hasFriends)
+            {
+                FriendsStatusText.Text = "У тебя пока нет добавленных друзей.";
+                return;
+            }
+
+            FriendsStatusText.Text = $"Друзей: {_friends.Count}";
+
+            // Load several avatars in parallel, but keep the number of concurrent
+            // requests bounded so a large friends list cannot flood the API.
+            using var concurrencyLimit = new SemaphoreSlim(4);
+            var avatarTasks = friends
+                .Where(friend => friend.HasAvatar == true)
+                .Select(async friend =>
+                {
+                    await concurrencyLimit.WaitAsync();
+                    try
+                    {
+                        var bytes = await _api.GetUserAvatarBytesAsync(friend.UserId, thumbnail: true);
+                        if (bytes is null) return;
+
+                        var avatar = await CreateBitmapImageAsync(bytes);
+                        var index = -1;
+                        for (var i = 0; i < _friends.Count; i++)
+                        {
+                            if (_friends[i].UserId != friend.UserId) continue;
+                            index = i;
+                            break;
+                        }
+
+                        if (index >= 0)
+                            _friends[index] = _friends[index] with { AvatarSource = avatar };
+                    }
+                    catch (Exception ex)
+                    {
+                        // An unavailable or newly restricted avatar should not hide
+                        // the rest of the friend list; the initials remain visible.
+                        Debug.WriteLine($"Could not load avatar for friend {friend.UserId}: {ex.Message}");
+                    }
+                    finally
+                    {
+                        concurrencyLimit.Release();
+                    }
+                });
+
+            await Task.WhenAll(avatarTasks);
+        }
+        catch (Exception ex)
+        {
+            FriendsStatusText.Text = "Не удалось обновить список друзей.";
+            await ShowMessageAsync("Не удалось загрузить друзей", ex.Message);
+        }
+        finally
+        {
+            _friendsLoading = false;
+            FriendsRefreshButton.IsEnabled = true;
+        }
+    }
+
+    private static string CreateInitials(string? displayName, string login)
+    {
+        var value = string.IsNullOrWhiteSpace(displayName) ? login.Trim() : displayName.Trim();
+        if (value.Length == 0) return "?";
+
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length > 1)
+            return string.Concat(char.ToUpperInvariant(parts[0][0]), char.ToUpperInvariant(parts[1][0]));
+
+        return value[..Math.Min(2, value.Length)].ToUpperInvariant();
+    }
+
+    private static async Task<BitmapImage> CreateBitmapImageAsync(byte[] bytes)
+    {
+        using var imageStream = new InMemoryRandomAccessStream();
+        using (var writer = new DataWriter(imageStream))
+        {
+            writer.WriteBytes(bytes);
+            await writer.StoreAsync();
+            await writer.FlushAsync();
+        }
+
+        imageStream.Seek(0);
+        var bitmap = new BitmapImage();
+        await bitmap.SetSourceAsync(imageStream);
+        return bitmap;
+    }
+
+    private async void OpenFriendProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not int userId) return;
+        var friend = _friends.FirstOrDefault(item => item.UserId == userId);
+        if (friend is null) return;
+
+        try
+        {
+            var profile = await _api.GetUserProfileAsync(userId);
+            var profileContent = new StackPanel { Spacing = 10 };
+
+            if (profile.HasAvatar == true)
+            {
+                var bytes = await _api.GetUserAvatarBytesAsync(userId, thumbnail: true);
+                if (bytes is not null)
+                {
+                    var avatar = new Image
+                    {
+                        Width = 92,
+                        Height = 92,
+                        Stretch = Stretch.UniformToFill,
+                        HorizontalAlignment = HorizontalAlignment.Left
+                    };
+                    avatar.Source = await CreateBitmapImageAsync(bytes);
+                    profileContent.Children.Add(avatar);
+                }
+            }
+
+            profileContent.Children.Add(new TextBlock
+            {
+                Text = profile.DisplayName ?? friend.Login,
+                FontSize = 22,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = Brush("#1B2A25")
+            });
+            profileContent.Children.Add(new TextBlock
+            {
+                Text = friend.LoginLabel,
+                FontSize = 13,
+                Foreground = Brush("#819087")
+            });
+
+            var location = string.Join(" · ",
+                new[] { profile.ResidenceCity, profile.ResidenceCountry }
+                    .Where(value => !string.IsNullOrWhiteSpace(value)));
+            if (!string.IsNullOrWhiteSpace(location))
+            {
+                profileContent.Children.Add(new TextBlock
+                {
+                    Text = location,
+                    FontSize = 13,
+                    Foreground = Brush("#74837A")
+                });
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = "Профиль друга",
+                Content = profileContent,
+                CloseButtonText = "Закрыть",
+                RequestedTheme = Root.RequestedTheme,
+                XamlRoot = Root.XamlRoot
+            };
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось открыть профиль", ex.Message);
+        }
+    }
+
+    private async void RemoveFriend_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not int userId) return;
+        var friend = _friends.FirstOrDefault(item => item.UserId == userId);
+        if (friend is null) return;
+
+        var result = await ConfirmAsync(
+            "Удалить из друзей?",
+            $"Пользователь {friend.LoginLabel} будет удалён из списка друзей.");
+        if (result != ContentDialogResult.Primary) return;
+
+        try
+        {
+            await _api.RemoveFriendAsync(userId);
+            await LoadFriendsAsync();
+        }
+        catch (Exception ex)
+        {
+            await ShowMessageAsync("Не удалось удалить друга", ex.Message);
+        }
+    }
+
     private async void MapNav_Click(object sender, RoutedEventArgs e) => await OpenMapAsync();
 
     private void MapWebView_WebResourceRequested(
@@ -811,6 +1030,7 @@ public sealed partial class MainWindow : Window
         VisitsPage.Visibility = page == "visits" ? Visibility.Visible : Visibility.Collapsed;
         WishlistPage.Visibility = page == "wishlist" ? Visibility.Visible : Visibility.Collapsed;
         MapPage.Visibility = page == "map" ? Visibility.Visible : Visibility.Collapsed;
+        FriendsPage.Visibility = page == "friends" ? Visibility.Visible : Visibility.Collapsed;
         ProfilePage.Visibility = page == "profile" ? Visibility.Visible : Visibility.Collapsed;
         SupportPage.Visibility = page == "support" ? Visibility.Visible : Visibility.Collapsed;
         FriendsPage.Visibility = page == "friends" ? Visibility.Visible : Visibility.Collapsed;
@@ -822,12 +1042,14 @@ public sealed partial class MainWindow : Window
             "visits" => ("Сохранённые моменты", "Мои посещения"),
             "wishlist" => ("Идеи для следующей поездки", "Хочу посетить"),
             "map" => ("Исследуй мир", "Карта открытий"),
+            "friends" => ("Люди и совместные открытия", "Мои друзья"),
             "profile" => ("Личные данные и оформление", "Профиль и настройки"),
             "friends" => ("Общение и совместные открытия", "Друзья"),
             "support" => ("Контакты и полезные ссылки", "Поддержка"),
             _ => ("Исследуй мир", "Карта открытий")
         };
         HomeNavButton.Background = page == "home" ? Brush("#29443D") : Brush("Transparent");
+        FriendsNavButton.Background = page == "friends" ? Brush("#29443D") : Brush("Transparent");
         SupportNavButton.Background = page == "support" ? Brush("#29443D") : Brush("Transparent");
         FriendsNavButton.Background = page == "friends" ? Brush("#29443D") : Brush("Transparent");
     }
@@ -1923,6 +2145,10 @@ public sealed partial class MainWindow : Window
             catch (Exception ex) { Debug.WriteLine($"WebView2 cleanup failed: {ex.Message}"); }
         }
         _currentUser = null;
+        _friends.Clear();
+        FriendsStatusText.Text = "Список ещё не загружен.";
+        FriendsList.Visibility = Visibility.Collapsed;
+        FriendsEmptyState.Visibility = Visibility.Visible;
         _selectedAttraction = null;
         _selectedVisit = null;
         PasswordBox.Password = string.Empty;
