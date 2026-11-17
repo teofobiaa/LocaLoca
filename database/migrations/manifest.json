@@ -140,5 +140,28 @@
       "repeatable": true,
       "sha256": "6241f74f95dd856370aa9e6f9d563014c44ffbb02e5c9125d7151d64fd4ed209"
     }
-  ]
+  ],
+  "freshInstallBaseline": {
+    "version": 20,
+    "path": "schema/02_schema_v20.sql",
+    "includesSchemaMigrations": [
+      3,
+      4,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20
+    ],
+    "sha256": "5fcba88a86b7d6fe7b36a4b1028ee0ccb4b4dd46ef9cb747f5e4fd4415f52aff"
+  }
 }
