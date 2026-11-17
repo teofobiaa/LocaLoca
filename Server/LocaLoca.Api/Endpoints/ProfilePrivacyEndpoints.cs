@@ -21,7 +21,8 @@ public static class ProfilePrivacyEndpoints
             await EnsurePrivacyRowAsync(connection, userId, cancellationToken);
             await using var command = new NpgsqlCommand(@"
                 SELECT display_name_visibility, avatar_visibility,
-                       residence_country_visibility, residence_city_visibility
+                       residence_country_visibility, residence_city_visibility,
+                       date_of_birth_visibility
                 FROM public.user_profile_visibility
                 WHERE user_id = @user", connection);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
@@ -43,7 +44,8 @@ public static class ProfilePrivacyEndpoints
             if (!IsAllowed(request.DisplayNameVisibility) ||
                 !IsAllowed(request.AvatarVisibility) ||
                 !IsAllowed(request.ResidenceCountryVisibility) ||
-                !IsAllowed(request.ResidenceCityVisibility))
+                !IsAllowed(request.ResidenceCityVisibility) ||
+                !IsAllowed(request.DateOfBirthVisibility))
             {
                 return Results.BadRequest(new ApiErrorResponse(
                     "Для каждого поля выбери один из вариантов: private, friends или registered."));
@@ -57,14 +59,17 @@ public static class ProfilePrivacyEndpoints
                     avatar_visibility = @avatar,
                     residence_country_visibility = @country,
                     residence_city_visibility = @city,
+                    date_of_birth_visibility = @date_of_birth,
                     updated_at = now()
                 WHERE user_id = @user
                 RETURNING display_name_visibility, avatar_visibility,
-                          residence_country_visibility, residence_city_visibility", connection);
+                          residence_country_visibility, residence_city_visibility,
+                          date_of_birth_visibility", connection);
             command.Parameters.AddWithValue("display_name", NpgsqlDbType.Varchar, request.DisplayNameVisibility!);
             command.Parameters.AddWithValue("avatar", NpgsqlDbType.Varchar, request.AvatarVisibility!);
             command.Parameters.AddWithValue("country", NpgsqlDbType.Varchar, request.ResidenceCountryVisibility!);
             command.Parameters.AddWithValue("city", NpgsqlDbType.Varchar, request.ResidenceCityVisibility!);
+            command.Parameters.AddWithValue("date_of_birth", NpgsqlDbType.Varchar, request.DateOfBirthVisibility!);
             command.Parameters.AddWithValue("user", NpgsqlDbType.Integer, userId);
 
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -88,10 +93,12 @@ public static class ProfilePrivacyEndpoints
                            u.display_name,
                            u.residence_country,
                            u.residence_city,
+                           u.date_of_birth,
                            COALESCE(v.display_name_visibility, 'registered') AS display_name_visibility,
                            COALESCE(v.avatar_visibility, 'registered') AS avatar_visibility,
                            COALESCE(v.residence_country_visibility, 'private') AS residence_country_visibility,
                            COALESCE(v.residence_city_visibility, 'private') AS residence_city_visibility,
+                           COALESCE(v.date_of_birth_visibility, 'private') AS date_of_birth_visibility,
                            (@viewer = u.user_id) AS is_owner,
                            EXISTS (
                                SELECT 1
@@ -122,7 +129,15 @@ public static class ProfilePrivacyEndpoints
                        CASE WHEN is_owner OR avatar_visibility = 'registered'
                                   OR (avatar_visibility = 'friends' AND is_friend)
                             THEN EXISTS (SELECT 1 FROM public.user_avatars a WHERE a.user_id = target.user_id)
-                            ELSE NULL END
+                            ELSE NULL END,
+                       CASE WHEN date_of_birth IS NOT NULL AND
+                                  (is_owner OR date_of_birth_visibility = 'registered'
+                                   OR (date_of_birth_visibility = 'friends' AND is_friend))
+                            THEN EXTRACT(MONTH FROM date_of_birth)::int ELSE NULL END,
+                       CASE WHEN date_of_birth IS NOT NULL AND
+                                  (is_owner OR date_of_birth_visibility = 'registered'
+                                   OR (date_of_birth_visibility = 'friends' AND is_friend))
+                            THEN EXTRACT(DAY FROM date_of_birth)::int ELSE NULL END
                 FROM target", connection);
             command.Parameters.AddWithValue("viewer", NpgsqlDbType.Integer, viewerId);
             command.Parameters.AddWithValue("profile", NpgsqlDbType.Integer, profileUserId);
@@ -137,7 +152,9 @@ public static class ProfilePrivacyEndpoints
                 reader.IsDBNull(1) ? null : reader.GetString(1),
                 reader.IsDBNull(2) ? null : reader.GetString(2),
                 reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetBoolean(4)));
+                reader.IsDBNull(4) ? null : reader.GetBoolean(4),
+                reader.IsDBNull(5) ? null : reader.GetInt32(5),
+                reader.IsDBNull(6) ? null : reader.GetInt32(6)));
         });
 
         app.MapGet("/api/users/{profileUserId:int}/avatar", async Task<IResult> (
@@ -204,5 +221,6 @@ public static class ProfilePrivacyEndpoints
         reader.GetString(0),
         reader.GetString(1),
         reader.GetString(2),
-        reader.GetString(3));
+        reader.GetString(3),
+        reader.GetString(4));
 }
