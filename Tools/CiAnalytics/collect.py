@@ -14,8 +14,10 @@ import urllib.request
 import zipfile
 import xml.etree.ElementTree as ET
 
-REPO = os.environ["GITHUB_REPOSITORY"]
-TOKEN = os.environ["GITHUB_TOKEN"]
+# Keep import side-effect-free so pagination and reporting helpers can be unit-tested
+# without injecting CI secrets into the test process.
+REPO = os.getenv("GITHUB_REPOSITORY", "")
+TOKEN = os.getenv("GITHUB_TOKEN", "")
 API = "https://api.github.com"
 DAYS = max(1, min(90, int(os.getenv("ANALYTICS_DAYS", "30"))))
 
@@ -29,9 +31,10 @@ UTC = dt.timezone.utc
 
 HEAD = {
     "Accept": "application/vnd.github+json",
-    "Authorization": f"Bearer {TOKEN}",
     "X-GitHub-Api-Version": "2022-11-28",
 }
+if TOKEN:
+    HEAD["Authorization"] = f"Bearer {TOKEN}"
 
 API_REQUESTS = 0
 API_RETRIES = 0
@@ -328,6 +331,9 @@ def trx(run_id):
 
 def main():
     global API_REQUESTS, API_RETRIES
+
+    if not REPO or not TOKEN:
+        raise RuntimeError("GITHUB_REPOSITORY and GITHUB_TOKEN are required to collect CI analytics.")
 
     generated_at = dt.datetime.now(UTC).replace(microsecond=0)
     since = generated_at - dt.timedelta(days=DAYS)
