@@ -902,7 +902,8 @@ public sealed partial class MainWindow : Window
                 var actions = new List<UIElement>
                 {
                     CreateSocialButton("Принять", request.UserId, request.Login, AcceptFriendRequest_Click, primary: true),
-                    CreateSocialButton("Отклонить", request.UserId, request.Login, RejectFriendRequest_Click)
+                    CreateSocialButton("Отклонить", request.UserId, request.Login, RejectFriendRequest_Click),
+                    CreateSocialButton("Блокировать", request.UserId, request.Login, BlockUser_Click)
                 };
                 IncomingFriendRequestsPanel.Children.Add(CreateSocialCard(
                     request.UserId,
@@ -917,7 +918,8 @@ public sealed partial class MainWindow : Window
             {
                 var actions = new List<UIElement>
                 {
-                    CreateSocialButton("Отменить", request.UserId, request.Login, CancelFriendRequest_Click)
+                    CreateSocialButton("Отменить", request.UserId, request.Login, CancelFriendRequest_Click),
+                    CreateSocialButton("Блокировать", request.UserId, request.Login, BlockUser_Click)
                 };
                 OutgoingFriendRequestsPanel.Children.Add(CreateSocialCard(
                     request.UserId,
@@ -1462,7 +1464,19 @@ public sealed partial class MainWindow : Window
     private async void BlockUser_Click(object sender, RoutedEventArgs e)
     {
         if (!TryGetSocialUser(sender, out var userId, out var login)) return;
+        await BlockUserAsync(userId, login);
+    }
 
+    private async void BlockFriend_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not int userId) return;
+        var friend = _friends.FirstOrDefault(item => item.UserId == userId);
+        if (friend is null) return;
+        await BlockUserAsync(userId, friend.Login);
+    }
+
+    private async Task BlockUserAsync(int userId, string login)
+    {
         var result = await ConfirmAsync(
             "Заблокировать пользователя?",
             $"Пользователь @{login} будет заблокирован. Дружба и все ожидающие заявки между вами будут удалены. Уведомление о блокировке не отправляется.");
