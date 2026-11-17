@@ -23,6 +23,9 @@ public static class PersonalEndpoints
                 return Results.BadRequest(new ApiErrorResponse($"Параметры пагинации должны задавать страницу от 1 и размер от 1 до {MaxPageSize}."));
         
             var offset = ((long)currentPage - 1) * currentPageSize;
+            if (offset > MaxPageOffset)
+                return Results.BadRequest(new ApiErrorResponse(
+                    $"Смещение списка не должно превышать {MaxPageOffset} записей. Запросите более раннюю страницу."));
             var items = new List<VisitDto>();
             await using var connection = await OpenAsync(connectionString, cancellationToken);
         
@@ -83,6 +86,9 @@ public static class PersonalEndpoints
                 return Results.BadRequest(new ApiErrorResponse($"Параметры пагинации должны задавать страницу от 1 и размер от 1 до {MaxPageSize}."));
         
             var offset = ((long)currentPage - 1) * currentPageSize;
+            if (offset > MaxPageOffset)
+                return Results.BadRequest(new ApiErrorResponse(
+                    $"Смещение списка не должно превышать {MaxPageOffset} записей. Запросите более раннюю страницу."));
             var items = new List<int>();
             await using var connection = await OpenAsync(connectionString, cancellationToken);
         
