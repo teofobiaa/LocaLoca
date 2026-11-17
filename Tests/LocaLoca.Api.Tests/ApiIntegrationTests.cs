@@ -1178,6 +1178,40 @@ public sealed class ApiIntegrationTests
             "/api/users/search?login=" + Uri.EscapeDataString(requester.Login));
         using (var reverseBlockedJson = JsonDocument.Parse(await reverseSearchAfterBlock.Content.ReadAsStringAsync()))
             Assert.Empty(reverseBlockedJson.RootElement.GetProperty("items").EnumerateArray());
+
+        using var blockedUsersResponse = await targetClient.GetAsync("/api/me/blocks");
+        Assert.Equal(HttpStatusCode.OK, blockedUsersResponse.StatusCode);
+        Assert.True(blockedUsersResponse.Headers.CacheControl?.Private);
+        Assert.True(blockedUsersResponse.Headers.CacheControl?.NoStore);
+        using (var blockedUsersJson = JsonDocument.Parse(await blockedUsersResponse.Content.ReadAsStringAsync()))
+        {
+            var blockedUser = Assert.Single(blockedUsersJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal(requester.UserId, blockedUser.GetProperty("userId").GetInt32());
+            Assert.Equal(requester.Login, blockedUser.GetProperty("login").GetString());
+        }
+
+        using var unblock = await targetClient.DeleteAsync($"/api/me/blocks/{requester.UserId}");
+        Assert.Equal(HttpStatusCode.OK, unblock.StatusCode);
+
+        using var searchAfterUnblock = await requesterClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(target.Login));
+        using (var unblockedJson = JsonDocument.Parse(await searchAfterUnblock.Content.ReadAsStringAsync()))
+        {
+            var result = Assert.Single(unblockedJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal("none", result.GetProperty("relationshipStatus").GetString());
+        }
+
+        using var reverseSearchAfterUnblock = await targetClient.GetAsync(
+            "/api/users/search?login=" + Uri.EscapeDataString(requester.Login));
+        using (var reverseUnblockedJson = JsonDocument.Parse(await reverseSearchAfterUnblock.Content.ReadAsStringAsync()))
+        {
+            var result = Assert.Single(reverseUnblockedJson.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal("none", result.GetProperty("relationshipStatus").GetString());
+        }
+
+        using var emptyBlockedUsersResponse = await targetClient.GetAsync("/api/me/blocks");
+        using (var emptyBlockedUsersJson = JsonDocument.Parse(await emptyBlockedUsersResponse.Content.ReadAsStringAsync()))
+            Assert.Empty(emptyBlockedUsersJson.RootElement.GetProperty("items").EnumerateArray());
     }
 
     [Fact]
