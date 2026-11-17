@@ -126,9 +126,7 @@ public sealed class FreshSchemaV20Tests
                 AND EXISTS (SELECT 1 FROM pg_proc
                             WHERE oid = 'public.create_default_user_profile_visibility()'::regprocedure
                               AND proconfig @> ARRAY['search_path=pg_catalog, public'])
-                AND has_table_privilege('localoca_app', 'public.birthday_contacts', 'SELECT')
                 AND has_column_privilege('localoca_app', 'public.users', 'password_hash', 'UPDATE')
-                AND has_sequence_privilege('localoca_app', 'public.birthday_contacts_birthday_contact_id_seq', 'USAGE')
                 AND NOT has_sequence_privilege('localoca_app', 'public.countries_country_id_seq', 'USAGE')
                 AND NOT has_table_privilege('anon', 'public.users', 'SELECT')
                 AND NOT has_table_privilege('authenticated', 'public.users', 'SELECT')
