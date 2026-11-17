@@ -7,7 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
-using Microsoft.UI.Xaml.Shapes;
+using Ellipse = Microsoft.UI.Xaml.Shapes.Ellipse;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Windows.Storage;
@@ -1362,7 +1362,7 @@ public sealed partial class MainWindow : Window
     {
         var remainder100 = count % 100;
         if (remainder100 is >= 11 and <= 14) return many;
-        return count % 10 switch
+        return (count % 10) switch
         {
             1 => one,
             2 or 3 or 4 => few,
