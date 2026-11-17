@@ -319,6 +319,7 @@ public static class RelationshipEndpoints
             var (lowId, highId) = OrderedPair(userId, targetUserId);
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            await LockRelationshipPairAsync(connection, transaction, lowId, highId, cancellationToken);
 
             await using (var targetCheck = new NpgsqlCommand(
                 "SELECT EXISTS (SELECT 1 FROM public.users WHERE user_id = @target)", connection, transaction))
