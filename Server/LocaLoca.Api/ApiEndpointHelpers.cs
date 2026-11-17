@@ -23,10 +23,10 @@ internal static class ApiEndpointHelpers
         }
     }
     
-    internal static async Task<IResult> SaveVisitAsync(string connectionString, VisitWriteRequest request, int userId, int? visitId, CancellationToken cancellationToken)
+    internal static async Task<IResult> SaveVisitAsync(string connectionString, VisitWriteRequest request, int userId, int? visitId, HttpContext context, CancellationToken cancellationToken)
     {
         if (request.AttractionId <= 0) return Results.BadRequest(new ApiErrorResponse("Выберите достопримечательность."));
-        if (!DateOnly.TryParse(request.VisitDate, out var date) || date > DateOnly.FromDateTime(DateTime.Today))
+        if (!DateOnly.TryParse(request.VisitDate, out var date) || date > GetUserToday(context))
             return Results.BadRequest(new ApiErrorResponse("Укажите корректную дату посещения, не позднее сегодняшнего дня."));
         if (request.Rating is < 1 or > 5) return Results.BadRequest(new ApiErrorResponse("Оценка должна быть от 1 до 5."));
         int id;
@@ -64,6 +64,26 @@ internal static class ApiEndpointHelpers
         command.Parameters.AddWithValue("n", NpgsqlDbType.Text, request.Notes ?? string.Empty);
     }
     
+    internal static DateOnly GetUserToday(HttpContext context, DateTimeOffset? utcNow = null)
+    {
+        var timeZoneId = context.Request.Headers["X-Time-Zone"].ToString();
+        if (!string.IsNullOrWhiteSpace(timeZoneId))
+        {
+            try
+            {
+                var timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+                var localNow = TimeZoneInfo.ConvertTime(utcNow ?? DateTimeOffset.UtcNow, timeZone);
+                return DateOnly.FromDateTime(localNow.DateTime);
+            }
+            catch (TimeZoneNotFoundException) { }
+            catch (InvalidTimeZoneException) { }
+            catch (ArgumentException) { }
+        }
+
+        // Older clients without timezone metadata retain deterministic UTC behavior.
+        return DateOnly.FromDateTime((utcNow ?? DateTimeOffset.UtcNow).UtcDateTime);
+    }
+
     internal static bool TryUser(HttpContext context, SessionStore sessions, out int userId)
     {
         userId = context.Items.TryGetValue("LocaLoca.UserId", out var value) && value is int id ? id : 0;

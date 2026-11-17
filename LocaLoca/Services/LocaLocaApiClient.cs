@@ -695,6 +695,7 @@ public sealed class LocaLocaApiClient : IDisposable
 
     private void AddAuthorization(HttpRequestMessage request)
     {
+        request.Headers.TryAddWithoutValidation("X-Time-Zone", TimeZoneInfo.Local.Id);
         if (!string.IsNullOrWhiteSpace(_token))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _token);
     }

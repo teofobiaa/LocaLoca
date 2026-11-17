@@ -10,7 +10,7 @@ const palette = { visited:'#26966f', wished:'#d59b2a', normal:'#4777c8' };
 const markers = L.layerGroup().addTo(map);
 const photoUrls = new Map();
 async function api(path, options = {}) {
-  const response = await fetch(path, { ...options, credentials: 'omit', headers: { ...(options.headers || {}) } });
+  const response = await fetch(path, { ...options, credentials: 'omit', headers: { 'X-Time-Zone': Intl.DateTimeFormat().resolvedOptions().timeZone, ...(options.headers || {}) } });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(body?.error || 'Не удалось сохранить данные.');
