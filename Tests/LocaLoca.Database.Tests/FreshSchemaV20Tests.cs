@@ -19,21 +19,46 @@ public sealed class FreshSchemaV20Tests
         await using var connection = new NpgsqlConnection(postgres.GetConnectionString());
         await connection.OpenAsync();
 
-        await using (var createRoles = new NpgsqlCommand(@"
+        await using (var createSupabaseRoles = new NpgsqlCommand(@"
             CREATE ROLE postgres NOLOGIN SUPERUSER;
             CREATE ROLE anon NOLOGIN;
             CREATE ROLE authenticated NOLOGIN;
-            CREATE ROLE localoca_app LOGIN PASSWORD 'fresh-v20-test-password'
-                NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
             SET ROLE postgres;",
             connection))
         {
-            await createRoles.ExecuteNonQueryAsync();
+            await createSupabaseRoles.ExecuteNonQueryAsync();
         }
 
         // The production permission bootstrap is defined for objects owned by
         // Supabase's postgres role, so create the fresh schema under that role.
         await ExecuteFileAsync(connection, "schema", "02_schema_v20.sql");
+
+        // Exercise the real app-role bootstrap instead of duplicating its flags
+        // and grants in test-only SQL. The password exists only in this container.
+        var appRoleScriptPath = Path.Combine(
+            AppContext.BaseDirectory, "Database", "security", "05_create_app_role.sql");
+        var appRoleScript = await File.ReadAllTextAsync(appRoleScriptPath);
+        var testPassword = Convert.ToHexString(
+            System.Security.Cryptography.RandomNumberGenerator.GetBytes(24));
+        appRoleScript = appRoleScript.Replace(
+            "REPLACE_WITH_A_LONG_RANDOM_PASSWORD", testPassword, StringComparison.Ordinal);
+        await using (var createAppRole = new NpgsqlCommand(appRoleScript, connection))
+        {
+            await createAppRole.ExecuteNonQueryAsync();
+        }
+
+        // Supabase supplies this event-trigger function at the platform level.
+        // A no-op stand-in lets plain PostgreSQL exercise the unchanged REVOKE.
+        await using (var createSupabaseFunction = new NpgsqlCommand(@"
+            CREATE FUNCTION public.rls_auto_enable()
+            RETURNS event_trigger
+            LANGUAGE plpgsql
+            AS $$ BEGIN RETURN; END; $$;",
+            connection))
+        {
+            await createSupabaseFunction.ExecuteNonQueryAsync();
+        }
+
         await ExecuteFileAsync(connection, "security", "06_update_runtime_permissions.sql");
 
         await using var schemaCheck = new NpgsqlCommand(@"
@@ -73,7 +98,9 @@ public sealed class FreshSchemaV20Tests
                             AND NOT (rolsuper OR rolcreatedb OR rolcreaterole
                                      OR rolinherit OR rolreplication OR rolbypassrls)
                      FROM pg_roles WHERE rolname = 'localoca_app')
-                AND NOT pg_has_role('localoca_app', 'postgres', 'MEMBER')",
+                AND NOT pg_has_role('localoca_app', 'postgres', 'MEMBER')
+                AND EXISTS (SELECT 1 FROM pg_proc
+                            WHERE oid = 'public.rls_auto_enable()'::regprocedure)",
             connection);
 
         Assert.True((bool)(await schemaCheck.ExecuteScalarAsync() ?? false));
