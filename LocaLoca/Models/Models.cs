@@ -9,6 +9,8 @@ public sealed record FriendRequestDto(
 public sealed record UserRelationshipDto(
     int UserId, string Login, string? DisplayName, bool? HasAvatar);
 public sealed record UserBlockDto(int UserId, string Login);
+public sealed record UserProfileViewDto(
+    int Id, string? DisplayName, string? ResidenceCountry, string? ResidenceCity, bool? HasAvatar);
 public sealed record UpdateDisplayNameRequest(string DisplayName);
 public sealed record UpdateResidenceRequest(string? ResidenceCountry, string? ResidenceCity);
 public sealed record UpdateBirthDateRequest(DateOnly? DateOfBirth);
