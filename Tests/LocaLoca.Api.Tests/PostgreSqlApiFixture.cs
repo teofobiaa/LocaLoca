@@ -106,6 +106,10 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
         attractionCommand.Parameters.AddWithValue("category", categoryId);
         attractionCommand.Parameters.AddWithValue("city", cityId);
         AttractionId = Convert.ToInt32(await attractionCommand.ExecuteScalarAsync());
+
+        var attractionUniquenessSql = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Database", "migrations", "23_attraction_name_unique_per_city.sql"));
+        await using (var attractionUniquenessCommand = new NpgsqlCommand(attractionUniquenessSql, connection))
+            await attractionUniquenessCommand.ExecuteNonQueryAsync();
     }
 
     public ApiTestFactory CreateFactory(string? sessionSecret = null, IPAddress? rateLimitClientIp = null) => new(ConnectionString, sessionSecret, rateLimitClientIp);

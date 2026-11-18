@@ -33,7 +33,7 @@ record UserBlockDto(int UserId, string Login);
 record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
 record AuthResponse(UserDto User, string Token);
 record MessageDto(string Message);
-record HealthDto(bool ApiConfigured, bool DatabaseConnected, string Message);
+record HealthDto(bool ApiConfigured, bool DatabaseConnected, string Message, bool SchemaReady = true, bool RuntimePermissionsReady = true);
 record CategoryDto(int Id, string Name);
 record AttractionDto(int Id, string Name, string Description, string History, double Latitude, double Longitude, string Category, string City, string Country);
 record VisitWriteRequest(int AttractionId, string VisitDate, int Rating, string? Impressions, string? Notes);

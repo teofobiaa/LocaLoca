@@ -13,12 +13,14 @@ public static class HealthEndpoints
         {
             if (string.IsNullOrWhiteSpace(connectionString) || connectionString.Contains("CHANGE_ME", StringComparison.OrdinalIgnoreCase))
                 return Results.Json(new HealthDto(false, false,
-                    connectionConfigurationError ?? "Не настроена строка подключения Supabase PostgreSQL. Запусти tools\\Install-CloudDependencies.ps1."),
+                    connectionConfigurationError ?? "Не настроена строка подключения Supabase PostgreSQL. Запусти tools\\Install-CloudDependencies.ps1.", false, false),
                     statusCode: 503);
+            var databaseConnected = false;
             try
             {
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync(cancellationToken);
+                databaseConnected = true;
                 const string photoSchemaCheck = @"
         SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='user_sessions')
             AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='photos' AND column_name='image_data')
@@ -29,8 +31,8 @@ public static class HealthEndpoints
                 {
                     var photoSchemaReady = Equals(await schemaCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!photoSchemaReady)
-                        return Results.Json(new HealthDto(true, false,
-                            "Не настроено хранение фотографий в PostgreSQL. Выполните database/migrations/07_migrate_photo_storage.sql в Supabase SQL Editor."),
+                        return Results.Json(new HealthDto(true, true,
+                            "Не настроено хранение фотографий в PostgreSQL. Не применена миграция 007: database/migrations/07_migrate_photo_storage.sql.", false, true),
                             statusCode: 503);
                 }
         
@@ -48,8 +50,8 @@ public static class HealthEndpoints
                 {
                     var residenceSchemaReady = Equals(await residenceCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!residenceSchemaReady)
-                        return Results.Json(new HealthDto(true, false,
-                            "Не применена миграция места проживания. Выполните database/migrations/11_user_residence_location.sql в Supabase SQL Editor."),
+                        return Results.Json(new HealthDto(true, true,
+                            "Не применена миграция 011: database/migrations/11_user_residence_location.sql.", false, true),
                             statusCode: 503);
                 }
 
@@ -63,8 +65,8 @@ public static class HealthEndpoints
                 {
                     var rateLimitSchemaReady = Equals(await rateLimitSchemaCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!rateLimitSchemaReady)
-                        return Results.Json(new HealthDto(true, false,
-                            "Не применена миграция распределённого ограничения авторизации. Выполните database/migrations/12_distributed_auth_rate_limits.sql в Supabase SQL Editor."),
+                        return Results.Json(new HealthDto(true, true,
+                            "Не применена миграция 012: database/migrations/12_distributed_auth_rate_limits.sql.", false, true),
                             statusCode: 503);
                 }
 
@@ -83,8 +85,8 @@ public static class HealthEndpoints
                 {
                     var avatarSchemaReady = Equals(await avatarSchemaCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!avatarSchemaReady)
-                        return Results.Json(new HealthDto(true, false,
-                            "Не применена миграция аватаров 013 или таблица public.user_avatars имеет неполную структуру. Выполните database/migrations/13_user_avatars.sql в Supabase SQL Editor."),
+                        return Results.Json(new HealthDto(true, true,
+                            "Не применена миграция 013 или таблица public.user_avatars имеет неполную структуру: database/migrations/13_user_avatars.sql.", false, true),
                             statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
 
@@ -96,18 +98,18 @@ public static class HealthEndpoints
             AND EXISTS (SELECT 1 FROM pg_trigger
                         WHERE tgrelid = to_regclass('public.users')
                           AND tgname = 'trg_users_default_profile_visibility' AND NOT tgisinternal)
-            AND (SELECT count(*) = 6
+            AND (SELECT count(*) = 5
                  FROM pg_attribute
                  WHERE attrelid = to_regclass('public.user_profile_visibility')
                    AND attnum > 0 AND NOT attisdropped
                    AND attname IN ('user_id', 'display_name_visibility', 'avatar_visibility',
-                                   'residence_country_visibility', 'residence_city_visibility', 'date_of_birth_visibility'))";
+                                   'residence_country_visibility', 'residence_city_visibility'))";
                 await using (var privacySchemaCommand = new NpgsqlCommand(privacySchemaCheck, connection))
                 {
                     var privacySchemaReady = Equals(await privacySchemaCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!privacySchemaReady)
-                        return Results.Json(new HealthDto(true, false,
-                            "Не применены миграции настроек приватности и отношений пользователей (015 и 022). Выполните database/migrations/15_profile_privacy_and_relationships.sql и database/migrations/22_profile_birthday_visibility_and_remove_contacts.sql в Supabase SQL Editor."),
+                        return Results.Json(new HealthDto(true, true,
+                            "Не применена миграция 015: database/migrations/15_profile_privacy_and_relationships.sql.", false, true),
                             statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
 
@@ -127,8 +129,59 @@ public static class HealthEndpoints
                 {
                     var birthdaySchemaReady = Equals(await birthdaySchemaCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!birthdaySchemaReady)
-                        return Results.Json(new HealthDto(true, false,
-                            "Не применена миграция дней рождения и возрастных ограничений 014. Выполните database/migrations/14_user_birthdays_and_age_filtering.sql в Supabase SQL Editor."),
+                        return Results.Json(new HealthDto(true, true,
+                            "Не применена миграция 014: database/migrations/14_user_birthdays_and_age_filtering.sql.", false, true),
+                            statusCode: StatusCodes.Status503ServiceUnavailable);
+                }
+
+
+                const string birthdayVisibilitySchemaCheck = @"
+        SELECT
+            EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema='public' AND table_name='user_profile_visibility'
+                      AND column_name='date_of_birth_visibility'
+                      AND data_type='character varying' AND character_maximum_length=20
+                      AND is_nullable='NO' AND column_default LIKE '%private%')
+            AND EXISTS (SELECT 1 FROM pg_constraint
+                        WHERE conrelid='public.user_profile_visibility'::regclass
+                          AND conname='ck_user_profile_visibility_date_of_birth_visibility'
+                          AND convalidated)
+            AND to_regclass('public.birthday_contacts') IS NULL";
+                await using (var birthdayVisibilityCommand = new NpgsqlCommand(birthdayVisibilitySchemaCheck, connection))
+                {
+                    var ready = Equals(await birthdayVisibilityCommand.ExecuteScalarAsync(cancellationToken), true);
+                    if (!ready)
+                        return Results.Json(new HealthDto(true, true,
+                            "Не применена миграция 022: database/migrations/22_profile_birthday_visibility_and_remove_contacts.sql.", false, true),
+                            statusCode: StatusCodes.Status503ServiceUnavailable);
+                }
+
+                const string loginPrefixIndexCheck = @"
+        SELECT EXISTS (SELECT 1 FROM pg_index i
+                       JOIN pg_class idx ON idx.oid=i.indexrelid
+                       JOIN pg_namespace ns ON ns.oid=idx.relnamespace
+                       WHERE ns.nspname='public' AND idx.relname='ix_users_login_prefix'
+                         AND i.indisvalid AND i.indisready)";
+                await using (var loginPrefixCommand = new NpgsqlCommand(loginPrefixIndexCheck, connection))
+                {
+                    var ready = Equals(await loginPrefixCommand.ExecuteScalarAsync(cancellationToken), true);
+                    if (!ready)
+                        return Results.Json(new HealthDto(true, true,
+                            "Не применена миграция 021: database/migrations/21_user_login_prefix_search.sql.", false, true),
+                            statusCode: StatusCodes.Status503ServiceUnavailable);
+                }
+
+                const string attractionUniquenessCheck = @"
+        SELECT EXISTS (SELECT 1 FROM pg_constraint
+                       WHERE conrelid='public.attractions'::regclass
+                         AND conname='uq_attractions_city_name'
+                         AND contype='u' AND convalidated)";
+                await using (var attractionUniquenessCommand = new NpgsqlCommand(attractionUniquenessCheck, connection))
+                {
+                    var ready = Equals(await attractionUniquenessCommand.ExecuteScalarAsync(cancellationToken), true);
+                    if (!ready)
+                        return Results.Json(new HealthDto(true, true,
+                            "Не применена миграция 023: database/migrations/23_attraction_name_unique_per_city.sql.", false, true),
                             statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
 
@@ -142,8 +195,8 @@ public static class HealthEndpoints
                 {
                     var avatarPermissionsReady = Equals(await avatarPermissionCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!avatarPermissionsReady)
-                        return Results.Json(new HealthDto(true, false,
-                            "У текущей роли PostgreSQL отсутствуют необходимые права на public.user_avatars (SELECT, INSERT, UPDATE, DELETE). Для существующей роли выполните database/security/06_update_runtime_permissions.sql; для новой роли — database/security/05_create_app_role.sql после миграции 014."),
+                        return Results.Json(new HealthDto(true, true,
+                            "Подключение к PostgreSQL есть, но runtime-роли не хватает прав на public.user_avatars (SELECT, INSERT, UPDATE, DELETE). Выполните database/security/06_update_runtime_permissions.sql.", true, false),
                             statusCode: StatusCodes.Status503ServiceUnavailable);
                 }
 
@@ -214,8 +267,8 @@ public static class HealthEndpoints
                 await using var command = new NpgsqlCommand(permissionCheck, connection);
                 var hasPermissions = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
                 if (!hasPermissions)
-                    return Results.Json(new HealthDto(true, false,
-                        "Подключение к PostgreSQL есть, но у роли БД не хватает прав для LocaLoca. Если localoca_app уже создана, выполни database/security/06_update_runtime_permissions.sql после миграции 15_profile_privacy_and_relationships.sql. Если роли ещё нет, создай её через database/security/05_create_app_role.sql после применения всех необходимых миграций."),
+                    return Results.Json(new HealthDto(true, true,
+                        "Подключение к PostgreSQL есть, но runtime-роли не хватает прав для LocaLoca. Выполните database/security/06_update_runtime_permissions.sql после применения миграций.", true, false),
                         statusCode: 503);
                 return Results.Ok(new HealthDto(true, true, "Supabase PostgreSQL подключена; права роли LocaLoca проверены."));
             }
@@ -223,13 +276,13 @@ public static class HealthEndpoints
             {
                 var mapping = ApiExceptionMiddleware.MapPostgresError(ex.SqlState, ex.Message);
                 app.Logger.LogWarning(ex, "Readiness check failed with PostgreSQL SQLSTATE {SqlState}.", ex.SqlState);
-                return Results.Json(new HealthDto(true, false, mapping.Message), statusCode: mapping.StatusCode);
+                return Results.Json(new HealthDto(true, databaseConnected, mapping.Message, false, false), statusCode: mapping.StatusCode);
             }
             catch (Exception ex) when (ex is NpgsqlException or DatabaseUnavailableException or TimeoutException)
             {
                 app.Logger.LogWarning(ex, "PostgreSQL is unavailable during readiness check.");
                 return Results.Json(new HealthDto(true, false,
-                    ApiErrorResponse.MessageFor(StatusCodes.Status503ServiceUnavailable)),
+                    ApiErrorResponse.MessageFor(StatusCodes.Status503ServiceUnavailable), false, false),
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
         });
