@@ -18,9 +18,9 @@
     "sha256": "b3cd7e6f00ff8d60e069ece970ec4970a93f1bcb0d58d42803ef929fa390b084"
   },
   "seed": {
-    "version": 3,
+    "version": 4,
     "path": "seed/02_seed.sql",
-    "sha256": "b8c5ce2d6955a7ebd14e56f8952c36625f2d1b2755c4d5cd821243638dac1e31"
+    "sha256": "4db40f8278d40220714b06ca70530df807079c6b229245145b88006fe8441581"
   },
   "trackingBootstrap": {
     "version": 0,
