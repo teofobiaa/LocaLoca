@@ -15,10 +15,12 @@ public static class HealthEndpoints
                 return Results.Json(new HealthDto(false, false,
                     connectionConfigurationError ?? "Не настроена строка подключения Supabase PostgreSQL. Запусти tools\\Install-CloudDependencies.ps1.", false, false),
                     statusCode: 503);
+            var databaseConnected = false;
             try
             {
                 await using var connection = new NpgsqlConnection(connectionString);
                 await connection.OpenAsync(cancellationToken);
+                databaseConnected = true;
                 const string photoSchemaCheck = @"
         SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='user_sessions')
             AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='photos' AND column_name='image_data')
@@ -274,7 +276,7 @@ public static class HealthEndpoints
             {
                 var mapping = ApiExceptionMiddleware.MapPostgresError(ex.SqlState, ex.Message);
                 app.Logger.LogWarning(ex, "Readiness check failed with PostgreSQL SQLSTATE {SqlState}.", ex.SqlState);
-                return Results.Json(new HealthDto(true, true, mapping.Message, false, false), statusCode: mapping.StatusCode);
+                return Results.Json(new HealthDto(true, databaseConnected, mapping.Message, false, false), statusCode: mapping.StatusCode);
             }
             catch (Exception ex) when (ex is NpgsqlException or DatabaseUnavailableException or TimeoutException)
             {
