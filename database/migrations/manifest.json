@@ -140,7 +140,7 @@
       "version": 23,
       "name": "attraction_name_unique_per_city",
       "path": "migrations/23_attraction_name_unique_per_city.sql",
-      "sha256": "ec223a2f4cbc158f1040fc2544d85767f2f702e8f6817bb184c0d784a7241921"
+      "sha256": "00986e5e4226f7b22359b9686d3d7cfe5d71b60f6d879ae6f291d280e4a04356"
     }
   ],
   "securityScripts": [
