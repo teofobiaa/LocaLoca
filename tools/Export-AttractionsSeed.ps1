@@ -1,7 +1,7 @@
 ﻿[CmdletBinding()]
 param(
     [string]$ConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json'),
-    [string]$OutputPath = (Join-Path $PSScriptRoot '..\database\seed\02_seed.sql'),
+    [string]$OutputPath = (Join-Path $PSScriptRoot '..\database\seed\02_seed.sql')
 )
 
 $ErrorActionPreference = 'Stop'
