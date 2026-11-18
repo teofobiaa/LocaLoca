@@ -14,7 +14,7 @@ BEGIN
     ) THEN
         SELECT string_agg(
                    format('%s / %s (%s записей)', ci.name, duplicates.name, duplicates.duplicate_count),
-                   E'\\n' ORDER BY ci.name, duplicates.name
+                   chr(10) ORDER BY ci.name, duplicates.name
                )
         INTO duplicate_details
         FROM (
