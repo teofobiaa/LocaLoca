@@ -35,7 +35,7 @@ public sealed class AvatarReadinessTests
             var body = await response.Content.ReadAsStringAsync();
 
             Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-            Assert.Contains("миграция аватаров 013", body, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("миграция 013", body, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("public.user_avatars", body, StringComparison.OrdinalIgnoreCase);
         }
         finally
@@ -85,7 +85,7 @@ public sealed class AvatarReadinessTests
             var body = await response.Content.ReadAsStringAsync();
 
             Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-            Assert.Contains("отсутствуют необходимые права", body, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("runtime-роли не хватает прав", body, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("SELECT, INSERT, UPDATE, DELETE", body, StringComparison.Ordinal);
         }
         finally

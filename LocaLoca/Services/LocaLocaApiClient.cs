@@ -105,7 +105,7 @@ public sealed class LocaLocaApiClient : IDisposable
         // never make the client start a second API process on the same port.
         var localApiIsResponding = !_useRemoteApi && await TryLivenessAsync(cancellationToken);
         HealthDto? firstHealth = await TryReadinessAsync(cancellationToken);
-        if (firstHealth is { ApiConfigured: true, DatabaseConnected: true })
+        if (firstHealth is { ApiConfigured: true, DatabaseConnected: true, SchemaReady: true, RuntimePermissionsReady: true })
             return firstHealth;
 
         // A configured cloud endpoint is authoritative: never silently fall
@@ -125,7 +125,7 @@ public sealed class LocaLocaApiClient : IDisposable
             {
                 await Task.Delay(500, cancellationToken);
                 var current = await TryReadinessAsync(cancellationToken);
-                if (current is { ApiConfigured: true, DatabaseConnected: true }) return current;
+                if (current is { ApiConfigured: true, DatabaseConnected: true, SchemaReady: true, RuntimePermissionsReady: true }) return current;
                 if (current is not null) firstHealth = current;
             }
             throw new InvalidOperationException(firstHealth.Message);
@@ -162,7 +162,7 @@ public sealed class LocaLocaApiClient : IDisposable
             if (!await TryLivenessAsync(cancellationToken)) continue;
 
             var health = await TryReadinessAsync(cancellationToken);
-            if (health is { ApiConfigured: true, DatabaseConnected: true }) return health;
+            if (health is { ApiConfigured: true, DatabaseConnected: true, SchemaReady: true, RuntimePermissionsReady: true }) return health;
             throw new InvalidOperationException(health?.Message ??
                 "Локальный API отвечает на /health, но /ready не вернул ответ за 10 секунд. Проверь подключение к Supabase.");
         }
