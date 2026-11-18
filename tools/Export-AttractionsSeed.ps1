@@ -203,7 +203,7 @@ if ($duplicateItems.Count -gt 0) {
         $duplicate = $_.Group[0]
         "'$($duplicate.name)' — $($duplicate.city) ($($_.Count) записей)"
     }
-    throw "В базе обнаружены дубликаты достопримечательностей с одинаковыми названием и городом. Файл $OutputPath не изменён. Исправь записи перед экспортом: $($duplicateDescriptions -join '; ')".
+    throw "В базе обнаружены дубликаты достопримечательностей с одинаковыми названием и городом. Файл $OutputPath не изменён. Исправь записи перед экспортом: $($duplicateDescriptions -join '; ')"
 }
 
 $categories = @($items | ForEach-Object { [string]$_.category } | Sort-Object -Unique)
