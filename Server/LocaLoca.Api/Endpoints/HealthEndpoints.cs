@@ -145,9 +145,9 @@ public static class HealthEndpoints
                           AND conname='ck_user_profile_visibility_date_of_birth_visibility'
                           AND convalidated)
             AND to_regclass('public.birthday_contacts') IS NULL";
-                await using (var command = new NpgsqlCommand(birthdayVisibilitySchemaCheck, connection))
+                await using (var birthdayVisibilityCommand = new NpgsqlCommand(birthdayVisibilitySchemaCheck, connection))
                 {
-                    var ready = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
+                    var ready = Equals(await birthdayVisibilityCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!ready)
                         return Results.Json(new HealthDto(true, true,
                             "Не применена миграция 022: database/migrations/22_profile_birthday_visibility_and_remove_contacts.sql.", false, true),
@@ -160,9 +160,9 @@ public static class HealthEndpoints
                        JOIN pg_namespace ns ON ns.oid=idx.relnamespace
                        WHERE ns.nspname='public' AND idx.relname='ix_users_login_prefix'
                          AND i.indisvalid AND i.indisready)";
-                await using (var command = new NpgsqlCommand(loginPrefixIndexCheck, connection))
+                await using (var loginPrefixCommand = new NpgsqlCommand(loginPrefixIndexCheck, connection))
                 {
-                    var ready = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
+                    var ready = Equals(await loginPrefixCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!ready)
                         return Results.Json(new HealthDto(true, true,
                             "Не применена миграция 021: database/migrations/21_user_login_prefix_search.sql.", false, true),
@@ -174,9 +174,9 @@ public static class HealthEndpoints
                        WHERE conrelid='public.attractions'::regclass
                          AND conname='uq_attractions_city_name'
                          AND contype='u' AND convalidated)";
-                await using (var command = new NpgsqlCommand(attractionUniquenessCheck, connection))
+                await using (var attractionUniquenessCommand = new NpgsqlCommand(attractionUniquenessCheck, connection))
                 {
-                    var ready = Equals(await command.ExecuteScalarAsync(cancellationToken), true);
+                    var ready = Equals(await attractionUniquenessCommand.ExecuteScalarAsync(cancellationToken), true);
                     if (!ready)
                         return Results.Json(new HealthDto(true, true,
                             "Не применена миграция 023: database/migrations/23_attraction_name_unique_per_city.sql.", false, true),
