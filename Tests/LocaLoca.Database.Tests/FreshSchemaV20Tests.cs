@@ -8,10 +8,10 @@ namespace LocaLoca.Database.Tests;
 public sealed class FreshSchemaV20Tests
 {
     [Fact]
-    public async Task Fresh_V020_Baseline_With_Current_Migrations_Produces_V022_Runtime_Schema()
+    public async Task Fresh_V020_Baseline_With_Current_Migrations_Produces_V023_Runtime_Schema()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
-            .WithDatabase("localoca_fresh_v20_tests")
+            .WithDatabase("localoca_fresh_v23_tests")
             .WithUsername("localoca_test")
             .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)))
             .Build();
@@ -34,10 +34,11 @@ public sealed class FreshSchemaV20Tests
         // Supabase's postgres role, so create the fresh schema under that role.
         await ExecuteFileAsync(connection, "schema", "02_schema_v20.sql");
 
-        // The immutable baseline is v020; apply the current migrations before
+        // The immutable baseline is v020; apply every post-baseline migration before
         // granting runtime permissions or validating the deployable schema.
         await ExecuteFileAsync(connection, "migrations", "21_user_login_prefix_search.sql");
         await ExecuteFileAsync(connection, "migrations", "22_profile_birthday_visibility_and_remove_contacts.sql");
+        await ExecuteFileAsync(connection, "migrations", "23_attraction_name_unique_per_city.sql");
 
         // Exercise the real app-role bootstrap instead of duplicating its flags
         // and grants in test-only SQL. The password exists only in this container.
@@ -128,6 +129,10 @@ public sealed class FreshSchemaV20Tests
                 AND to_regclass('public.user_friendships') IS NOT NULL
                 AND to_regclass('public.user_blocks') IS NOT NULL
                 AND to_regclass('public.ix_attractions_name_trgm') IS NOT NULL
+                AND EXISTS (SELECT 1 FROM pg_constraint
+                            WHERE conrelid = 'public.attractions'::regclass
+                              AND conname = 'uq_attractions_city_name'
+                              AND contype = 'u')
                 AND to_regclass('public.ix_cities_name_trgm') IS NOT NULL
                 AND to_regclass('public.ix_countries_name_trgm') IS NOT NULL
                 AND to_regclass('public.ix_user_friendships_requested_by_status') IS NOT NULL
@@ -152,6 +157,66 @@ public sealed class FreshSchemaV20Tests
             connection);
 
         Assert.True((bool)(await schemaCheck.ExecuteScalarAsync() ?? false));
+
+        // The same attraction name is forbidden twice in one city, but may be
+        // reused by a different city (for example, multiple city museums).
+        int uniquenessCountryId;
+        await using (var insertCountry = new NpgsqlCommand(
+            "INSERT INTO public.countries(name) VALUES ('Uniqueness test country') RETURNING country_id",
+            connection))
+        {
+            uniquenessCountryId = Convert.ToInt32(await insertCountry.ExecuteScalarAsync());
+        }
+
+        int firstCityId;
+        int secondCityId;
+        await using (var insertCities = new NpgsqlCommand(@"
+            INSERT INTO public.cities(country_id, name)
+            VALUES (@countryId, 'First test city') RETURNING city_id", connection))
+        {
+            insertCities.Parameters.AddWithValue("countryId", uniquenessCountryId);
+            firstCityId = Convert.ToInt32(await insertCities.ExecuteScalarAsync());
+        }
+        await using (var insertSecondCity = new NpgsqlCommand(@"
+            INSERT INTO public.cities(country_id, name)
+            VALUES (@countryId, 'Second test city') RETURNING city_id", connection))
+        {
+            insertSecondCity.Parameters.AddWithValue("countryId", uniquenessCountryId);
+            secondCityId = Convert.ToInt32(await insertSecondCity.ExecuteScalarAsync());
+        }
+
+        int categoryId;
+        await using (var insertCategory = new NpgsqlCommand(
+            "INSERT INTO public.categories(name) VALUES ('Uniqueness test category') RETURNING category_id",
+            connection))
+        {
+            categoryId = Convert.ToInt32(await insertCategory.ExecuteScalarAsync());
+        }
+
+        const string insertAttractionSql = @"
+            INSERT INTO public.attractions(name, description, latitude, longitude, category_id, city_id)
+            VALUES ('Same attraction name', 'Test description', 0, 0, @categoryId, @cityId)";
+        await using (var insertFirstAttraction = new NpgsqlCommand(insertAttractionSql, connection))
+        {
+            insertFirstAttraction.Parameters.AddWithValue("categoryId", categoryId);
+            insertFirstAttraction.Parameters.AddWithValue("cityId", firstCityId);
+            await insertFirstAttraction.ExecuteNonQueryAsync();
+        }
+
+        await Assert.ThrowsAsync<PostgresException>(async () =>
+        {
+            await using var duplicateAttraction = new NpgsqlCommand(insertAttractionSql, connection);
+            duplicateAttraction.Parameters.AddWithValue("categoryId", categoryId);
+            duplicateAttraction.Parameters.AddWithValue("cityId", firstCityId);
+            await duplicateAttraction.ExecuteNonQueryAsync();
+        });
+
+        await using (var sameNameInAnotherCity = new NpgsqlCommand(insertAttractionSql, connection))
+        {
+            sameNameInAnotherCity.Parameters.AddWithValue("categoryId", categoryId);
+            sameNameInAnotherCity.Parameters.AddWithValue("cityId", secondCityId);
+            await sameNameInAnotherCity.ExecuteNonQueryAsync();
+        }
 
         // Verify the effective default table and sequence ACLs for objects
         // subsequently created by the postgres owner.
