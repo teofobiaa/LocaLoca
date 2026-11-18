@@ -2,7 +2,6 @@
 param(
     [string]$ConfigPath = (Join-Path $env:LOCALAPPDATA 'LocaLoca\server-config.json'),
     [string]$OutputPath = (Join-Path $PSScriptRoot '..\database\seed\02_seed.sql'),
-    [int]$ExpectedCount = 44
 )
 
 $ErrorActionPreference = 'Stop'
@@ -190,8 +189,21 @@ if ([string]::IsNullOrWhiteSpace($json)) {
 }
 
 $items = @($json | ConvertFrom-Json)
-if ($items.Count -ne $ExpectedCount) {
-    throw "В подключённой базе найдено $($items.Count) достопримечательностей, ожидалось $ExpectedCount. Файл $OutputPath не изменён. Проверь активную базу или укажи -ExpectedCount."
+if ($items.Count -eq 0) {
+    throw "В подключённой базе не найдено достопримечательностей. Файл $OutputPath не изменён."
+}
+
+$duplicateItems = @(
+    $items |
+        Group-Object { ConvertTo-Json -InputObject @([string]$_.name, [string]$_.city) -Compress } |
+        Where-Object { $_.Count -gt 1 }
+)
+if ($duplicateItems.Count -gt 0) {
+    $duplicateDescriptions = $duplicateItems | ForEach-Object {
+        $duplicate = $_.Group[0]
+        "'$($duplicate.name)' — $($duplicate.city) ($($_.Count) записей)"
+    }
+    throw "В базе обнаружены дубликаты достопримечательностей с одинаковыми названием и городом. Файл $OutputPath не изменён. Исправь записи перед экспортом: $($duplicateDescriptions -join '; ')".
 }
 
 $categories = @($items | ForEach-Object { [string]$_.category } | Sort-Object -Unique)
