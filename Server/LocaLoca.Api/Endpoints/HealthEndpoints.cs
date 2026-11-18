@@ -96,12 +96,12 @@ public static class HealthEndpoints
             AND EXISTS (SELECT 1 FROM pg_trigger
                         WHERE tgrelid = to_regclass('public.users')
                           AND tgname = 'trg_users_default_profile_visibility' AND NOT tgisinternal)
-            AND (SELECT count(*) = 6
+            AND (SELECT count(*) = 5
                  FROM pg_attribute
                  WHERE attrelid = to_regclass('public.user_profile_visibility')
                    AND attnum > 0 AND NOT attisdropped
                    AND attname IN ('user_id', 'display_name_visibility', 'avatar_visibility',
-                                   'residence_country_visibility', 'residence_city_visibility', 'date_of_birth_visibility'))";
+                                   'residence_country_visibility', 'residence_city_visibility'))";
                 await using (var privacySchemaCommand = new NpgsqlCommand(privacySchemaCheck, connection))
                 {
                     var privacySchemaReady = Equals(await privacySchemaCommand.ExecuteScalarAsync(cancellationToken), true);
