@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 22,
+  "currentSchemaVersion": 23,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -135,6 +135,12 @@
       "name": "profile_birthday_visibility_and_remove_contacts",
       "path": "migrations/22_profile_birthday_visibility_and_remove_contacts.sql",
       "sha256": "e81bdf417d628ab6510f509e1ad7a24e1e9709ed74c56d3762301028dd5ed1e3"
+    },
+    {
+      "version": 23,
+      "name": "attraction_name_unique_per_city",
+      "path": "migrations/23_attraction_name_unique_per_city.sql",
+      "sha256": "ec223a2f4cbc158f1040fc2544d85767f2f702e8f6817bb184c0d784a7241921"
     }
   ],
   "securityScripts": [
