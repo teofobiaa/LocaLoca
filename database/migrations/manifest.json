@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 22,
+  "currentSchemaVersion": 23,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -25,7 +25,7 @@
   "trackingBootstrap": {
     "version": 0,
     "path": "migrations/00_migration_history.sql",
-    "sha256": "e250e9421e40523b4d37a88e7992764be0859e7d4429eafb7c19c2b3ea97e6fe"
+    "sha256": "56272f9335ea1da2fd085e1f159aedc6a1286254cd7b5b979f8ee61b13092f6c"
   },
   "schemaMigrations": [
     {
@@ -135,6 +135,12 @@
       "name": "profile_birthday_visibility_and_remove_contacts",
       "path": "migrations/22_profile_birthday_visibility_and_remove_contacts.sql",
       "sha256": "e81bdf417d628ab6510f509e1ad7a24e1e9709ed74c56d3762301028dd5ed1e3"
+    },
+    {
+      "version": 23,
+      "name": "attraction_name_unique_per_city",
+      "path": "migrations/23_attraction_name_unique_per_city.sql",
+      "sha256": "00986e5e4226f7b22359b9686d3d7cfe5d71b60f6d879ae6f291d280e4a04356"
     }
   ],
   "securityScripts": [

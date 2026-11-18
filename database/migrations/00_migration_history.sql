@@ -240,3 +240,14 @@ BEGIN
     END IF;
 END
 $adopt_runtime_sequence_privileges$;
+
+INSERT INTO public.localoca_schema_migrations (version,name,source)
+SELECT 23,'attraction_name_unique_per_city','adopted'
+WHERE EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = to_regclass('public.attractions')
+      AND conname = 'uq_attractions_city_name'
+      AND contype = 'u'
+)
+ON CONFLICT (version) DO NOTHING;
