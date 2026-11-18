@@ -13,8 +13,8 @@ BEGIN
           AND conname = 'uq_attractions_city_name'
     ) THEN
         SELECT string_agg(
-                   format('%s / %s (%s записей)', ci.name, a.name, duplicate_count),
-                   E'\\n' ORDER BY ci.name, a.name
+                   format('%s / %s (%s записей)', ci.name, duplicates.name, duplicates.duplicate_count),
+                   E'\\n' ORDER BY ci.name, duplicates.name
                )
         INTO duplicate_details
         FROM (
