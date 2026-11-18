@@ -10,6 +10,9 @@
     <Content Include="../../database/migrations/22_profile_birthday_visibility_and_remove_contacts.sql"
              Link="Database/migrations/22_profile_birthday_visibility_and_remove_contacts.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/23_attraction_name_unique_per_city.sql"
+             Link="Database/migrations/23_attraction_name_unique_per_city.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
