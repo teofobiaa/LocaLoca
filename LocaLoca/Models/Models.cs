@@ -2,7 +2,7 @@ using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace LocaLoca.Models;
 
-public sealed record HealthDto(bool ApiConfigured, bool DatabaseConnected, string Message);
+public sealed record HealthDto(bool ApiConfigured, bool DatabaseConnected, string Message, bool SchemaReady = true, bool RuntimePermissionsReady = true);
 public sealed record UserDto(int Id, string Login, string DisplayName, string? ResidenceCountry = null, string? ResidenceCity = null, bool HasAvatar = false);
 public sealed record UserSearchResultDto(
     int UserId, string Login, string? DisplayName, bool? HasAvatar, string RelationshipStatus);
