@@ -274,7 +274,7 @@ public static class HealthEndpoints
             {
                 var mapping = ApiExceptionMiddleware.MapPostgresError(ex.SqlState, ex.Message);
                 app.Logger.LogWarning(ex, "Readiness check failed with PostgreSQL SQLSTATE {SqlState}.", ex.SqlState);
-                return Results.Json(new HealthDto(true, false, mapping.Message, false, false), statusCode: mapping.StatusCode);
+                return Results.Json(new HealthDto(true, true, mapping.Message, false, false), statusCode: mapping.StatusCode);
             }
             catch (Exception ex) when (ex is NpgsqlException or DatabaseUnavailableException or TimeoutException)
             {
