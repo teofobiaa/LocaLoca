@@ -1,5 +1,5 @@
 using System.Net;
-using System.Net.Http.Json;
+using System.Text.Json;
 using Npgsql;
 using Xunit;
 
@@ -27,15 +27,15 @@ public sealed class ReadinessContractTests
             using var factory = _database.CreateFactory();
             using var client = factory.CreateClient();
             using var response = await client.GetAsync("/ready");
-            var health = await response.Content.ReadFromJsonAsync<HealthDto>();
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            var health = document.RootElement;
 
             Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-            Assert.NotNull(health);
-            Assert.True(health.ApiConfigured);
-            Assert.True(health.DatabaseConnected);
-            Assert.False(health.SchemaReady);
-            Assert.True(health.RuntimePermissionsReady);
-            Assert.Contains("021", health.Message, StringComparison.Ordinal);
+            Assert.True(health.GetProperty("apiConfigured").GetBoolean());
+            Assert.True(health.GetProperty("databaseConnected").GetBoolean());
+            Assert.False(health.GetProperty("schemaReady").GetBoolean());
+            Assert.True(health.GetProperty("runtimePermissionsReady").GetBoolean());
+            Assert.Contains("021", health.GetProperty("message").GetString(), StringComparison.Ordinal);
         }
         finally
         {
