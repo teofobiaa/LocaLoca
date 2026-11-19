@@ -11,17 +11,26 @@ public sealed record GoogleIdentity(string Subject, string Email, string Display
 public sealed class GoogleIdTokenValidator
 {
     private const string JwksUri = "https://www.googleapis.com/oauth2/v3/certs";
-    private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private static readonly HttpClient SharedHttp = new() { Timeout = TimeSpan.FromSeconds(10) };
+    private readonly HttpClient _http;
+    private readonly string _jwksUri;
     private readonly string _clientId;
     private readonly SemaphoreSlim _refreshLock = new(1, 1);
     private Dictionary<string, RSAParameters> _keys = new(StringComparer.Ordinal);
     private DateTimeOffset _keysExpireAt = DateTimeOffset.MinValue;
 
-    public GoogleIdTokenValidator(string clientId)
+    public GoogleIdTokenValidator(
+        string clientId,
+        HttpClient? httpClient = null,
+        string jwksUri = JwksUri)
     {
         _clientId = string.IsNullOrWhiteSpace(clientId)
             ? throw new InvalidOperationException("LOCA_GOOGLE_CLIENT_ID is not configured.")
             : clientId;
+        _http = httpClient ?? SharedHttp;
+        _jwksUri = string.IsNullOrWhiteSpace(jwksUri)
+            ? throw new ArgumentException("A JWKS endpoint is required.", nameof(jwksUri))
+            : jwksUri;
     }
 
     public async Task<GoogleIdentity?> ValidateAsync(
@@ -118,7 +127,7 @@ public sealed class GoogleIdTokenValidator
             if (_keysExpireAt > DateTimeOffset.UtcNow && _keys.ContainsKey(requestedKid))
                 return _keys;
 
-            using var response = await Http.GetAsync(JwksUri, cancellationToken);
+            using var response = await _http.GetAsync(_jwksUri, cancellationToken);
             response.EnsureSuccessStatusCode();
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
             var refreshed = new Dictionary<string, RSAParameters>(StringComparer.Ordinal);
