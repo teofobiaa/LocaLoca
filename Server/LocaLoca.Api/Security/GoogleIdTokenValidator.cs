@@ -96,7 +96,7 @@ public sealed class GoogleIdTokenValidator
         }
         catch (Exception exception) when (
             exception is JsonException or FormatException or CryptographicException or
-            HttpRequestException or TaskCanceledException or ArgumentException)
+            HttpRequestException or TaskCanceledException or ArgumentException or InvalidOperationException or KeyNotFoundException)
         {
             return null;
         }
