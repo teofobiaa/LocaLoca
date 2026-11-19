@@ -69,7 +69,6 @@ internal static class GoogleOAuthBrowserFlow
             throw new TimeoutException("Время ожидания ответа Google истекло. Повтори вход.");
         }
 
-        using (callback)
         {
             if (callback.Request.RemoteEndPoint is null ||
                 !IPAddress.IsLoopback(callback.Request.RemoteEndPoint.Address))
