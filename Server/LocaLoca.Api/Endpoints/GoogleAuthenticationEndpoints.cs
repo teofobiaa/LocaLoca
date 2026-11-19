@@ -31,7 +31,7 @@ public static class GoogleAuthenticationEndpoints
             await using var insert = new NpgsqlCommand(@"
                 INSERT INTO public.google_oauth_challenges(challenge_hash, expires_at)
                 VALUES (@hash, now() + interval '5 minutes')", connection);
-            insert.Parameters.AddWithValue("hash", NpgsqlDbType.Char, hash);
+            insert.Parameters.AddWithValue("hash", NpgsqlDbType.Varchar, hash);
             await insert.ExecuteNonQueryAsync(cancellationToken);
 
             return Results.Ok(new GoogleChallengeResponse(nonce));
@@ -57,6 +57,15 @@ public static class GoogleAuthenticationEndpoints
             var challengeHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(nonce)));
             await using var connection = await OpenAsync(connectionString, cancellationToken);
             await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+            // Serialize first-time provisioning for the same Google subject. This
+            // prevents two concurrent sign-ins from racing on the unique login.
+            await using (var identityLock = new NpgsqlCommand(
+                "SELECT pg_advisory_xact_lock(hashtextextended(@subject, 0))", connection, transaction))
+            {
+                identityLock.Parameters.AddWithValue("subject", NpgsqlDbType.Varchar, identity.Subject);
+                await identityLock.ExecuteNonQueryAsync(cancellationToken);
+            }
 
             await using (var consume = new NpgsqlCommand(@"
                 DELETE FROM public.google_oauth_challenges
