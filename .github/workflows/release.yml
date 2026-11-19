@@ -186,7 +186,11 @@ jobs:
         shell: pwsh
         env:
           RELEASE_VERSION: ${{ steps.validate.outputs.version }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:GOOGLE_CLIENT_SECRET)) {
+            throw 'Missing repository secret: GOOGLE_CLIENT_SECRET.'
+          }
           ./tools/Build-Installer.ps1 -AppVersion $env:RELEASE_VERSION
 
       - name: Generate SHA256 checksum
