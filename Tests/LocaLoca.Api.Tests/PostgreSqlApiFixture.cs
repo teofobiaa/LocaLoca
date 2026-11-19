@@ -82,6 +82,16 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
         await using (var birthdayVisibilityCommand = new NpgsqlCommand(birthdayVisibilitySql, connection))
             await birthdayVisibilityCommand.ExecuteNonQuery();
 
+        await using (var testRoles = new NpgsqlCommand(@"
+            DO $roles$
+            BEGIN
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN CREATE ROLE anon NOLOGIN; END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN CREATE ROLE authenticated NOLOGIN; END IF;
+                IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'localoca_app') THEN CREATE ROLE localoca_app NOLOGIN; END IF;
+            END
+            $roles$;", connection))
+            await testRoles.ExecuteNonQueryAsync();
+
         var googleOAuthSql = await File.ReadAllTextAsync(Path.Combine(
             AppContext.BaseDirectory, "Database", "migrations",
             "24_google_external_identities_and_oauth_challenges.sql"));
