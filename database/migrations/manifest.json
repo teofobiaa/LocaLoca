@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "currentSchemaVersion": 23,
+  "currentSchemaVersion": 24,
   "baseline": {
     "version": 13,
     "path": "schema/01_schema.sql",
@@ -141,6 +141,12 @@
       "name": "attraction_name_unique_per_city",
       "path": "migrations/23_attraction_name_unique_per_city.sql",
       "sha256": "00986e5e4226f7b22359b9686d3d7cfe5d71b60f6d879ae6f291d280e4a04356"
+    },
+    {
+      "version": 24,
+      "name": "google_external_identities_and_oauth_challenges",
+      "path": "migrations/24_google_external_identities_and_oauth_challenges.sql",
+      "sha256": "4cb849ea53017ccd6108a274b06a74583d7270a73f635d71fce85caed2edb19e"
     }
   ],
   "securityScripts": [

@@ -152,6 +152,8 @@
                         <PasswordBox x:Name="PasswordBox" PlaceholderText="Введите пароль" Height="46" />
                     </StackPanel>
                     <Button x:Name="AuthSubmitButton" Content="Войти в аккаунт" Style="{StaticResource PrimaryButtonStyle}" HorizontalAlignment="Stretch" Click="AuthSubmit_Click" Margin="0,12,0,0" />
+                    <TextBlock Text="или" FontSize="12" Foreground="{ThemeResource AuthMutedTextBrush}" HorizontalAlignment="Center" Margin="0,2" />
+                    <Button x:Name="GoogleAuthButton" Content="Продолжить с Google" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Stretch" Click="GoogleAuth_Click" />
                     <Button x:Name="AuthModeButton" Content="Создать новый аккаунт" Background="Transparent" BorderThickness="0" Foreground="{ThemeResource AuthMutedTextBrush}" HorizontalAlignment="Center" Click="AuthModeButton_Click" />
                     <TextBlock x:Name="AuthStatusText" Text="Проверяем локальное подключение…" TextWrapping="Wrap" Foreground="{ThemeResource AuthMutedTextBrush}" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center" />
                         <Button x:Name="RetryConnectionButton" Content="Повторить подключение" Style="{StaticResource QuietButtonStyle}" HorizontalAlignment="Center" Visibility="Collapsed" Click="RetryConnection_Click" />

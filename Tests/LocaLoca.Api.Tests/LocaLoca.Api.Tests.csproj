@@ -13,6 +13,9 @@
     <Content Include="../../database/migrations/23_attraction_name_unique_per_city.sql"
              Link="Database/migrations/23_attraction_name_unique_per_city.sql"
              CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../database/migrations/24_google_external_identities_and_oauth_challenges.sql"
+             Link="Database/migrations/24_google_external_identities_and_oauth_challenges.sql"
+             CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
