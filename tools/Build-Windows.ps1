@@ -20,7 +20,12 @@ if (Test-Path -LiteralPath $Output) {
     Remove-Item -LiteralPath $Output -Recurse -Force
 }
 New-Item -ItemType Directory -Path $Output -Force | Out-Null
-& dotnet publish $WinUiProject -c Release -r win-x64 --self-contained true -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true -o $Output
+$publishArgs = @(
+    'publish', $WinUiProject, '-c', 'Release', '-r', 'win-x64', '--self-contained', 'true',
+    '-p:WindowsPackageType=None', '-p:WindowsAppSDKSelfContained=true', "-p:GoogleClientSecret=$env:GOOGLE_CLIENT_SECRET",
+    '-o', $Output
+)
+& dotnet @publishArgs
 if ($LASTEXITCODE -ne 0) { throw 'Сборка WinUI 3 завершилась ошибкой.' }
 
 $apiDestination = Join-Path $Output 'Server'
