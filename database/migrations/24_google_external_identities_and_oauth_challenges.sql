@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.user_external_identities (
 );
 
 CREATE TABLE IF NOT EXISTS public.google_oauth_challenges (
-    challenge_hash char(64) PRIMARY KEY,
+    challenge_hash varchar(64) PRIMARY KEY,
     expires_at timestamptz NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now()
 );
