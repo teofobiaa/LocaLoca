@@ -15,6 +15,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SITE_DIR = REPO_ROOT / "site"
 HTML_FILE = SITE_DIR / "index.html"
 CSS_FILE = SITE_DIR / "styles.css"
+PRIVACY_FILE = SITE_DIR / "privacy.html"
+PRIVACY_CSS_FILE = SITE_DIR / "styles-privacy.css"
 
 
 class SiteMarkupParser(HTMLParser):
@@ -128,9 +130,15 @@ class WebsiteStaticTests(unittest.TestCase):
             raise FileNotFoundError(f"Website entry point not found: {HTML_FILE}")
         if not CSS_FILE.is_file():
             raise FileNotFoundError(f"Website stylesheet not found: {CSS_FILE}")
+        if not PRIVACY_FILE.is_file():
+            raise FileNotFoundError(f"Privacy policy page not found: {PRIVACY_FILE}")
+        if not PRIVACY_CSS_FILE.is_file():
+            raise FileNotFoundError(f"Privacy stylesheet not found: {PRIVACY_CSS_FILE}")
 
         cls.html = HTML_FILE.read_text(encoding="utf-8")
         cls.css = CSS_FILE.read_text(encoding="utf-8")
+        cls.privacy_html = PRIVACY_FILE.read_text(encoding="utf-8")
+        cls.privacy_css = PRIVACY_CSS_FILE.read_text(encoding="utf-8")
         cls.parser = SiteMarkupParser()
         cls.parser.feed(cls.html)
         cls.parser.close()
@@ -291,6 +299,29 @@ class WebsiteStaticTests(unittest.TestCase):
             self.parser.nav_labels,
             "The primary navigation landmark must have an accessible name.",
         )
+
+
+    def test_privacy_policy_contains_core_disclosures(self) -> None:
+        for phrase in (
+            "не продаёт",
+            "не сдаёт в аренду",
+            "рекламного профилирования",
+            "рекламным сетям",
+            "16 лет",
+            "10 рабочих дней",
+            "24 часов",
+            "72 часов",
+        ):
+            self.assertIn(phrase, self.privacy_html.lower())
+
+    def test_privacy_page_is_valid_html5(self) -> None:
+        parser = html5lib.HTMLParser(strict=True, namespaceHTMLElements=False)
+        parser.parse(self.privacy_html)
+
+    def test_privacy_page_css_has_no_parse_errors(self) -> None:
+        rules = tinycss2.parse_stylesheet(self.privacy_css, skip_whitespace=True, skip_comments=True)
+        errors = _css_parse_errors(rules, str(PRIVACY_CSS_FILE.relative_to(REPO_ROOT)))
+        self.assertEqual(errors, [], "\\n".join(errors))
 
     def test_css_has_no_parse_errors(self) -> None:
         rules = tinycss2.parse_stylesheet(
