@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import unittest
 from html.parser import HTMLParser
 from pathlib import Path
@@ -222,34 +221,21 @@ class WebsiteStaticTests(unittest.TestCase):
         self.assertIn('href="privacy.html"', self.html)
 
     def test_latest_release_installer_download_resolves(self) -> None:
-        """The public CTA must resolve to the installer in GitHub's latest release."""
-        release_api = "https://api.github.com/repos/teofobiaa/LocaLoca/releases/latest"
+        """The public CTA must resolve directly to the latest-release installer."""
         download_url = (
             "https://github.com/teofobiaa/LocaLoca/releases/latest/download/"
             "LocaLoca-Setup.exe"
         )
         headers = {
-            "Accept": "application/vnd.github+json",
+            "Accept": "application/octet-stream",
             "User-Agent": "LocaLoca-Website-CI",
+            "Range": "bytes=0-0",
         }
 
-        with urlopen(Request(release_api, headers=headers), timeout=30) as response:
-            release = json.load(response)
-
-        installer_assets = [
-            asset
-            for asset in release.get("assets", [])
-            if asset.get("name") == "LocaLoca-Setup.exe"
-        ]
-        self.assertTrue(
-            installer_assets,
-            "The latest published GitHub release must contain LocaLoca-Setup.exe.",
-        )
-
-        request = Request(
-            download_url,
-            headers={**headers, "Range": "bytes=0-0"},
-        )
+        # The latest/download endpoint itself resolves the release asset. Avoid
+        # the separate unauthenticated Releases API request: its low anonymous
+        # rate limit made this test fail intermittently with HTTP 403.
+        request = Request(download_url, headers=headers)
         with urlopen(request, timeout=60) as response:
             self.assertIn(
                 response.status,
