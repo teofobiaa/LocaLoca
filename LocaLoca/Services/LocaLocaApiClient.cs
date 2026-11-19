@@ -11,6 +11,7 @@ namespace LocaLoca.Services;
 
 public sealed class LocaLocaApiClient : IDisposable
 {
+    private const string GoogleOAuthClientId = "131084012305-qpmocgpqalcffg6i8fltudi6do4hv9fr.apps.googleusercontent.com";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -185,6 +186,19 @@ public sealed class LocaLocaApiClient : IDisposable
         await StoreSessionTokenAsync(result.Token);
         return result;
     }
+
+    public async Task<AuthResponse> GoogleLoginAsync(CancellationToken cancellationToken = default)
+    {
+        var idToken = await GoogleOAuthBrowserFlow.AcquireIdTokenAsync(
+            _http, GoogleOAuthClientId, cancellationToken);
+        var result = await PostJsonAsync<GoogleSignInRequest, AuthResponse>(
+            "api/auth/google", new GoogleSignInRequest(idToken),
+            authenticated: false, cancellationToken);
+        await StoreSessionTokenAsync(result.Token);
+        return result;
+    }
+
+    private sealed record GoogleSignInRequest(string IdToken);
 
     public async Task<List<UserSearchResultDto>> SearchUsersAsync(
         string login, CancellationToken cancellationToken = default)

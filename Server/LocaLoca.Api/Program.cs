@@ -35,6 +35,8 @@ builder.Services.Configure<FormOptions>(options =>
 });
 builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSingleton<DistributedAuthRateLimitStore>();
+builder.Services.AddSingleton(new GoogleIdTokenValidator(
+    builder.Configuration["LOCA_GOOGLE_CLIENT_ID"] ?? "131084012305-qpmocgpqalcffg6i8fltudi6do4hv9fr.apps.googleusercontent.com"));
 var app = builder.Build();
 app.UsePerformanceDiagnostics(builder.Configuration);
 
@@ -155,6 +157,16 @@ app.Use(async (context, next) =>
             policyKey = "auth-logout";
             permitLimit = 10;
         }
+        else if (string.Equals(path, "/api/auth/google/challenge", StringComparison.OrdinalIgnoreCase))
+        {
+            policyKey = "google-challenge";
+            permitLimit = 10;
+        }
+        else if (string.Equals(path, "/api/auth/google", StringComparison.OrdinalIgnoreCase))
+        {
+            policyKey = "google-oauth";
+            permitLimit = 5;
+        }
     }
 
     if (policyKey is null)
@@ -227,6 +239,7 @@ Directory.CreateDirectory(photosRoot);
 
 app.MapHealthEndpoints(connectionString, connectionConfigurationError);
 app.MapAuthenticationEndpoints(connectionString, passwordHashIterations);
+app.MapGoogleAuthenticationEndpoints(connectionString);
 app.MapProfilePrivacyEndpoints(connectionString);
 app.MapRelationshipEndpoints(connectionString);
 app.MapAvatarEndpoints(connectionString);

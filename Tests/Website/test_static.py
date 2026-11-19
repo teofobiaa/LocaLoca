@@ -4,6 +4,7 @@ import unittest
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
+from urllib.request import Request, urlopen
 
 import html5lib
 import tinycss2
@@ -13,6 +14,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SITE_DIR = REPO_ROOT / "site"
 HTML_FILE = SITE_DIR / "index.html"
 CSS_FILE = SITE_DIR / "styles.css"
+PRIVACY_FILE = SITE_DIR / "privacy.html"
+PRIVACY_CSS_FILE = SITE_DIR / "styles-privacy.css"
 
 
 class SiteMarkupParser(HTMLParser):
@@ -126,9 +129,15 @@ class WebsiteStaticTests(unittest.TestCase):
             raise FileNotFoundError(f"Website entry point not found: {HTML_FILE}")
         if not CSS_FILE.is_file():
             raise FileNotFoundError(f"Website stylesheet not found: {CSS_FILE}")
+        if not PRIVACY_FILE.is_file():
+            raise FileNotFoundError(f"Privacy policy page not found: {PRIVACY_FILE}")
+        if not PRIVACY_CSS_FILE.is_file():
+            raise FileNotFoundError(f"Privacy stylesheet not found: {PRIVACY_CSS_FILE}")
 
         cls.html = HTML_FILE.read_text(encoding="utf-8")
         cls.css = CSS_FILE.read_text(encoding="utf-8")
+        cls.privacy_html = PRIVACY_FILE.read_text(encoding="utf-8")
+        cls.privacy_css = PRIVACY_CSS_FILE.read_text(encoding="utf-8")
         cls.parser = SiteMarkupParser()
         cls.parser.feed(cls.html)
         cls.parser.close()
@@ -205,6 +214,41 @@ class WebsiteStaticTests(unittest.TestCase):
 
         self.assertEqual(missing, [], f"Missing local site assets: {missing}")
 
+
+    def test_privacy_commitments_are_visible_on_homepage(self) -> None:
+        self.assertIn("Не продаём персональные данные", self.html)
+        self.assertIn("Не используем данные для рекламы", self.html)
+        self.assertIn('href="privacy.html"', self.html)
+
+    def test_latest_release_installer_download_resolves(self) -> None:
+        """The public CTA must resolve directly to the latest-release installer."""
+        download_url = (
+            "https://github.com/teofobiaa/LocaLoca/releases/latest/download/"
+            "LocaLoca-Setup.exe"
+        )
+        headers = {
+            "Accept": "application/octet-stream",
+            "User-Agent": "LocaLoca-Website-CI",
+            "Range": "bytes=0-0",
+        }
+
+        # The latest/download endpoint itself resolves the release asset. Avoid
+        # the separate unauthenticated Releases API request: its low anonymous
+        # rate limit made this test fail intermittently with HTTP 403.
+        request = Request(download_url, headers=headers)
+        with urlopen(request, timeout=60) as response:
+            self.assertIn(
+                response.status,
+                {200, 206},
+                "The latest-release installer URL must return a successful response.",
+            )
+            self.assertEqual(
+                response.headers.get_filename(),
+                "LocaLoca-Setup.exe",
+                "The download response must identify the expected installer filename.",
+            )
+            response.read(1)
+
     def test_images_have_alt_attributes(self) -> None:
         missing_alt = [
             image.get("src", "<image without src>")
@@ -241,6 +285,67 @@ class WebsiteStaticTests(unittest.TestCase):
             self.parser.nav_labels,
             "The primary navigation landmark must have an accessible name.",
         )
+
+
+    def test_privacy_policy_contains_core_disclosures(self) -> None:
+        for phrase in (
+            "не продаёт",
+            "не сдаёт в аренду",
+            "рекламного профилирования",
+            "рекламным сетям",
+            "16 лет",
+            "10 рабочих дней",
+            "24 часов",
+            "72 часов",
+        ):
+            self.assertIn(phrase, self.privacy_html.lower())
+
+    def test_privacy_policy_is_complete_and_matches_full_structure(self) -> None:
+        expected_headings = (
+            "## 1. Общие положения",
+            "### 1.1. Основные термины и определения",
+            "## 2. Категории обрабатываемых персональных данных",
+            "### 2.1. Данные учётной записи",
+            "### 2.2. Данные профиля",
+            "### 2.3. Данные дневника и пользовательский контент",
+            "### 2.4. Данные социальных функций",
+            "### 2.5. Технические данные",
+            "## 3. Цели обработки персональных данных",
+            "## 4. Правовые основания обработки",
+            "## 5. Способы и действия по обработке персональных данных",
+            "## 6. Хранение и инфраструктура",
+            "## 7. Передача персональных данных третьим лицам",
+            "### 7.1. Запрет продажи и использования персональных данных в рекламных целях",
+            "## 8. Трансграничная передача персональных данных",
+            "## 9. Видимость профиля и пользовательского контента",
+            "## 10. Сроки хранения персональных данных",
+            "## 11. Права пользователей",
+            "## 12. Защита персональных данных",
+            "## 13. Несовершеннолетние",
+            "## 14. Изменение Политики",
+            "## 15. Контактная информация",
+        )
+        for heading in expected_headings:
+            self.assertIn(heading, self.privacy_html)
+        for technical_term in (
+            "Хеширование пароля",
+            "Хеш пароля",
+            "Пользовательская сессия",
+            "IP-адрес",
+            "OAuth",
+            "Инцидент безопасности персональных данных",
+        ):
+            self.assertIn(technical_term, self.privacy_html)
+        self.assertNotIn("cdn.jsdelivr.net", self.privacy_html)
+
+    def test_privacy_page_is_valid_html5(self) -> None:
+        parser = html5lib.HTMLParser(strict=True, namespaceHTMLElements=False)
+        parser.parse(self.privacy_html)
+
+    def test_privacy_page_css_has_no_parse_errors(self) -> None:
+        rules = tinycss2.parse_stylesheet(self.privacy_css, skip_whitespace=True, skip_comments=True)
+        errors = _css_parse_errors(rules, str(PRIVACY_CSS_FILE.relative_to(REPO_ROOT)))
+        self.assertEqual(errors, [], "\\n".join(errors))
 
     def test_css_has_no_parse_errors(self) -> None:
         rules = tinycss2.parse_stylesheet(

@@ -32,6 +32,13 @@
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	</PropertyGroup>
 
+	<ItemGroup Condition="'$(GoogleClientSecret)' != ''">
+		<AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+			<_Parameter1>GoogleClientSecret</_Parameter1>
+			<_Parameter2>$(GoogleClientSecret)</_Parameter2>
+		</AssemblyAttribute>
+	</ItemGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Microsoft.WindowsAppSDK" Version="2.6.5" />
 	</ItemGroup>
