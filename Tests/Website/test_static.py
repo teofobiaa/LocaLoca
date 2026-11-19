@@ -242,11 +242,10 @@ class WebsiteStaticTests(unittest.TestCase):
                 {200, 206},
                 "The latest-release installer URL must return a successful response.",
             )
-            final_url = response.geturl()
             self.assertEqual(
-                Path(urlsplit(final_url).path).name,
+                response.headers.get_filename(),
                 "LocaLoca-Setup.exe",
-                "The download URL must resolve to the expected installer asset.",
+                "The download response must identify the expected installer filename.",
             )
             response.read(1)
 
