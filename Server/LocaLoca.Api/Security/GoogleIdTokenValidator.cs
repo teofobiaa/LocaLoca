@@ -67,6 +67,10 @@ public sealed class GoogleIdTokenValidator
             var authorizedParty = GetString(claims, "azp");
             if (authorizedParty is not null && !string.Equals(authorizedParty, _clientId, StringComparison.Ordinal))
                 return null;
+            if (claims.TryGetProperty("aud", out var audienceClaim) &&
+                audienceClaim.ValueKind == JsonValueKind.Array &&
+                audienceClaim.GetArrayLength() > 1 && authorizedParty is null)
+                return null;
 
             var now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             if (!TryInt64(claims, "exp", out var expiry) || expiry <= now ||
