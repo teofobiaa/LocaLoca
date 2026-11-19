@@ -25,6 +25,14 @@ CREATE TABLE IF NOT EXISTS public.google_oauth_challenges (
 CREATE INDEX IF NOT EXISTS ix_google_oauth_challenges_expires_at
     ON public.google_oauth_challenges (expires_at);
 
+DO $runtime_role$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'localoca_app') THEN
+        CREATE ROLE localoca_app NOLOGIN;
+    END IF;
+END
+$runtime_role$;
+
 REVOKE ALL ON TABLE public.user_external_identities, public.google_oauth_challenges
     FROM PUBLIC, anon, authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
