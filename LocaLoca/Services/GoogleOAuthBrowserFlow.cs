@@ -119,7 +119,41 @@ internal static class GoogleOAuthBrowserFlow
                 cancellationToken);
             var tokenBody = await tokenResponse.Content.ReadAsStringAsync(cancellationToken);
             if (!tokenResponse.IsSuccessStatusCode)
-                throw new InvalidOperationException("Google отклонил обмен authorization code на токен.");
+            {
+                var errorCode = "unknown";
+                string? errorDescription = null;
+
+                try
+                {
+                    using var errorJson = JsonDocument.Parse(tokenBody);
+                    if (errorJson.RootElement.TryGetProperty("error", out var errorElement) &&
+                        errorElement.ValueKind == JsonValueKind.String)
+                    {
+                        errorCode = errorElement.GetString() ?? errorCode;
+                    }
+
+                    if (errorJson.RootElement.TryGetProperty("error_description", out var descriptionElement) &&
+                        descriptionElement.ValueKind == JsonValueKind.String)
+                    {
+                        errorDescription = descriptionElement.GetString();
+                    }
+                }
+                catch (JsonException)
+                {
+                    // Google may return a non-JSON error response; retain a bounded diagnostic.
+                    errorDescription = string.IsNullOrWhiteSpace(tokenBody)
+                        ? null
+                        : tokenBody[..Math.Min(tokenBody.Length, 1000)];
+                }
+
+                var details = string.IsNullOrWhiteSpace(errorDescription)
+                    ? string.Empty
+                    : $" Описание: {errorDescription}";
+
+                throw new InvalidOperationException(
+                    $"Google отклонил обмен authorization code на токен. " +
+                    $"HTTP {(int)tokenResponse.StatusCode}; код: {errorCode}.{details}");
+            }
 
             using var tokenJson = JsonDocument.Parse(tokenBody);
             if (!tokenJson.RootElement.TryGetProperty("id_token", out var idTokenElement) ||
