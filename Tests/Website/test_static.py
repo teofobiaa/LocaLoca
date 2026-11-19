@@ -207,6 +207,12 @@ class WebsiteStaticTests(unittest.TestCase):
 
         self.assertEqual(missing, [], f"Missing local site assets: {missing}")
 
+
+    def test_privacy_commitments_are_visible_on_homepage(self) -> None:
+        self.assertIn("Не продаём персональные данные", self.html)
+        self.assertIn("Не используем данные для рекламы", self.html)
+        self.assertIn('href="privacy.html"', self.html)
+
     def test_latest_release_installer_download_resolves(self) -> None:
         """The public CTA must resolve to the installer in GitHub's latest release."""
         release_api = "https://api.github.com/repos/teofobiaa/LocaLoca/releases/latest"
