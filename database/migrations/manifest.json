@@ -146,7 +146,7 @@
       "version": 24,
       "name": "google_external_identities_and_oauth_challenges",
       "path": "migrations/24_google_external_identities_and_oauth_challenges.sql",
-      "sha256": "88494b7a5c8cb45aae417442f4273d64fa916f4ae56283eb2c65816728b2838b"
+      "sha256": "4cb849ea53017ccd6108a274b06a74583d7270a73f635d71fce85caed2edb19e"
     }
   ],
   "securityScripts": [
