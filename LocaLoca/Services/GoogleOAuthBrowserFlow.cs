@@ -18,6 +18,13 @@ internal static class GoogleOAuthBrowserFlow
         string clientId,
         CancellationToken cancellationToken)
     {
+        var clientSecret = typeof(GoogleOAuthBrowserFlow).Assembly
+            .GetCustomAttributes<System.Reflection.AssemblyMetadataAttribute>()
+            .FirstOrDefault(attribute => attribute.Key == "GoogleClientSecret")?.Value;
+        if (string.IsNullOrWhiteSpace(clientSecret))
+            throw new InvalidOperationException(
+                "Не настроен Google OAuth Client Secret. Добавь GOOGLE_CLIENT_SECRET в GitHub Actions Secrets и пересобери приложение.");
+
         using var challengeRequest = new HttpRequestMessage(HttpMethod.Post, "api/auth/google/challenge")
         {
             Content = new StringContent("{}", Encoding.UTF8, "application/json")
@@ -111,6 +118,7 @@ internal static class GoogleOAuthBrowserFlow
                 new FormUrlEncodedContent(new Dictionary<string, string>
                 {
                     ["client_id"] = clientId,
+                    ["client_secret"] = clientSecret,
                     ["code"] = code,
                     ["code_verifier"] = verifier,
                     ["grant_type"] = "authorization_code",
