@@ -164,6 +164,32 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    private async void GoogleAuth_Click(object sender, RoutedEventArgs e)
+    {
+        GoogleAuthButton.IsEnabled = false;
+        AuthSubmitButton.IsEnabled = false;
+        SetAuthStatus("Открываем Google для безопасного входа…", "muted");
+        try
+        {
+            var result = await _api.GoogleLoginAsync();
+            _currentUser = result.User;
+            ProfileNameText.Text = result.User.DisplayName;
+            AuthPage.Visibility = Visibility.Collapsed;
+            MainShell.Visibility = Visibility.Visible;
+            ShowPage("home");
+            await LoadMainDataAsync();
+        }
+        catch (Exception ex)
+        {
+            SetAuthStatus(ex.Message, "error");
+        }
+        finally
+        {
+            GoogleAuthButton.IsEnabled = true;
+            AuthSubmitButton.IsEnabled = true;
+        }
+    }
+
     private void AuthModeButton_Click(object sender, RoutedEventArgs e)
     {
         _isRegisterMode = !_isRegisterMode;
