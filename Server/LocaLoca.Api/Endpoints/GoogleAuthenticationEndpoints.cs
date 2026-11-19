@@ -72,7 +72,7 @@ public static class GoogleAuthenticationEndpoints
                 WHERE challenge_hash = @hash AND expires_at > now()
                 RETURNING challenge_hash", connection, transaction))
             {
-                consume.Parameters.AddWithValue("hash", NpgsqlDbType.Char, challengeHash);
+                consume.Parameters.AddWithValue("hash", NpgsqlDbType.Varchar, challengeHash);
                 if (await consume.ExecuteScalarAsync(cancellationToken) is null)
                     return Results.Unauthorized();
             }
