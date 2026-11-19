@@ -35,3 +35,10 @@
 .privacy-disclaimer { margin-top:36px; padding:18px; background:var(--surface-soft); border-radius:14px; font-size:.92rem; }
 .privacy-footer { justify-content:center; border-top:1px solid var(--line); border-bottom:0; color:var(--muted); }
 @media (max-width:600px) { .privacy-header { padding:16px 20px; } .privacy-main { padding-top:42px; } .privacy-content { border-radius:16px; } }
+
+.privacy-content h1 { margin: 0 0 22px; color: var(--ink); font-size: clamp(1.8rem, 4vw, 2.5rem); line-height: 1.15; }
+.privacy-content h2 { margin: 34px 0 12px; color: var(--green); font-size: 1.35rem; }
+.privacy-content h3 { margin: 26px 0 10px; color: var(--ink); font-size: 1.08rem; }
+.privacy-content ul, .privacy-content ol { padding-left: 26px; margin: 12px 0 20px; }
+.privacy-content li { margin: 7px 0; color: var(--text-body); line-height: 1.8; }
+.privacy-content strong { color: var(--ink); }
