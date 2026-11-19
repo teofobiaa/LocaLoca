@@ -56,7 +56,7 @@ internal static class GoogleOAuthBrowserFlow
             if (!launched)
                 throw new InvalidOperationException("Не удалось открыть системный браузер для входа через Google.");
 
-            using var callbackClient = await listener.AcceptTcpClientAsync(cancellationToken)
+            using var callbackClient = await listener.AcceptTcpClientAsync(cancellationToken).AsTask()
                 .WaitAsync(TimeSpan.FromMinutes(3), cancellationToken);
             var remote = (IPEndPoint?)callbackClient.Client.RemoteEndPoint;
             if (remote is null || !IPAddress.IsLoopback(remote.Address))
