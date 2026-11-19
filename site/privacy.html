@@ -24,7 +24,6 @@
     <article class="privacy-content" id="privacy-content"></article>
   </main>
   <footer class="privacy-footer"><a href="./">Loca Loca</a><span>·</span><a href="mailto:teofobia@proton.me">Связаться с оператором</a></footer>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script id="privacy-source" type="text/plain"># Политика конфиденциальности Loca Loca
 
 **Дата вступления в силу:** 19 ноября 2026 года
@@ -342,14 +341,54 @@
     (() => {
       const source = document.getElementById("privacy-source").textContent.trim();
       const target = document.getElementById("privacy-content");
-      if (window.marked && typeof window.marked.parse === "function") {
-        target.innerHTML = window.marked.parse(source);
-      } else {
-        const fallback = document.createElement("pre");
-        fallback.className = "privacy-source-fallback";
-        fallback.textContent = source;
-        target.appendChild(fallback);
+      const escapeHtml = value => value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      const inline = value => {
+        let text = escapeHtml(value);
+        text = text.replace(/\[([^\]]+)\]\((mailto:[^)]+)\)/g, '<a href="$2">$1</a>');
+        text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+        return text;
+      };
+      const lines = source.split(/\r?\n/);
+      const output = [];
+      let paragraph = [];
+      let listType = null;
+      const closeList = () => {
+        if (listType) output.push(listType === "ul" ? "</ul>" : "</ol>");
+        listType = null;
+      };
+      const flushParagraph = () => {
+        if (paragraph.length) output.push("<p>" + inline(paragraph.join(" ")) + "</p>");
+        paragraph = [];
+      };
+      for (const line of lines) {
+        const heading = line.match(/^(#{1,3})\s+(.+)$/);
+        const bullet = line.match(/^-\s+(.+)$/);
+        const numbered = line.match(/^\d+\.\s+(.+)$/);
+        if (!line.trim()) {
+          flushParagraph();
+          closeList();
+        } else if (heading) {
+          flushParagraph();
+          closeList();
+          const level = heading[1].length;
+          output.push("<h" + level + ">" + inline(heading[2]) + "</h" + level + ">");
+        } else if (bullet || numbered) {
+          flushParagraph();
+          const nextType = bullet ? "ul" : "ol";
+          if (listType !== nextType) {
+            closeList();
+            output.push(nextType === "ul" ? "<ul>" : "<ol>");
+            listType = nextType;
+          }
+          output.push("<li>" + inline((bullet || numbered)[1]) + "</li>");
+        } else {
+          closeList();
+          paragraph.push(line.trim());
+        }
       }
+      flushParagraph();
+      closeList();
+      target.innerHTML = output.join("\n");
     })();
   </script>
 </body>
