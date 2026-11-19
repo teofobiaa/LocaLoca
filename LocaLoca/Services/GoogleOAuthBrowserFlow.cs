@@ -19,7 +19,8 @@ internal static class GoogleOAuthBrowserFlow
         CancellationToken cancellationToken)
     {
         var clientSecret = typeof(GoogleOAuthBrowserFlow).Assembly
-            .GetCustomAttributes<System.Reflection.AssemblyMetadataAttribute>()
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyMetadataAttribute), inherit: false)
+            .Cast<System.Reflection.AssemblyMetadataAttribute>()
             .FirstOrDefault(attribute => attribute.Key == "GoogleClientSecret")?.Value;
         if (string.IsNullOrWhiteSpace(clientSecret))
             throw new InvalidOperationException(
