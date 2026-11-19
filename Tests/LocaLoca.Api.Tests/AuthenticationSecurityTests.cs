@@ -17,6 +17,27 @@ public sealed class AuthenticationSecurityTests
     public AuthenticationSecurityTests(PostgreSqlApiFixture database) => _database = database;
 
     [Fact]
+    public async Task Google_Challenge_Is_Issued_And_Malformed_Id_Token_Is_Rejected()
+    {
+        using var factory = _database.CreateFactory();
+        using var client = factory.CreateClient();
+
+        using var challengeResponse = await client.PostAsync("/api/auth/google/challenge", content: null);
+        Assert.Equal(HttpStatusCode.OK, challengeResponse.StatusCode);
+        var challenge = await challengeResponse.Content.ReadFromJsonAsync<GoogleChallengeResponse>();
+        Assert.NotNull(challenge);
+        Assert.True(challenge.Nonce.Length >= 32);
+
+        using var signInResponse = await client.PostAsJsonAsync("/api/auth/google", new
+        {
+            idToken = "not.a.valid-google-token"
+        });
+        Assert.Equal(HttpStatusCode.Unauthorized, signInResponse.StatusCode);
+    }
+
+    private sealed record GoogleChallengeResponse(string Nonce);
+
+    [Fact]
     public async Task Protected_Endpoint_Rejects_An_Expired_Session_Token()
     {
         using var factory = _database.CreateFactory();
