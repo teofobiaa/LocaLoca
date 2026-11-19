@@ -80,7 +80,7 @@ public sealed class PostgreSqlApiFixture : IAsyncLifetime
 
         var birthdayVisibilitySql = await File.ReadAllTextAsync(Path.Combine(AppContext.BaseDirectory, "Database", "migrations", "22_profile_birthday_visibility_and_remove_contacts.sql"));
         await using (var birthdayVisibilityCommand = new NpgsqlCommand(birthdayVisibilitySql, connection))
-            await birthdayVisibilityCommand.ExecuteNonQuery();
+            await birthdayVisibilityCommand.ExecuteNonQueryAsync();
 
         await using (var testRoles = new NpgsqlCommand(@"
             DO $roles$
