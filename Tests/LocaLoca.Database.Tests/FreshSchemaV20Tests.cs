@@ -8,10 +8,10 @@ namespace LocaLoca.Database.Tests;
 public sealed class FreshSchemaV20Tests
 {
     [Fact]
-    public async Task Fresh_V020_Baseline_With_Current_Migrations_Produces_V023_Runtime_Schema()
+    public async Task Fresh_V020_Baseline_With_Current_Migrations_Produces_V024_Runtime_Schema()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine")
-            .WithDatabase("localoca_fresh_v23_tests")
+            .WithDatabase("localoca_fresh_v24_tests")
             .WithUsername("localoca_test")
             .WithPassword(Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24)))
             .Build();
@@ -67,6 +67,8 @@ public sealed class FreshSchemaV20Tests
         }
 
         await ExecuteFileAsync(connection, "security", "06_update_runtime_permissions.sql");
+        // Migration 024 grants the external-identity tables to the already-created API role.
+        await ExecuteFileAsync(connection, "migrations", "24_google_external_identities_and_oauth_challenges.sql");
 
         // The manifest lists structural migrations only. Ledger version 1 is the
         // separate initial_schema marker and is validated independently.
@@ -111,7 +113,7 @@ public sealed class FreshSchemaV20Tests
                 current_user = 'postgres'
                 AND (SELECT rolsuper AND NOT rolcanlogin
                      FROM pg_roles WHERE rolname = 'postgres')
-                AND (SELECT count(*) = 16 FROM pg_policies
+                AND (SELECT count(*) = 18 FROM pg_policies
                      WHERE schemaname = 'public'
                        AND policyname IN ('localoca_app_runtime_access', 'localoca_app_catalog_read'))
                 AND EXISTS (SELECT 1 FROM information_schema.columns
@@ -128,6 +130,12 @@ public sealed class FreshSchemaV20Tests
                 AND to_regclass('public.user_profile_visibility') IS NOT NULL
                 AND to_regclass('public.user_friendships') IS NOT NULL
                 AND to_regclass('public.user_blocks') IS NOT NULL
+                AND to_regclass('public.user_external_identities') IS NOT NULL
+                AND to_regclass('public.google_oauth_challenges') IS NOT NULL
+                AND has_table_privilege('localoca_app', 'public.user_external_identities', 'SELECT')
+                AND has_table_privilege('localoca_app', 'public.google_oauth_challenges', 'SELECT')
+                AND NOT has_table_privilege('anon', 'public.user_external_identities', 'SELECT')
+                AND NOT has_table_privilege('authenticated', 'public.google_oauth_challenges', 'SELECT')
                 AND to_regclass('public.ix_attractions_name_trgm') IS NOT NULL
                 AND EXISTS (SELECT 1 FROM pg_constraint
                             WHERE conrelid = 'public.attractions'::regclass
