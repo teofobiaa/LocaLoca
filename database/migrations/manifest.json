@@ -20,7 +20,7 @@
   "seed": {
     "version": 7,
     "path": "seed/02_seed.sql",
-    "sha256": "27b67cc816c0b9c95c4be41afb31e918c532b113965ea724187730a56adb97d4"
+    "sha256": "a91a3f59316ffe618903688533056d0be2de9de3a4f8d4af83506bc7fa53bb94"
   },
   "trackingBootstrap": {
     "version": 0,
