@@ -44,7 +44,7 @@ jobs:
           fi
       - name: Upload machine-readable metrics
         if: always() && hashFiles('ci-analytics/metrics.json') != ''
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ci-cd-analytics-${{ github.run_id }}
           path: ci-analytics/
