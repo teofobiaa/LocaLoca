@@ -768,7 +768,7 @@ WHERE NOT EXISTS (
 );
 
 
--- Партия 12: 10 объектов всемирного наследия в ранее не представленных странах.
+-- Партия 12: 9 новых стран и дополнительный объект в уже представленной Румынии.
 INSERT INTO cities (country_id, name)
 SELECT co.country_id, v.city_name
 FROM (VALUES
